@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Rajdhani", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-erp-bg: #070b19;
+  --color-erp-sidebar: #0f1225;
+  --color-erp-panel: #121833;
+  --color-erp-cyan: #00f0ff;
+  --color-erp-purple: #b026ff;
+  --color-erp-text: #a8b2d1;
+  --color-erp-text-bright: #e2e8f0;
+  --color-erp-border: #1e293b;
+
+  /* Backwards compatibility for other pages */
+  --color-cyber-bg: var(--color-erp-bg);
+  --color-cyber-dark: var(--color-erp-bg);
+  --color-cyber-panel: var(--color-erp-panel);
+  --color-cyber-border: var(--color-erp-border);
+  
+  --color-neon-cyan: var(--color-erp-cyan);
+  --color-neon-cyan-dim: rgba(0, 240, 255, 0.2);
+  --color-neon-red: #ff2a2a;
+  --color-neon-red-dim: rgba(255, 42, 42, 0.2);
+  --color-neon-purple: var(--color-erp-purple);
+  --color-neon-purple-dim: rgba(176, 38, 255, 0.2);
+
+  --color-cyber-neon: var(--color-erp-cyan);
+  --color-cyber-accent: var(--color-erp-cyan);
+  --color-cyber-red: #ff2a2a;
+  --color-cyber-purple: var(--color-erp-purple);
+  
+  --color-text-main: var(--color-erp-text-bright);
+  --color-text-muted: var(--color-erp-text);
+  --color-cyber-text: var(--color-erp-text-bright);
+  --color-cyber-muted: var(--color-erp-text);
+
+  --shadow-glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
+  --shadow-glow-cyan-lg: 0 0 15px rgba(0, 240, 255, 0.6), 0 0 30px rgba(0, 240, 255, 0.4);
+  --shadow-glow-purple: 0 0 10px rgba(176, 38, 255, 0.5);
+
+  --background-image-grid-pattern: linear-gradient(to right, #1e293b 1px, transparent 1px), linear-gradient(to bottom, #1e293b 1px, transparent 1px);
+  --background-image-circuit-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83.83v58.34h-58.34l-.83-.83V0h58.34zM27 24v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm14.12 11.29l1.41-1.41 2.12 2.12-1.41 1.41-2.12-2.12zm-28.24 0l-2.12 2.12 1.41 1.41 2.12-2.12-1.41-1.41zm28.24-22.58l-1.41-1.41-2.12 2.12 1.41 1.41 2.12-2.12zM12.88 12.71l2.12-2.12-1.41-1.41-2.12 2.12 1.41 1.41z' fill='%231e293b' fill-opacity='0.2' fill-rule='evenodd'/%3E%3C/svg%3E");
+}
+
+@layer utilities {
+  .bg-grid {
+    background-size: 40px 40px;
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.8);
+  }
+
+  .clip-path-polygon {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  }
+  
+  .clip-path-btn {
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  }
+}
+
+body {
+  background-color: var(--color-erp-bg);
+  color: var(--color-erp-text);
+  font-family: 'Rajdhani', sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-erp-bg); 
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-erp-border); 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-erp-text); 
+}
+
+/* Progress Bar Custom Styles */
+.progress-bar-container {
+  position: relative;
+  border: 1px solid var(--color-erp-purple);
+  border-radius: 4px;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  height: 20px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0,240,255,0.8) 0%, rgba(0,240,255,0.4) 100%);
+  box-shadow: var(--shadow-glow-cyan);
+  border-radius: 2px;
+}
+
+.progress-bar-decor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  border-right: 2px solid var(--color-erp-purple);
+  background-color: var(--color-erp-cyan);
+  box-shadow: var(--shadow-glow-cyan);
+}
