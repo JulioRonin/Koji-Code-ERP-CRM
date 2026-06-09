@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Search,
   Wrench,
@@ -18,60 +18,61 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
+import { useProfiles, useWorkOrders, useMachines } from '@/lib/api';
+import type { Profile, WorkOrder } from '@/types/database';
 import { cn } from '@/lib/utils';
 
-export const mockTechnicians = [
-  { id: 'T-001', name: 'Alex Vance',      role: 'Operador CNC Senior',     machine: 'CNC-001 (Fresadora 5 ejes)', status: 'Activo',  avatar: 'AV', efficiency: 94 },
-  { id: 'T-002', name: 'Sarah Connor',    role: 'Especialista Impresión 3D', machine: '3D-PRT-04',                  status: 'Activo',  avatar: 'SC', efficiency: 88 },
-  { id: 'T-003', name: 'David Martinez',  role: 'Técnico de Ensamblaje',   machine: 'Estación ENS-02',            status: 'Pausado', avatar: 'DM', efficiency: 76 },
-  { id: 'T-004', name: 'Elena Rosas',     role: 'Operador Torno CNC',       machine: 'CNC-003 (Torno)',            status: 'Activo',  avatar: 'ER', efficiency: 91 },
-];
+// Re-export para no romper imports en otros archivos
+// (algunos módulos siguen referenciando mockTechnicians de aquí)
+export const mockTechnicians: Profile[] = [];
 
-const initialTasks = [
-  { id: 'ORD-992', techId: 'T-001', project: 'IMC-2026-042', part: 'Soporte de Titanio A4', status: 'En Proceso',  progress: 68,  priority: 'Alta',  specs: 'Aleación Ti-6Al-4V, Tolerancia ±0.005mm', projectStatus: 'Producción Activa', blueprint: 'BP-737-A4-v2' },
-  { id: 'ORD-993', techId: 'T-001', project: 'IMC-2026-042', part: 'Eje de Transmisión',   status: 'Pendiente',   progress: 0,   priority: 'Media', specs: 'Acero Inoxidable 316L, Longitud 120cm',  projectStatus: 'Producción Activa', blueprint: 'BP-737-TR-v1' },
-  { id: 'ORD-842', techId: 'T-002', project: 'IMC-2026-045', part: 'Carcasa de Polímero',   status: 'En Proceso',  progress: 45,  priority: 'Alta',  specs: 'Polímero PEEK, Resistente a 500atm',      projectStatus: 'Fase de Pruebas',    blueprint: 'BP-SSH-C1' },
-  { id: 'ORD-843', techId: 'T-002', project: 'IMC-2026-045', part: 'Soporte Interno',       status: 'Completado',  progress: 100, priority: 'Baja',  specs: 'Aluminio 7075-T6, Anodizado',              projectStatus: 'Fase de Pruebas',    blueprint: 'BP-SSH-S2' },
-  { id: 'ORD-710', techId: 'T-003', project: 'IMC-2026-048', part: 'Anillo de Sellado',     status: 'Pausado',     progress: 30,  priority: 'Media', specs: 'Caucho de Fluorocarbono (FKM)',           projectStatus: 'Retrasado',          blueprint: 'BP-TSC-R1' },
-  { id: 'ORD-605', techId: 'T-004', project: 'IMC-2026-039', part: 'Rotor Principal',       status: 'En Proceso',  progress: 82,  priority: 'Crítica', specs: 'Fibra de Carbono Compuesta',            projectStatus: 'Ensamblaje Final',   blueprint: 'BP-HLD-R0' },
-];
+function initialsFor(name: string): string {
+  return name
+    .split(' ')
+    .map(p => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
 
 const statusBadge: Record<string, 'default' | 'secondary' | 'warning' | 'success'> = {
   'En Proceso': 'default',
   Pendiente: 'secondary',
   Pausado: 'warning',
   Completado: 'success',
+  Setup: 'warning',
+  Calidad: 'default',
+  Cancelado: 'secondary',
 };
 
 export function Technicians() {
-  const [technicians] = useState(mockTechnicians);
-  const [tasks, setTasks] = useState(initialTasks);
-  const [selectedTechId, setSelectedTechId] = useState(mockTechnicians[0].id);
+  const navigate = useNavigate();
+  const { data: technicians } = useProfiles('Técnico');
+  const { data: allWorkOrders } = useWorkOrders();
+  const { data: machines } = useMachines();
+
+  const [selectedTechId, setSelectedTechId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTaskDetails, setSelectedTaskDetails] = useState<typeof initialTasks[0] | null>(null);
+  const [selectedTaskDetails, setSelectedTaskDetails] = useState<WorkOrder | null>(null);
+
+  // Selecciona el primer técnico cuando cargan
+  useEffect(() => {
+    if (technicians.length > 0 && !selectedTechId) {
+      setSelectedTechId(technicians[0].id);
+    }
+  }, [technicians, selectedTechId]);
 
   const selectedTech = technicians.find(t => t.id === selectedTechId);
-  const techTasks = tasks.filter(t => t.techId === selectedTechId);
-
-  const handleStatusChange = (taskId: string, newStatus: string) => {
-    setTasks(
-      tasks.map(t => {
-        if (t.id === taskId) {
-          let newProgress = t.progress;
-          if (newStatus === 'Completado') newProgress = 100;
-          if (newStatus === 'En Proceso' && t.progress === 0) newProgress = 5;
-          return { ...t, status: newStatus, progress: newProgress };
-        }
-        return t;
-      })
-    );
-  };
+  const techTasks = allWorkOrders.filter(t => t.assigned_technician_id === selectedTechId);
 
   const filteredTechnicians = technicians.filter(
     t =>
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.machine.toLowerCase().includes(searchQuery.toLowerCase())
+      t.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const machineFor = (wo: WorkOrder) => machines.find(m => m.id === wo.machine_id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -86,7 +87,7 @@ export function Technicians() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-app-text-subtle)]" />
           <Input
-            placeholder="Buscar técnico o máquina..."
+            placeholder="Buscar técnico..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -101,6 +102,11 @@ export function Technicians() {
             <CardTitle className="text-sm">Personal activo</CardTitle>
           </CardHeader>
           <CardContent className="p-2 max-h-[600px] overflow-y-auto">
+            {filteredTechnicians.length === 0 && (
+              <p className="text-sm text-[var(--color-app-text-muted)] p-3 text-center">
+                No hay técnicos registrados.
+              </p>
+            )}
             <div className="space-y-1">
               {filteredTechnicians.map(tech => (
                 <button
@@ -121,12 +127,12 @@ export function Technicians() {
                         : 'bg-[var(--color-app-surface-alt)] text-[var(--color-app-text-muted)]'
                     )}
                   >
-                    {tech.avatar}
+                    {initialsFor(tech.full_name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium truncate">{tech.name}</h3>
+                    <h3 className="text-sm font-medium truncate">{tech.full_name}</h3>
                     <p className="text-xs text-[var(--color-app-text-muted)] truncate flex items-center gap-1 mt-0.5">
-                      <Wrench className="h-3 w-3" /> {tech.machine}
+                      <Wrench className="h-3 w-3" /> {tech.role}
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4 text-[var(--color-app-text-subtle)]" />
@@ -144,19 +150,19 @@ export function Technicians() {
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-4">
                     <div className="h-14 w-14 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-xl font-medium">
-                      {selectedTech.avatar}
+                      {initialsFor(selectedTech.full_name)}
                     </div>
                     <div>
-                      <h2 className="text-base font-semibold">{selectedTech.name}</h2>
+                      <h2 className="text-base font-semibold">{selectedTech.full_name}</h2>
                       <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">{selectedTech.role}</p>
                       <p className="text-xs text-[var(--color-app-text-muted)] mt-1 flex items-center gap-1">
-                        <Wrench className="h-3 w-3" /> {selectedTech.machine}
+                        <Wrench className="h-3 w-3" /> {selectedTech.metadata.shift ?? 'Sin turno asignado'}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-[var(--color-app-text-muted)] mb-1">Eficiencia</div>
-                    <div className="text-2xl font-semibold">{selectedTech.efficiency}%</div>
+                    <div className="text-2xl font-semibold">{selectedTech.metadata.efficiency ?? 90}%</div>
                   </div>
                 </div>
               </CardContent>
@@ -178,52 +184,54 @@ export function Technicians() {
                     No hay órdenes asignadas a este técnico.
                   </p>
                 ) : (
-                  techTasks.map(task => (
-                    <div key={task.id} className="p-4 hover:bg-[var(--color-app-surface-alt)]/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-mono text-xs text-[var(--color-app-text-muted)]">{task.id}</p>
-                          <p className="font-medium mt-0.5">{task.part}</p>
-                          <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">{task.project}</p>
-                        </div>
-
-                        <div className="flex flex-col items-end gap-2 min-w-[180px]">
-                          <Badge variant={statusBadge[task.status]}>{task.status}</Badge>
-                          <div className="w-32 flex items-center gap-2">
-                            <Progress value={task.progress} className="h-1.5" />
-                            <span className="text-xs tabular-nums text-[var(--color-app-text-muted)] w-9 text-right">
-                              {task.progress}%
-                            </span>
+                  techTasks.map(task => {
+                    const progress = task.quantity > 0
+                      ? Math.round((task.completed_qty / task.quantity) * 100)
+                      : 0;
+                    return (
+                      <div key={task.id} className="p-4 hover:bg-[var(--color-app-surface-alt)]/50 transition-colors">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-mono text-xs text-[var(--color-app-text-muted)]">{task.id}</p>
+                            <p className="font-medium mt-0.5">
+                              {task.completed_qty}/{task.quantity} pzas
+                            </p>
+                            <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5 font-mono">
+                              {task.project_id}
+                            </p>
                           </div>
-                          <div className="flex items-center gap-1">
-                            {task.status === 'Pendiente' && (
-                              <Button size="icon" variant="outline" className="h-7 w-7" title="Iniciar" onClick={() => handleStatusChange(task.id, 'En Proceso')}>
-                                <Play className="h-3.5 w-3.5" />
+
+                          <div className="flex flex-col items-end gap-2 min-w-[180px]">
+                            <Badge variant={statusBadge[task.status] ?? 'secondary'}>{task.status}</Badge>
+                            <div className="w-32 flex items-center gap-2">
+                              <Progress value={progress} className="h-1.5" />
+                              <span className="text-xs tabular-nums text-[var(--color-app-text-muted)] w-9 text-right">
+                                {progress}%
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                title="Detalles de la WO"
+                                onClick={() => setSelectedTaskDetails(task)}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
                               </Button>
-                            )}
-                            {task.status === 'En Proceso' && (
-                              <>
-                                <Button size="icon" variant="outline" className="h-7 w-7" title="Pausar" onClick={() => handleStatusChange(task.id, 'Pausado')}>
-                                  <Pause className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button size="icon" variant="outline" className="h-7 w-7" title="Completar" onClick={() => handleStatusChange(task.id, 'Completado')}>
-                                  <CheckSquare className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            )}
-                            {task.status === 'Pausado' && (
-                              <Button size="icon" variant="outline" className="h-7 w-7" title="Reanudar" onClick={() => handleStatusChange(task.id, 'En Proceso')}>
-                                <Play className="h-3.5 w-3.5" />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(`/production/wo/${task.id}`)}
+                              >
+                                Etapas
                               </Button>
-                            )}
-                            <Button size="icon" variant="ghost" className="h-7 w-7" title="Detalles" onClick={() => setSelectedTaskDetails(task)}>
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </CardContent>
@@ -250,56 +258,49 @@ export function Technicians() {
                   <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5 mb-1.5">
                     <Layers className="h-3.5 w-3.5" /> Proyecto asociado
                   </p>
-                  <p className="font-medium">{selectedTaskDetails.project}</p>
-                  <p className="text-xs text-[var(--color-app-text-muted)] mt-1">
-                    Estado general: <span className="text-[var(--color-app-text)]">{selectedTaskDetails.projectStatus}</span>
-                  </p>
+                  <p className="font-medium font-mono">{selectedTaskDetails.project_id}</p>
                 </div>
                 <div className="rounded-md bg-[var(--color-app-surface-alt)] p-4">
                   <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5 mb-1.5">
                     <Activity className="h-3.5 w-3.5" /> Estado / progreso
                   </p>
                   <div className="flex items-center gap-3">
-                    <Badge variant={statusBadge[selectedTaskDetails.status]}>{selectedTaskDetails.status}</Badge>
-                    <div className="flex-1">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-[var(--color-app-text-muted)]">Progreso</span>
-                        <span className="font-medium">{selectedTaskDetails.progress}%</span>
-                      </div>
-                      <Progress value={selectedTaskDetails.progress} className="h-1.5" />
-                    </div>
+                    <Badge variant={statusBadge[selectedTaskDetails.status] ?? 'secondary'}>
+                      {selectedTaskDetails.status}
+                    </Badge>
+                    <span className="text-sm tabular-nums">
+                      {selectedTaskDetails.completed_qty}/{selectedTaskDetails.quantity}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div className="rounded-md bg-[var(--color-app-surface-alt)] p-4">
                 <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5 mb-3">
-                  <Wrench className="h-3.5 w-3.5" /> Especificaciones de la pieza
+                  <Wrench className="h-3.5 w-3.5" /> Equipo asignado
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <p className="text-xs text-[var(--color-app-text-muted)]">Nombre</p>
-                    <p className="font-medium mt-0.5">{selectedTaskDetails.part}</p>
+                    <p className="text-xs text-[var(--color-app-text-muted)]">Máquina</p>
+                    <p className="font-medium mt-0.5">{machineFor(selectedTaskDetails)?.id ?? '—'}</p>
+                    <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
+                      {machineFor(selectedTaskDetails)?.type ?? ''}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs text-[var(--color-app-text-muted)]">Material y tolerancias</p>
-                    <p className="text-sm mt-0.5">{selectedTaskDetails.specs}</p>
+                    <p className="text-xs text-[var(--color-app-text-muted)]">Prioridad</p>
+                    <p className="font-medium mt-0.5">{selectedTaskDetails.priority}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-md bg-[var(--color-app-surface-alt)] p-4">
-                <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5 mb-3">
-                  <FileCode2 className="h-3.5 w-3.5" /> Planos y referencias
-                </p>
-                <div className="border border-dashed border-[var(--color-app-border-strong)] rounded-md min-h-[180px] flex flex-col items-center justify-center gap-2 bg-white">
-                  <FileCode2 className="h-10 w-10 text-[var(--color-app-text-subtle)]" />
-                  <p className="text-sm font-medium">{selectedTaskDetails.blueprint}.pdf</p>
-                  <p className="text-xs text-[var(--color-app-text-muted)]">Haz clic para abrir el visor CAD</p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Ver plano completo
-                  </Button>
-                </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setSelectedTaskDetails(null)}>
+                  Cerrar
+                </Button>
+                <Button onClick={() => navigate(`/production/wo/${selectedTaskDetails.id}`)}>
+                  Ver etapas y time tracking
+                </Button>
               </div>
             </div>
           </Card>

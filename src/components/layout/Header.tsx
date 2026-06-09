@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Settings, Shield, UserCircle, Search, Bell } from 'lucide-react';
+import { LogOut, Settings, Shield, UserCircle, Search, Bell, Webhook } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -90,6 +90,13 @@ export function Header() {
             >
               <Settings className="h-4 w-4 text-[var(--color-app-text-muted)]" />
               <span>Configuración</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate('/settings/integrations')}
+              className="gap-2 cursor-pointer"
+            >
+              <Webhook className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+              <span>Integraciones (n8n)</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-[var(--color-app-border)]" />
             <DropdownMenuItem

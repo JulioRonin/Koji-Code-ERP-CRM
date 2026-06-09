@@ -79,6 +79,16 @@ export type PmoReportType = 'Semanal' | 'Quincenal' | 'Mensual' | 'Cierre' | 'Ad
 // TABLA: profiles
 // ============================================================================
 
+export interface ProfileMetadata {
+  bio?: string;
+  skills?: { name: string; level: number }[];
+  certifications?: string[];
+  experience?: string;
+  bonus?: number;
+  efficiency?: number;
+  shift?: string;
+}
+
 export interface Profile {
   id: string;
   full_name: string;
@@ -92,6 +102,7 @@ export interface Profile {
   bio: string | null;
   salary: number;
   pin_code: string | null;
+  metadata: ProfileMetadata;
   created_at: string;
   updated_at: string;
 }

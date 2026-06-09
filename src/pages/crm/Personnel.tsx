@@ -28,8 +28,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { STAFF_MEMBERS, ROLES, StaffMember } from '@/data/crmData';
+import { ROLES } from '@/data/crmData';
 import { cn } from '@/lib/utils';
+import { useProfiles } from '@/lib/api';
+import type { Profile } from '@/types/database';
+
+function initialsFor(name: string): string {
+  return name
+    .split(' ')
+    .map(p => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
 
 const tabs = [
   { id: 'directory', label: 'Directorio',         icon: Users },
@@ -40,9 +51,9 @@ type Tab = (typeof tabs)[number]['id'];
 
 export function Personnel() {
   const [activeTab, setActiveTab] = useState<Tab>('directory');
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<Profile | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [staff, setStaff] = useState<StaffMember[]>(STAFF_MEMBERS);
+  const { data: staff } = useProfiles();
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [newStaff, setNewStaff] = useState({
     name: '',
@@ -56,44 +67,15 @@ export function Personnel() {
 
   const filteredStaff = staff.filter(
     s =>
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.department.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = `STF-${String(staff.length + 1).padStart(3, '0')}`;
-    const avatar = newStaff.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-
-    const newcomer: StaffMember = {
-      id,
-      name: newStaff.name,
-      role: newStaff.role,
-      department: newStaff.department,
-      avatar,
-      email: newStaff.email,
-      phone: newStaff.phone,
-      status: 'Activo',
-      joinDate: new Date().toISOString().split('T')[0],
-      portfolio: {
-        bio: `Nuevo colaborador del equipo de ${newStaff.department}.`,
-        skills: [
-          { name: 'Trabajo en equipo', level: 90 },
-          { name: 'Adaptabilidad', level: 85 },
-        ],
-        certifications: [],
-        experience: 'Registro inicial.',
-      },
-      salary: {
-        base: newStaff.baseSalary,
-        bonus: newStaff.bonus,
-        currency: 'MXN',
-        lastPaymentDate: 'N/A',
-      },
-    };
-
-    setStaff(prev => [...prev, newcomer]);
+    // En modo Supabase real, esto debería invocar un hook (crear auth user + profile).
+    // Por ahora cerramos el modal sin persistir en demo.
     setIsRegisterModalOpen(false);
     setNewStaff({
       name: '',
@@ -164,10 +146,10 @@ export function Personnel() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center font-medium">
-                      {member.avatar}
+                      {initialsFor(member.full_name)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate">{member.name}</h3>
+                      <h3 className="font-medium truncate">{member.full_name}</h3>
                       <p className="text-xs text-[var(--color-app-text-muted)] truncate mt-0.5">{member.role}</p>
                       <Badge variant="success" className="mt-1.5">{member.status}</Badge>
                     </div>
@@ -179,7 +161,7 @@ export function Personnel() {
                       <Mail className="h-3 w-3 shrink-0" /> {member.email}
                     </p>
                     <p className="flex items-center gap-1.5">
-                      <Phone className="h-3 w-3 shrink-0" /> {member.phone}
+                      <Phone className="h-3 w-3 shrink-0" /> {member.phone ?? '—'}
                     </p>
                   </div>
                   <div className="pt-3 border-t border-[var(--color-app-border)] flex justify-between items-center text-xs">
@@ -204,19 +186,19 @@ export function Personnel() {
             <Card className="lg:col-span-1 h-fit">
               <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
                 <div className="h-24 w-24 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-2xl font-medium">
-                  {selectedStaff.avatar}
+                  {initialsFor(selectedStaff.full_name)}
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold">{selectedStaff.name}</h2>
+                  <h2 className="text-lg font-semibold">{selectedStaff.full_name}</h2>
                   <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">{selectedStaff.role}</p>
                   <p className="text-xs text-[var(--color-app-text-muted)] mt-1">{selectedStaff.department}</p>
                 </div>
                 <div className="w-full space-y-1.5 pt-3 border-t border-[var(--color-app-border)]">
                   <div className="flex justify-between text-xs">
                     <span className="text-[var(--color-app-text-muted)]">Eficiencia general</span>
-                    <span className="font-medium">94%</span>
+                    <span className="font-medium">{selectedStaff.metadata.efficiency ?? 90}%</span>
                   </div>
-                  <Progress value={94} className="h-1.5" />
+                  <Progress value={selectedStaff.metadata.efficiency ?? 90} className="h-1.5" />
                 </div>
                 <Button variant="outline" className="w-full">Editar información</Button>
               </CardContent>
@@ -229,7 +211,7 @@ export function Personnel() {
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    {selectedStaff.portfolio.skills.map(skill => (
+                    {(selectedStaff.metadata.skills ?? []).map(skill => (
                       <div key={skill.name} className="space-y-1">
                         <div className="flex justify-between text-sm">
                           <span>{skill.name}</span>
@@ -238,17 +220,23 @@ export function Personnel() {
                         <Progress value={skill.level} className="h-1.5" />
                       </div>
                     ))}
+                    {!selectedStaff.metadata.skills?.length && (
+                      <p className="text-xs text-[var(--color-app-text-muted)]">Sin habilidades registradas.</p>
+                    )}
                   </div>
                   <div className="bg-[var(--color-app-surface-alt)] p-4 rounded-md space-y-2">
                     <h4 className="text-xs font-medium text-[var(--color-app-text-muted)] flex items-center gap-1.5">
                       <BadgeCheck className="h-3.5 w-3.5" /> Certificaciones
                     </h4>
                     <ul className="space-y-2">
-                      {selectedStaff.portfolio.certifications.map(cert => (
+                      {(selectedStaff.metadata.certifications ?? []).map(cert => (
                         <li key={cert} className="flex items-center gap-2 text-sm">
                           <Zap className="h-3 w-3 text-[var(--color-app-primary)]" /> {cert}
                         </li>
                       ))}
+                      {!selectedStaff.metadata.certifications?.length && (
+                        <li className="text-xs text-[var(--color-app-text-muted)]">Sin certificaciones registradas.</li>
+                      )}
                     </ul>
                   </div>
                 </CardContent>
@@ -261,12 +249,12 @@ export function Personnel() {
                 <CardContent className="space-y-4">
                   <div>
                     <h4 className="text-xs text-[var(--color-app-text-muted)] mb-1">Resumen</h4>
-                    <p className="text-sm leading-relaxed">{selectedStaff.portfolio.bio}</p>
+                    <p className="text-sm leading-relaxed">{selectedStaff.bio ?? 'Sin biografía.'}</p>
                   </div>
                   <div>
                     <h4 className="text-xs text-[var(--color-app-text-muted)] mb-1">Experiencia previa</h4>
                     <p className="text-sm bg-[var(--color-app-surface-alt)] p-3 rounded-md">
-                      {selectedStaff.portfolio.experience}
+                      {selectedStaff.metadata.experience ?? 'Sin experiencia registrada.'}
                     </p>
                   </div>
                 </CardContent>
@@ -368,36 +356,39 @@ export function Personnel() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {staff.map(member => (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-xs font-medium">
-                            {member.avatar}
+                  {staff.map(member => {
+                    const bonus = member.metadata.bonus ?? 0;
+                    return (
+                      <TableRow key={member.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-xs font-medium">
+                              {initialsFor(member.full_name)}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{member.full_name}</p>
+                              <p className="text-xs text-[var(--color-app-text-muted)] font-mono">{member.id.slice(0, 8)}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium text-sm">{member.name}</p>
-                            <p className="text-xs text-[var(--color-app-text-muted)] font-mono">{member.id}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        ${member.salary.base.toLocaleString()} {member.salary.currency}
-                      </TableCell>
-                      <TableCell className="tabular-nums text-[var(--color-app-success)]">
-                        +${member.salary.bonus.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="font-semibold tabular-nums">
-                        ${(member.salary.base + member.salary.bonus).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="success">Depósito listo</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">Recibo</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          ${member.salary.toLocaleString()} MXN
+                        </TableCell>
+                        <TableCell className="tabular-nums text-[var(--color-app-success)]">
+                          +${bonus.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-semibold tabular-nums">
+                          ${(member.salary + bonus).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="success">Depósito listo</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm">Recibo</Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>

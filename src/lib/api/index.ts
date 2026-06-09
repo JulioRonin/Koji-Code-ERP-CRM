@@ -19,3 +19,6 @@ export * from './projectFiles';
 export * from './workOrderStages';
 export * from './shipments';
 export * from './clientPortal';
+export * from './pmo';
+export * from './automations';
+export * from './chat';

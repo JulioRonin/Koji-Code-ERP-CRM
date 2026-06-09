@@ -20,6 +20,8 @@ import { Technicians } from './pages/technicians/Technicians';
 import { Personnel } from './pages/crm/Personnel';
 import { Shipping } from './pages/shipping/Shipping';
 import { ClientPortal } from './pages/client-portal/ClientPortal';
+import { Pmo } from './pages/pmo/Pmo';
+import { Integrations } from './pages/settings/Integrations';
 import { 
   Billing, 
   Settings 
@@ -142,6 +144,18 @@ export default function App() {
           <Route path="shipping" element={
             <ProtectedRoute allowedDepartments={['Producción']}>
                 <Shipping />
+            </ProtectedRoute>
+          } />
+
+          <Route path="pmo" element={
+            <ProtectedRoute allowedDepartments={['Producción']}>
+                <Pmo />
+            </ProtectedRoute>
+          } />
+
+          <Route path="settings/integrations" element={
+            <ProtectedRoute allowedDepartments={[]}>
+                <Integrations />
             </ProtectedRoute>
           } />
 

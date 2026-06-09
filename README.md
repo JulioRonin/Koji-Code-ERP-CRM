@@ -136,12 +136,14 @@ y manejan el fallback transparentemente.
 | Calidad             | ✅ | ✅ Hooks | Inspecciones, NCRs, instrumentos |
 | **Embarques**       | ✅ | ✅ Hooks | Packing list + cajas con etiquetas QR imprimibles |
 | **Portal cliente**  | ✅ | ✅ Hooks | Ruta pública `/cliente/:token` con timeline visual |
-| Personal            | ✅ | 🟡 Mock | Schema rico (portfolio) pendiente |
-| Técnicos            | ✅ | 🟡 Mock | — |
-| Chat                | ✅ | 🟡 Mock (in-memory) | — |
+| **PMO Reports**     | ✅ | ✅ Hooks | Generar, ver y enviar reportes ejecutivos al cliente |
+| **Integraciones**   | ✅ | ✅ Hooks | Config n8n + cola de eventos + replay manual |
+| Personal            | ✅ | ✅ Hooks | Portfolio en `profiles.metadata` JSONB |
+| Técnicos            | ✅ | ✅ Hooks | Profiles filtrados + WO asignadas reales |
+| Chat                | ✅ | ✅ Hooks | Supabase Realtime cuando hay credenciales, demo localStorage si no |
 | Auth                | n/a | ✅ Supabase Auth + fallback | Dual-mode |
 
-### Workflow end-to-end (Fase 3)
+### Workflow end-to-end
 
 1. **PM crea proyecto** vía wizard (`/projects/new`) — sube OC del cliente,
    BOM en Excel y planos 2D/3D.
@@ -153,10 +155,49 @@ y manejan el fallback transparentemente.
 4. **Calidad** registra inspecciones por pieza, abre NCRs si rechaza.
 5. **Embarque** (`/shipping`) — empaqueta en cajas, genera etiquetas QR que
    se pueden imprimir. Cada QR linka al portal del cliente.
-6. **Portal cliente** (`/cliente/:token`) — el cliente abre el link y ve el
+6. **PMO** (`/pmo`) — el PM genera un reporte snapshot y lo envía al cliente
+   con un click. El envío dispara un evento `pmo.report_sent` en la cola.
+7. **Portal cliente** (`/cliente/:token`) — el cliente abre el link y ve el
    avance: timeline, KPIs, inspecciones, documentos compartidos. Sin login.
 
-**Siguiente (Fase 4):** Integración n8n (cola `automation_events` ya existe,
-falta el webhook out), reporte PMO PDF profesional con envío automático
-semanal, mejoras al chat (cableado a Supabase realtime), migración de
-Personnel/Técnicos a hooks reales.
+### Automatizaciones (n8n)
+
+Triggers PostgreSQL en `database_schema.sql` insertan automáticamente en
+`automation_events` cuando ocurren eventos críticos:
+
+| Evento | Cuándo se dispara |
+|---|---|
+| `project.status_changed`  | Cambia el `status` de un proyecto |
+| `ncr.opened`              | Se inserta un NCR |
+| `inspection.final_approved` | Inspección tipo `Final` con resultado `Aprobado` |
+| `shipment.listo` / `en_tránsito` / `entregado` | Cambia el estado del embarque |
+| `pmo.report_sent`         | Reporte PMO marcado como enviado al cliente |
+
+**Para consumir desde n8n** (3 opciones):
+
+1. **Database Webhooks (recomendado):** Supabase Dashboard → Database → Webhooks
+   → apunta a tu webhook de n8n filtrando por la tabla `automation_events`.
+2. **Polling:** nodo Supabase en n8n que consulta `SELECT * FROM
+   automation_events WHERE delivered = false` cada N minutos, procesa, y llama
+   `mark_event_delivered(event_id, error)` vía RPC.
+3. **Replay manual:** desde `Configuración → Integraciones (n8n)` puedes
+   reenviar cualquier evento al webhook con un click.
+
+La URL del webhook se configura en Vercel como `VITE_N8N_WEBHOOK_URL`.
+
+### Realtime (Supabase)
+
+El schema ya añade a la publicación `supabase_realtime` las tablas:
+`chat_messages`, `chat_channels`, `automation_events`, `work_order_stages`.
+
+Esto permite que:
+- El chat se actualice en vivo sin reload cuando alguien manda mensaje.
+- El portal del técnico vea cambios de etapa en tiempo real.
+- Los eventos automatizados aparezcan en `/settings/integrations` al instante.
+
+En modo demo (sin Supabase), un fallback con localStorage + eventos de
+ventana simula este comportamiento dentro del mismo browser tab.
+
+**Siguiente:** Edge Function de Supabase que automatice el POST a n8n
+(elimina la necesidad de configurar Database Webhook manualmente), envío
+automático del reporte PMO semanal vía cron, mejoras de exportación PDF.

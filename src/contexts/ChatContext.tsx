@@ -1,5 +1,73 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
+import { useSendMessage, useChannels } from '@/lib/api';
+import type { MessageType } from '@/types/database';
 
+/**
+ * ChatContext es un wrapper minimal sobre los hooks reales.
+ * Solo expone `sendSystemMessage` para que el resto de los módulos puedan
+ * publicar eventos automáticos al chat sin depender directo del hook.
+ *
+ * El chat real (renderizado de canales y mensajes) usa los hooks de
+ * `@/lib/api` directamente.
+ */
+
+interface ChatContextType {
+  sendSystemMessage: (
+    channelHint: string,
+    content: string,
+    type?: MessageType
+  ) => Promise<void>;
+}
+
+const ChatContext = createContext<ChatContextType | undefined>(undefined);
+
+// Mapeo legacy: el código viejo pasaba '1','2','3','4','5'. Los traducimos al
+// nombre de canal correspondiente cuando exista.
+const LEGACY_CHANNEL_MAP: Record<string, string> = {
+  '1': 'general',
+  '2': 'anuncios',
+  '3': 'ingeniería',
+  '4': 'producción',
+  '5': 'calidad',
+  '6': 'general',
+};
+
+export function ChatProvider({ children }: { children: ReactNode }) {
+  const { data: channels } = useChannels();
+  const { send } = useSendMessage();
+
+  const sendSystemMessage = async (channelHint: string, content: string, type: MessageType = 'SYSTEM') => {
+    const targetName = LEGACY_CHANNEL_MAP[channelHint] ?? channelHint;
+    const channel = channels.find(c => c.name === targetName) ?? channels.find(c => c.id === channelHint);
+    if (!channel) return;
+    try {
+      await send({
+        channel_id: channel.id,
+        content,
+        user_id: null,
+        message_type: type,
+      });
+    } catch (err) {
+      console.warn('sendSystemMessage failed', err);
+    }
+  };
+
+  return (
+    <ChatContext.Provider value={{ sendSystemMessage }}>
+      {children}
+    </ChatContext.Provider>
+  );
+}
+
+export function useChat() {
+  const context = useContext(ChatContext);
+  if (context === undefined) {
+    throw new Error('useChat must be used within a ChatProvider');
+  }
+  return context;
+}
+
+// Mantenemos los tipos legacy export para no romper imports existentes
 export type Message = {
   id: string;
   senderId: string;
@@ -18,83 +86,3 @@ export type Channel = {
   description?: string;
   unreadCount?: number;
 };
-
-interface ChatContextType {
-  messages: Record<string, Message[]>;
-  channels: Channel[];
-  sendMessage: (channelId: string, content: string) => void;
-  sendSystemMessage: (channelId: string, content: string, type?: 'QUALITY' | 'PROJECT') => void;
-}
-
-const CHANNELS: Channel[] = [
-  { id: '1', name: 'general', category: 'ADMIN', description: 'Canal general de la empresa.' },
-  { id: '2', name: 'anuncios', category: 'ADMIN', description: 'Comunicados oficiales de Ronin Studio.' },
-  { id: '3', name: 'ingeniería', category: 'DEPARTAMENTOS', description: 'Discusión de diseños CAD y CAM.' },
-  { id: '4', name: 'producción', category: 'DEPARTAMENTOS', description: 'Coordinación de piso y máquinas.' },
-  { id: '5', name: 'calidad', category: 'DEPARTAMENTOS', description: 'Revisiones dimensionales y reportes.' },
-  { id: '6', name: 'IMC-2026-042', category: 'PROYECTOS', description: 'Seguimiento: Eje Principal Ensamblaje.' },
-  { id: '7', name: 'IMC-2026-048', category: 'PROYECTOS', description: 'Seguimiento: Soportes Estructurales.' },
-];
-
-const INITIAL_MESSAGES: Record<string, Message[]> = {
-  '1': [
-    { id: 'm1', senderId: 'STF-001', senderName: 'Roberto Gomez', senderAvatar: 'RG', content: '¿Alguien sabe si ya llegaron los insertos para el torno suizo?', timestamp: '10:45 AM' },
-    { id: 'm2', senderId: 'STF-002', senderName: 'Ana Martinez', senderAvatar: 'AM', content: 'Sí Roberto, llegaron hace una hora. Están en el almacén de herramientas.', timestamp: '10:48 AM' },
-  ],
-  '3': [
-    { id: 'm3', senderId: 'STF-001', senderName: 'Roberto Gomez', senderAvatar: 'RG', content: 'Acabo de subir el modelo actualizado para el proyecto IMC-2026-042 a la carpeta de diseño.', timestamp: '09:12 AM' },
-    { id: 'm4', senderId: 'STF-003', senderName: 'Julian Herrera', senderAvatar: 'JH', content: 'Perfecto, voy a revisar las tolerancias geométricas ahora mismo.', timestamp: '09:30 AM' },
-  ],
-};
-
-const ChatContext = createContext<ChatContextType | undefined>(undefined);
-
-export function ChatProvider({ children }: { children: ReactNode }) {
-  const [messages, setMessages] = useState<Record<string, Message[]>>(INITIAL_MESSAGES);
-
-  const sendMessage = (channelId: string, content: string) => {
-    const msg: Message = {
-      id: Date.now().toString(),
-      senderId: 'ME',
-      senderName: 'Usuario Actual',
-      senderAvatar: 'UA',
-      content,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMessages(prev => ({
-      ...prev,
-      [channelId]: [...(prev[channelId] || []), msg]
-    }));
-  };
-
-  const sendSystemMessage = (channelId: string, content: string, type: 'QUALITY' | 'PROJECT' = 'QUALITY') => {
-    const msg: Message = {
-      id: `sys-${Date.now()}`,
-      senderId: 'SYSTEM',
-      senderName: 'KOJI-BOT',
-      senderAvatar: 'KB',
-      content,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isSystem: true,
-      type
-    };
-    setMessages(prev => ({
-      ...prev,
-      [channelId]: [...(prev[channelId] || []), msg]
-    }));
-  };
-
-  return (
-    <ChatContext.Provider value={{ messages, channels: CHANNELS, sendMessage, sendSystemMessage }}>
-      {children}
-    </ChatContext.Provider>
-  );
-}
-
-export function useChat() {
-  const context = useContext(ChatContext);
-  if (context === undefined) {
-    throw new Error('useChat must be used within a ChatProvider');
-  }
-  return context;
-}

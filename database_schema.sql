@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     bio          TEXT,
     salary       NUMERIC DEFAULT 0,
     pin_code     TEXT,  -- PIN 4-6 dígitos para portal del técnico (hash)
+    metadata     JSONB DEFAULT '{}'::jsonb,  -- portfolio: skills, certs, experiencia
     created_at   TIMESTAMPTZ DEFAULT NOW(),
     updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
@@ -644,3 +645,189 @@ INSERT INTO public.chat_channels (name, description, category) VALUES
     ('produccion',  'Coordinación diaria de manufactura',           'DEPARTAMENTOS'),
     ('compras',     'Requisiciones, POs y proveedores',             'DEPARTAMENTOS')
 ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- 17. AUTOMATION TRIGGERS — populate `automation_events` for n8n consumer
+-- ----------------------------------------------------------------------------
+-- Cada cambio crítico en el negocio genera un row en automation_events.
+-- n8n (u otro consumer) lee los eventos no entregados y los procesa.
+--
+-- En Supabase puedes conectar esto con Database Webhooks
+-- (Settings → Database → Webhooks) apuntando a la URL de n8n.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.emit_event(
+    p_event_type   TEXT,
+    p_entity_type  TEXT,
+    p_entity_id    TEXT,
+    p_payload      JSONB
+) RETURNS UUID
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_id UUID;
+BEGIN
+    INSERT INTO public.automation_events (event_type, entity_type, entity_id, payload)
+    VALUES (p_event_type, p_entity_type, p_entity_id, p_payload)
+    RETURNING id INTO v_id;
+    RETURN v_id;
+END;
+$$;
+
+-- --- Project status changed --------------------------------------------------
+CREATE OR REPLACE FUNCTION public.on_project_status_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status IS DISTINCT FROM OLD.status THEN
+        PERFORM public.emit_event(
+            'project.status_changed',
+            'project',
+            NEW.id,
+            jsonb_build_object(
+                'old_status', OLD.status,
+                'new_status', NEW.status,
+                'project_name', NEW.name,
+                'client_name', NEW.client_name,
+                'progress', NEW.progress,
+                'deadline', NEW.deadline,
+                'manager_id', NEW.manager_id
+            )
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_project_status_change ON public.projects;
+CREATE TRIGGER trg_project_status_change
+    AFTER UPDATE OF status ON public.projects
+    FOR EACH ROW EXECUTE FUNCTION public.on_project_status_change();
+
+-- --- NCR opened (insert with status='Abierta') -------------------------------
+CREATE OR REPLACE FUNCTION public.on_ncr_opened()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM public.emit_event(
+        'ncr.opened',
+        'ncr',
+        NEW.id,
+        jsonb_build_object(
+            'project_id', NEW.project_id,
+            'bom_item_id', NEW.bom_item_id,
+            'severity', NEW.severity,
+            'issue_description', NEW.issue_description,
+            'notify_customer', NEW.notify_customer
+        )
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_ncr_opened ON public.ncrs;
+CREATE TRIGGER trg_ncr_opened
+    AFTER INSERT ON public.ncrs
+    FOR EACH ROW EXECUTE FUNCTION public.on_ncr_opened();
+
+-- --- Final inspection approved ----------------------------------------------
+CREATE OR REPLACE FUNCTION public.on_final_inspection_approved()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.inspection_type = 'Final' AND NEW.result = 'Aprobado' THEN
+        PERFORM public.emit_event(
+            'inspection.final_approved',
+            'inspection',
+            NEW.id,
+            jsonb_build_object(
+                'project_id', NEW.project_id,
+                'bom_item_id', NEW.bom_item_id,
+                'inspector_id', NEW.inspector_id,
+                'inspection_date', NEW.inspection_date
+            )
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_final_inspection ON public.quality_inspections;
+CREATE TRIGGER trg_final_inspection
+    AFTER INSERT ON public.quality_inspections
+    FOR EACH ROW EXECUTE FUNCTION public.on_final_inspection_approved();
+
+-- --- Shipment status changed -------------------------------------------------
+CREATE OR REPLACE FUNCTION public.on_shipment_status_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('Listo','En Tránsito','Entregado') THEN
+        PERFORM public.emit_event(
+            'shipment.' || lower(replace(NEW.status, ' ', '_')),
+            'shipment',
+            NEW.id,
+            jsonb_build_object(
+                'project_id', NEW.project_id,
+                'carrier', NEW.carrier,
+                'tracking_number', NEW.tracking_number,
+                'old_status', OLD.status,
+                'new_status', NEW.status
+            )
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_shipment_status_change ON public.shipments;
+CREATE TRIGGER trg_shipment_status_change
+    AFTER UPDATE OF status ON public.shipments
+    FOR EACH ROW EXECUTE FUNCTION public.on_shipment_status_change();
+
+-- --- PMO report sent ---------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.on_pmo_report_sent()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.sent_to_client AND (OLD.sent_to_client IS NULL OR OLD.sent_to_client = FALSE) THEN
+        PERFORM public.emit_event(
+            'pmo.report_sent',
+            'pmo_report',
+            NEW.id::TEXT,
+            jsonb_build_object(
+                'project_id', NEW.project_id,
+                'report_type', NEW.report_type,
+                'period_end', NEW.period_end,
+                'progress_snapshot', NEW.progress_snapshot,
+                'pdf_url', NEW.pdf_url
+            )
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_pmo_sent ON public.pmo_reports;
+CREATE TRIGGER trg_pmo_sent
+    AFTER UPDATE OF sent_to_client ON public.pmo_reports
+    FOR EACH ROW EXECUTE FUNCTION public.on_pmo_report_sent();
+
+-- --- Marca un evento como entregado (lo llama el consumer) -------------------
+CREATE OR REPLACE FUNCTION public.mark_event_delivered(p_event_id UUID, p_error TEXT DEFAULT NULL)
+RETURNS VOID
+LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE public.automation_events
+    SET delivered = (p_error IS NULL),
+        delivered_at = CASE WHEN p_error IS NULL THEN NOW() ELSE delivered_at END,
+        error = p_error
+    WHERE id = p_event_id;
+END;
+$$;
+
+-- ============================================================================
+-- 18. REALTIME — habilita publication para chat y eventos en vivo
+-- ============================================================================
+-- Estos bloques son idempotentes (silencian el error si la tabla ya está).
+DO $$
+BEGIN
+    BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;       EXCEPTION WHEN duplicate_object THEN NULL; END;
+    BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_channels;       EXCEPTION WHEN duplicate_object THEN NULL; END;
+    BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.automation_events;   EXCEPTION WHEN duplicate_object THEN NULL; END;
+    BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.work_order_stages;   EXCEPTION WHEN duplicate_object THEN NULL; END;
+END$$;

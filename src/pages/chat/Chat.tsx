@@ -11,20 +11,42 @@ import {
   Bot,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { STAFF_MEMBERS } from '@/data/crmData';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { useChat } from '@/contexts/ChatContext';
+import { useChannels, useMessages, useSendMessage, useProfiles } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
 
 export function Chat() {
-  const { messages, channels, sendMessage } = useChat();
-  const [activeChannelId, setActiveChannelId] = useState('1');
+  const { user } = useAuth();
+  const { data: channels } = useChannels();
+  const { data: profiles } = useProfiles();
+  const [activeChannelId, setActiveChannelId] = useState<string>('');
   const [newMessage, setNewMessage] = useState('');
   const [showUserList, setShowUserList] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const activeChannel = channels.find(c => c.id === activeChannelId)!;
-  const currentMessages = messages[activeChannelId] || [];
+  // Selecciona el primer canal cuando llegan
+  useEffect(() => {
+    if (channels.length > 0 && !activeChannelId) {
+      setActiveChannelId(channels[0].id);
+    }
+  }, [channels, activeChannelId]);
+
+  const { data: currentMessages, refetch: refetchMessages } = useMessages(activeChannelId);
+  const { send: sendMessage } = useSendMessage();
+
+  const activeChannel = channels.find(c => c.id === activeChannelId);
+
+  // Re-fetch en modo demo cuando otro tab/handler emite el evento
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.channel_id === activeChannelId) refetchMessages();
+    };
+    window.addEventListener('koji-chat-update', handler);
+    return () => window.removeEventListener('koji-chat-update', handler);
+  }, [activeChannelId, refetchMessages]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -32,12 +54,50 @@ export function Chat() {
     }
   }, [currentMessages, activeChannelId]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
-    sendMessage(activeChannelId, newMessage);
+    if (!newMessage.trim() || !activeChannelId) return;
+    await sendMessage({
+      channel_id: activeChannelId,
+      content: newMessage,
+      user_id: user?.id ?? null,
+    });
     setNewMessage('');
+    await refetchMessages();
   };
+
+  // Helpers para resolver nombre/avatar del mensaje
+  const getSender = (userId: string | null) => {
+    if (!userId) return { name: 'Sistema', avatar: 'KB', isSystem: true };
+    const profile = profiles.find(p => p.id === userId);
+    if (!profile) return { name: 'Usuario', avatar: 'UA', isSystem: false };
+    return {
+      name: profile.full_name,
+      avatar: profile.full_name
+        .split(' ')
+        .map(p => p[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase(),
+      isSystem: false,
+    };
+  };
+
+  if (!activeChannel) {
+    return (
+      <div className="flex h-[calc(100vh-160px)] items-center justify-center text-sm text-[var(--color-app-text-muted)]">
+        Cargando canales...
+      </div>
+    );
+  }
+
+  // Agrupa por categoría
+  const channelsByCategory = channels.reduce<Record<string, typeof channels>>((acc, ch) => {
+    const cat = ch.category ?? 'GENERAL';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(ch);
+    return acc;
+  }, {});
 
   return (
     <div className="flex h-[calc(100vh-160px)] border border-[var(--color-app-border)] rounded-xl overflow-hidden bg-white">
@@ -48,7 +108,7 @@ export function Chat() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-4">
-          {['ADMIN', 'DEPARTAMENTOS', 'PROYECTOS'].map(cat => (
+          {Object.entries(channelsByCategory).map(([cat, list]) => (
             <div key={cat} className="space-y-1">
               <div className="flex items-center justify-between px-2">
                 <span className="text-xs font-medium text-[var(--color-app-text-muted)] uppercase tracking-wide">
@@ -58,26 +118,21 @@ export function Chat() {
                   <Plus className="h-3.5 w-3.5" />
                 </button>
               </div>
-              {channels
-                .filter(c => c.category === cat)
-                .map(channel => (
-                  <button
-                    key={channel.id}
-                    onClick={() => setActiveChannelId(channel.id)}
-                    className={cn(
-                      'w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors text-left relative',
-                      activeChannelId === channel.id
-                        ? 'bg-white text-[var(--color-app-text)] shadow-sm'
-                        : 'text-[var(--color-app-text-muted)] hover:bg-white hover:text-[var(--color-app-text)]'
-                    )}
-                  >
-                    <Hash className="h-3.5 w-3.5" />
-                    <span className="text-sm truncate">{channel.name}</span>
-                    {channel.unreadCount && channel.unreadCount > 0 && (
-                      <span className="absolute right-2 h-1.5 w-1.5 bg-[var(--color-app-danger)] rounded-full" />
-                    )}
-                  </button>
-                ))}
+              {list.map(channel => (
+                <button
+                  key={channel.id}
+                  onClick={() => setActiveChannelId(channel.id)}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors text-left',
+                    activeChannelId === channel.id
+                      ? 'bg-white text-[var(--color-app-text)] shadow-sm'
+                      : 'text-[var(--color-app-text-muted)] hover:bg-white hover:text-[var(--color-app-text)]'
+                  )}
+                >
+                  <Hash className="h-3.5 w-3.5" />
+                  <span className="text-sm truncate">{channel.name}</span>
+                </button>
+              ))}
             </div>
           ))}
         </div>
@@ -136,41 +191,47 @@ export function Chat() {
               </p>
             </div>
           ) : (
-            currentMessages.map(msg => (
-              <motion.div
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                key={msg.id}
-                className={cn(
-                  'group flex gap-3 -mx-6 px-6 py-2 hover:bg-[var(--color-app-surface-alt)]/50 transition-colors',
-                  msg.isSystem && 'bg-[var(--color-app-info-soft)]/40'
-                )}
-              >
-                <div
+            currentMessages.map(msg => {
+              const sender = getSender(msg.user_id);
+              const isSystem = sender.isSystem || msg.message_type !== 'USER';
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  key={msg.id}
                   className={cn(
-                    'h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-medium',
-                    msg.isSystem
-                      ? 'bg-[var(--color-app-info)] text-white'
-                      : 'bg-[var(--color-app-primary)] text-white'
+                    'group flex gap-3 -mx-6 px-6 py-2 hover:bg-[var(--color-app-surface-alt)]/50 transition-colors',
+                    isSystem && 'bg-[var(--color-app-info-soft)]/40'
                   )}
                 >
-                  {msg.isSystem ? <Bot className="h-4 w-4" /> : msg.senderAvatar}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium flex items-center gap-1">
-                      {msg.senderName}
-                      {msg.isSystem && <ShieldCheck className="h-3 w-3 text-[var(--color-app-info)]" />}
-                    </span>
-                    <span className="text-xs text-[var(--color-app-text-muted)]">{msg.timestamp}</span>
-                    {msg.isSystem && <Badge variant="default">Sistema</Badge>}
+                  <div
+                    className={cn(
+                      'h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-medium',
+                      isSystem
+                        ? 'bg-[var(--color-app-info)] text-white'
+                        : 'bg-[var(--color-app-primary)] text-white'
+                    )}
+                  >
+                    {isSystem ? <Bot className="h-4 w-4" /> : sender.avatar}
                   </div>
-                  <p className="text-sm leading-relaxed mt-0.5 text-[var(--color-app-text)]">
-                    {msg.content}
-                  </p>
-                </div>
-              </motion.div>
-            ))
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium flex items-center gap-1">
+                        {sender.name}
+                        {isSystem && <ShieldCheck className="h-3 w-3 text-[var(--color-app-info)]" />}
+                      </span>
+                      <span className="text-xs text-[var(--color-app-text-muted)]">
+                        {format(new Date(msg.created_at), 'HH:mm')}
+                      </span>
+                      {msg.message_type !== 'USER' && <Badge variant="default">{msg.message_type}</Badge>}
+                    </div>
+                    <p className="text-sm leading-relaxed mt-0.5 text-[var(--color-app-text)]">
+                      {msg.content}
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            })
           )}
         </div>
 
@@ -219,7 +280,7 @@ export function Chat() {
           >
             <div className="px-4 py-3 border-b border-[var(--color-app-border)] bg-white">
               <span className="text-xs font-medium text-[var(--color-app-text-muted)] uppercase tracking-wide">
-                Miembros · {STAFF_MEMBERS.length + 1}
+                Miembros · {profiles.length}
               </span>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-3">
@@ -227,35 +288,47 @@ export function Chat() {
                 <span className="text-xs text-[var(--color-app-text-muted)] px-2 flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 bg-[var(--color-app-success)] rounded-full" /> En línea · 1
                 </span>
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white transition-colors cursor-pointer">
-                  <div className="h-7 w-7 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-xs font-medium">
-                    UA
+                {user && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white transition-colors cursor-pointer">
+                    <div className="h-7 w-7 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-xs font-medium">
+                      {user.avatar || user.name?.[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{user.name} (tú)</p>
+                      <p className="text-xs text-[var(--color-app-text-muted)] truncate">{user.role}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">Tú</p>
-                    <p className="text-xs text-[var(--color-app-text-muted)] truncate">Administrador</p>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="space-y-1">
                 <span className="text-xs text-[var(--color-app-text-muted)] px-2">
-                  Fuera de línea · {STAFF_MEMBERS.length}
+                  Equipo · {profiles.length}
                 </span>
-                {STAFF_MEMBERS.map(member => (
-                  <div
-                    key={member.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white transition-colors cursor-pointer opacity-70 hover:opacity-100"
-                  >
-                    <div className="h-7 w-7 rounded-full bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] flex items-center justify-center text-xs font-medium text-[var(--color-app-text-muted)]">
-                      {member.avatar}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm truncate">{member.name}</p>
-                      <p className="text-xs text-[var(--color-app-text-muted)] truncate">{member.role}</p>
-                    </div>
-                  </div>
-                ))}
+                {profiles
+                  .filter(p => p.id !== user?.id)
+                  .map(member => {
+                    const initials = member.full_name
+                      .split(' ')
+                      .map(p => p[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase();
+                    return (
+                      <div
+                        key={member.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white transition-colors cursor-pointer opacity-70 hover:opacity-100"
+                      >
+                        <div className="h-7 w-7 rounded-full bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] flex items-center justify-center text-xs font-medium text-[var(--color-app-text-muted)]">
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm truncate">{member.full_name}</p>
+                          <p className="text-xs text-[var(--color-app-text-muted)] truncate">{member.role}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           </motion.div>

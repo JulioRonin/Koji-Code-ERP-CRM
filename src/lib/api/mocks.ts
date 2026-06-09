@@ -44,13 +44,70 @@ export const MOCK_SUPPLIERS: Supplier[] = [
 // Profiles
 // ---------------------------------------------------------------------------
 export const MOCK_PROFILES: Profile[] = [
-  { id: 'profile-001', full_name: 'Roberto Gómez',  email: 'roberto.g@roninstudio.com', avatar_url: null, role: 'Ingeniero de Diseño',    department: 'Diseño',                phone: '+52 555 123 4567', status: 'Activo', join_date: '2022-03-15', bio: 'Especialista en CAD/CAM.', salary: 45000, pin_code: null, created_at: now, updated_at: now },
-  { id: 'profile-002', full_name: 'Ana Martínez',   email: 'ana.m@roninstudio.com',     avatar_url: null, role: 'Operador CNC Master',    department: 'Producción',            phone: '+52 555 987 6543', status: 'Activo', join_date: '2023-01-10', bio: 'Centros de maquinado 5 ejes.', salary: 32000, pin_code: null, created_at: now, updated_at: now },
-  { id: 'profile-003', full_name: 'Julian Herrera', email: 'julian.h@roninstudio.com',  avatar_url: null, role: 'Técnico de Calidad',     department: 'Calidad',               phone: '+52 555 456 7890', status: 'Activo', join_date: '2023-06-20', bio: 'Control dimensional / ISO.', salary: 28000, pin_code: null, created_at: now, updated_at: now },
-  { id: 'profile-004', full_name: 'Admin User',     email: 'admin@imcdesign.com',        avatar_url: null, role: 'Administrador',          department: 'Administrador',         phone: '+52 555 000 1111', status: 'Activo', join_date: '2020-01-01', bio: 'Root.',                    salary: 80000, pin_code: null, created_at: now, updated_at: now },
-  { id: 'profile-005', full_name: 'Técnico Senior', email: 'tecnico@imcdesign.com',      avatar_url: null, role: 'Técnico Especialista',   department: 'Técnico',               phone: '+52 555 222 3333', status: 'Activo', join_date: '2024-01-01', bio: null,                       salary: 20000, pin_code: '1234', created_at: now, updated_at: now },
-  { id: 'profile-006', full_name: 'Gerente Compras', email: 'compras@imcdesign.com',     avatar_url: null, role: 'Purchasing Manager',     department: 'Compras',               phone: '+52 555 444 5555', status: 'Activo', join_date: '2021-05-01', bio: null,                       salary: 35000, pin_code: null, created_at: now, updated_at: now },
-  { id: 'profile-007', full_name: 'Gerente Admin',   email: 'pm@imcdesign.com',          avatar_url: null, role: 'Project Manager',        department: 'Administración / PM',   phone: '+52 555 777 8888', status: 'Activo', join_date: '2022-01-01', bio: null,                       salary: 50000, pin_code: null, created_at: now, updated_at: now },
+  {
+    id: 'profile-001', full_name: 'Roberto Gómez', email: 'roberto.g@roninstudio.com', avatar_url: null,
+    role: 'Ingeniero de Diseño', department: 'Diseño', phone: '+52 555 123 4567',
+    status: 'Activo', join_date: '2022-03-15', bio: 'Especialista en CAD/CAM.', salary: 45000, pin_code: null,
+    metadata: {
+      skills: [{ name: 'SolidWorks', level: 95 }, { name: 'CAMWorks', level: 90 }, { name: 'Análisis de tensiones', level: 85 }],
+      certifications: ['CSWP Mechanical Design', 'Expert CAD Designer'],
+      experience: 'Ex-ingeniero en Boeing. Lideró 15 proyectos de ensamblaje complejo.',
+      bonus: 5000, efficiency: 94,
+    },
+    created_at: now, updated_at: now,
+  },
+  {
+    id: 'profile-002', full_name: 'Ana Martínez', email: 'ana.m@roninstudio.com', avatar_url: null,
+    role: 'Operador CNC Master', department: 'Producción', phone: '+52 555 987 6543',
+    status: 'Activo', join_date: '2023-01-10', bio: 'Centros de maquinado 5 ejes.', salary: 32000, pin_code: null,
+    metadata: {
+      skills: [{ name: 'Maquinado 5 ejes', level: 98 }, { name: 'Mantenimiento preventivo', level: 85 }, { name: 'Metrología', level: 90 }],
+      certifications: ['Fanuc Master Class', 'Metrología avanzada'],
+      experience: '7 años operando maquinaria de alta precisión en General Electric.',
+      bonus: 3500, efficiency: 91,
+    },
+    created_at: now, updated_at: now,
+  },
+  {
+    id: 'profile-003', full_name: 'Julian Herrera', email: 'julian.h@roninstudio.com', avatar_url: null,
+    role: 'Técnico de Calidad', department: 'Calidad', phone: '+52 555 456 7890',
+    status: 'Activo', join_date: '2023-06-20', bio: 'Control dimensional / ISO.', salary: 28000, pin_code: null,
+    metadata: {
+      skills: [{ name: 'CMM Programming', level: 88 }, { name: 'GD&T', level: 95 }, { name: 'ISO 9001', level: 90 }],
+      certifications: ['ISO 9001 Lead Auditor', 'CMM Zeiss Professional'],
+      experience: 'Control de calidad en plantas automotrices de Ford.',
+      bonus: 2000, efficiency: 92,
+    },
+    created_at: now, updated_at: now,
+  },
+  {
+    id: 'profile-004', full_name: 'Admin User', email: 'admin@imcdesign.com', avatar_url: null,
+    role: 'Administrador', department: 'Administrador', phone: '+52 555 000 1111',
+    status: 'Activo', join_date: '2020-01-01', bio: 'Root.', salary: 80000, pin_code: null,
+    metadata: { bonus: 10000, efficiency: 100 },
+    created_at: now, updated_at: now,
+  },
+  {
+    id: 'profile-005', full_name: 'Técnico Senior', email: 'tecnico@imcdesign.com', avatar_url: null,
+    role: 'Técnico Especialista', department: 'Técnico', phone: '+52 555 222 3333',
+    status: 'Activo', join_date: '2024-01-01', bio: null, salary: 20000, pin_code: '1234',
+    metadata: { bonus: 1000, efficiency: 87, shift: 'Matutino · 07:00 – 16:00' },
+    created_at: now, updated_at: now,
+  },
+  {
+    id: 'profile-006', full_name: 'Gerente Compras', email: 'compras@imcdesign.com', avatar_url: null,
+    role: 'Purchasing Manager', department: 'Compras', phone: '+52 555 444 5555',
+    status: 'Activo', join_date: '2021-05-01', bio: null, salary: 35000, pin_code: null,
+    metadata: { bonus: 4000, efficiency: 90 },
+    created_at: now, updated_at: now,
+  },
+  {
+    id: 'profile-007', full_name: 'Gerente Admin', email: 'pm@imcdesign.com', avatar_url: null,
+    role: 'Project Manager', department: 'Administración / PM', phone: '+52 555 777 8888',
+    status: 'Activo', join_date: '2022-01-01', bio: null, salary: 50000, pin_code: null,
+    metadata: { bonus: 6000, efficiency: 95 },
+    created_at: now, updated_at: now,
+  },
 ];
 
 // ---------------------------------------------------------------------------
