@@ -1,110 +1,246 @@
-import React, { useState, useEffect } from 'react';
-import { Search, ChevronDown } from 'lucide-react';
-import { Background3D } from '@/components/dashboard/Background3D';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  TrendingUp,
+  TrendingDown,
+  Factory,
+  Package,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
-const activeProjects = [
-  { name: 'Wing Assembly 737-MAX', status: 'WIP', progress: 68, uid: 'AF-2024-081', statusColor: 'bg-erp-cyan text-black shadow-[var(--shadow-glow-cyan)]' },
-  { name: 'Sub-Surface Hull Sensor Array', status: 'DESIGN', progress: 15, uid: 'ND-2024-112', statusColor: 'border border-erp-cyan text-erp-cyan shadow-[0_0_10px_rgba(0,240,255,0.2)_inset]' },
-  { name: 'Turbine Shaft Calibration', status: 'QUALITY', progress: 15, uid: 'TR-2024-004', statusColor: 'bg-erp-cyan/20 border border-erp-cyan text-erp-cyan shadow-[var(--shadow-glow-cyan)]', progressColor: 'text-erp-purple' },
-  { name: 'Heavy Lift Cargo Drone V2', status: 'QUALITY', progress: 92, uid: 'QM-2024-001', statusColor: 'bg-erp-cyan text-black shadow-[var(--shadow-glow-cyan)]' },
-  { name: 'Plasma Conduit System', status: 'WIP', progress: 45, uid: 'PC-2024-092', statusColor: 'bg-erp-cyan text-black shadow-[var(--shadow-glow-cyan)]', progressColor: 'text-erp-purple' },
-  { name: 'Grav-Drive Stabilizer', status: 'DESIGN', progress: 30, uid: 'GD-2024-130', statusColor: 'border border-erp-cyan text-erp-cyan shadow-[0_0_10px_rgba(0,240,255,0.2)_inset]', progressColor: 'text-erp-purple' },
+// Mock data — en español, números realistas para una planta CNC
+const kpis = [
+  {
+    label: 'Proyectos activos',
+    value: '14',
+    delta: '+2',
+    trend: 'up' as const,
+    sublabel: 'vs. mes anterior',
+    icon: Factory,
+  },
+  {
+    label: 'Piezas en producción',
+    value: '3,482',
+    delta: '+186',
+    trend: 'up' as const,
+    sublabel: 'esta semana',
+    icon: Package,
+  },
+  {
+    label: 'A tiempo (OTD)',
+    value: '94.2%',
+    delta: '−1.8%',
+    trend: 'down' as const,
+    sublabel: 'últimos 30 días',
+    icon: CheckCircle2,
+  },
+  {
+    label: 'NCRs abiertas',
+    value: '3',
+    delta: '+1',
+    trend: 'down' as const,
+    sublabel: 'requieren acción',
+    icon: AlertTriangle,
+  },
+];
+
+type ProjectRow = {
+  id: string;
+  name: string;
+  client: string;
+  status: 'En Producción' | 'Diseño' | 'Calidad' | 'Cotización' | 'Entregado';
+  progress: number;
+  deadline: string;
+  pm: string;
+};
+
+const activeProjects: ProjectRow[] = [
+  { id: 'IMC-2026-042', name: 'Eje Principal Ensamblaje', client: 'BRP', status: 'En Producción', progress: 75, deadline: '15 abr 2026', pm: 'Carlos M.' },
+  { id: 'IMC-2026-045', name: 'Moldes de Inyección', client: 'Foxconn', status: 'Diseño', progress: 22, deadline: '20 abr 2026', pm: 'Ana G.' },
+  { id: 'IMC-2026-039', name: 'Carcasas de Aluminio', client: 'Bosch', status: 'Calidad', progress: 95, deadline: '30 mar 2026', pm: 'Carlos M.' },
+  { id: 'IMC-2026-048', name: 'Soportes Estructurales', client: 'Aptiv', status: 'Cotización', progress: 8, deadline: '05 may 2026', pm: 'Luis R.' },
+  { id: 'IMC-2026-050', name: 'Herramentales Varios', client: 'Lear', status: 'Diseño', progress: 14, deadline: '10 may 2026', pm: 'Luis R.' },
+];
+
+const statusBadge: Record<ProjectRow['status'], { variant: 'default' | 'success' | 'warning' | 'secondary' | 'outline'; label: string }> = {
+  'En Producción':  { variant: 'default',  label: 'En producción' },
+  'Diseño':         { variant: 'secondary', label: 'Diseño' },
+  'Calidad':        { variant: 'success',  label: 'Calidad' },
+  'Cotización':     { variant: 'warning',  label: 'Cotización' },
+  'Entregado':      { variant: 'outline',  label: 'Entregado' },
+};
+
+const recentActivity = [
+  { id: 1, when: 'hace 12 min', who: 'Sistema', what: 'Inspección final aprobada · IMC-2026-039 · Carcasa Alum.', tone: 'success' as const },
+  { id: 2, when: 'hace 1 h',     who: 'Marcos D.', what: 'NCR abierta · IMC-2026-048 · Soporte A (tolerancia +0.05mm)', tone: 'danger' as const },
+  { id: 3, when: 'hace 2 h',     who: 'Compras',   what: 'PO-2026-129 emitida · Acero 4140 (20 barras)', tone: 'info' as const },
+  { id: 4, when: 'hace 3 h',     who: 'Carlos M.', what: 'Avance reportado · WO-2026-089 · 325/500 piezas', tone: 'info' as const },
 ];
 
 export function Dashboard() {
-  const [time, setTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const navigate = useNavigate();
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <Background3D />
-      <div className="relative z-10 space-y-6 flex flex-col h-full p-8 pb-4">
-        {/* Action Bar */}
-        <div className="flex justify-between items-center gap-6">
-          <button className="bg-erp-cyan text-black font-bold text-lg px-8 py-3 clip-path-btn hover:bg-white transition-colors shadow-[var(--shadow-glow-cyan-lg)] uppercase tracking-wider relative overflow-hidden group">
-            <span className="relative z-10">New Project</span>
-            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity"></div>
-          </button>
-          <div className="flex-1 max-w-2xl relative text-erp-text-bright">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-erp-cyan w-5 h-5" />
-            <input 
-              className="w-full bg-erp-panel border border-erp-border rounded-lg py-3 pl-12 pr-4 text-erp-text-bright focus:outline-none focus:border-erp-cyan focus:ring-1 focus:ring-erp-cyan transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]" 
-              placeholder="SEARCH ASSETS..." 
-              type="text"
-            />
-          </div>
-          <button className="bg-erp-panel border border-erp-border text-erp-text-bright px-6 py-3 rounded-lg flex items-center gap-3 hover:border-erp-cyan transition-colors">
-            <svg className="w-5 h-5 text-erp-text" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-            <span className="font-semibold tracking-wider italic">STATUS</span>
-            <ChevronDown className="w-4 h-4 ml-2" />
-          </button>
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Resumen operativo</h1>
+          <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
+            Estado en tiempo real de proyectos, producción y calidad.
+          </p>
         </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/projects')}>
+            Ver proyectos
+          </Button>
+          <Button onClick={() => navigate('/projects')}>
+            Nuevo proyecto
+          </Button>
+        </div>
+      </div>
 
-        {/* Data Table Container */}
-        <div className="bg-erp-panel/50 backdrop-blur-md border border-erp-cyan/50 rounded-xl shadow-[var(--shadow-glow-cyan)] relative flex-1 flex flex-col overflow-hidden">
-          {/* Corner decorations */}
-          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-erp-cyan"></div>
-          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-erp-cyan"></div>
-          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-erp-cyan"></div>
-          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-erp-cyan"></div>
-          
-          {/* Table */}
-          <div className="overflow-auto flex-1 p-1">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-erp-cyan/30 text-erp-text-bright text-lg">
-                  <th className="py-4 px-6 font-semibold tracking-wider w-1/3 italic uppercase">Asset Name</th>
-                  <th className="py-4 px-6 font-semibold tracking-wider w-1/6 italic uppercase">Status</th>
-                  <th className="py-4 px-6 font-semibold tracking-wider w-1/3 italic uppercase">Completion</th>
-                  <th className="py-4 px-6 font-semibold tracking-wider w-1/6 italic uppercase">UID</th>
-                </tr>
-              </thead>
-              <tbody className="text-lg">
-                {activeProjects.map((project, index) => (
-                  <tr key={index} className="border-b border-erp-purple/20 hover:bg-erp-purple/5 transition-colors group">
-                    <td className="py-4 px-6 font-medium text-erp-text-bright group-hover:text-white transition-colors uppercase tracking-tight">{project.name}</td>
-                    <td className="py-4 px-6">
-                      <span className={`inline-block px-4 py-1 rounded-full font-bold text-sm tracking-wider ${project.statusColor}`}>
-                        {project.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-4">
-                        <div className="progress-bar-container w-48">
-                          <div className="progress-bar-decor"></div>
-                          <div className="progress-bar-fill" style={{ width: `${project.progress}%` }}></div>
-                        </div>
-                        <span className={`font-bold font-mono ${project.progressColor || 'text-erp-cyan'}`}>{project.progress}%</span>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpis.map(kpi => (
+          <Card key={kpi.label} className="p-0">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-[var(--color-app-text-muted)]">{kpi.label}</span>
+                  <span className="text-2xl font-semibold text-[var(--color-app-text)]">{kpi.value}</span>
+                </div>
+                <div className="h-9 w-9 rounded-md bg-[var(--color-app-surface-alt)] flex items-center justify-center">
+                  <kpi.icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-1.5 text-xs">
+                {kpi.trend === 'up' ? (
+                  <TrendingUp className="h-3.5 w-3.5 text-[var(--color-app-success)]" />
+                ) : (
+                  <TrendingDown className="h-3.5 w-3.5 text-[var(--color-app-danger)]" />
+                )}
+                <span
+                  className={cn(
+                    'font-medium',
+                    kpi.trend === 'up' ? 'text-[var(--color-app-success)]' : 'text-[var(--color-app-danger)]'
+                  )}
+                >
+                  {kpi.delta}
+                </span>
+                <span className="text-[var(--color-app-text-muted)]">{kpi.sublabel}</span>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Active projects table */}
+        <Card className="lg:col-span-2 p-0 overflow-hidden">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle>Proyectos activos</CardTitle>
+              <CardDescription>Pipeline actual de manufactura</CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/projects')} className="gap-1">
+              Ver todos <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Proyecto</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="w-[180px]">Avance</TableHead>
+                  <TableHead>Entrega</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activeProjects.map(p => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/projects/${p.id}`)}
+                  >
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-[var(--color-app-text)]">{p.name}</span>
+                        <span className="text-xs text-[var(--color-app-text-muted)] font-mono">{p.id}</span>
                       </div>
-                    </td>
-                    <td className="py-4 px-6 text-erp-text font-mono group-hover:text-erp-text-bright">{project.uid}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="text-[var(--color-app-text-muted)]">{p.client}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusBadge[p.status].variant}>
+                        {statusBadge[p.status].label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Progress value={p.progress} className="h-1.5 w-24" />
+                        <span className="text-xs font-medium text-[var(--color-app-text-muted)] tabular-nums w-9 text-right">
+                          {p.progress}%
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[var(--color-app-text-muted)] text-sm">
+                      {p.deadline}
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-        {/* Bottom Status Bar */}
-        <div className="flex justify-end pt-4 shrink-0">
-          <div className="bg-erp-panel border border-erp-cyan/40 rounded px-6 py-2 flex items-center space-x-6 text-xs font-mono text-erp-text shadow-[var(--shadow-glow-cyan)]">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-erp-cyan shadow-[var(--shadow-glow-cyan)]"></div>
-              <span>CORE: 38.2°C</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-erp-purple shadow-[var(--shadow-glow-purple)]"></div>
-              <span>ID: 268/S</span>
-            </div>
-            <div className="text-erp-text-bright">
-              <span>UTC {time.toISOString().substring(11, 19)}</span>
-            </div>
-          </div>
-        </div>
+        {/* Activity feed */}
+        <Card className="p-0">
+          <CardHeader>
+            <CardTitle>Actividad reciente</CardTitle>
+            <CardDescription>Últimos eventos del sistema</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {recentActivity.map(a => (
+              <div key={a.id} className="flex gap-3">
+                <div
+                  className={cn(
+                    'h-2 w-2 rounded-full mt-1.5 shrink-0',
+                    a.tone === 'success' && 'bg-[var(--color-app-success)]',
+                    a.tone === 'danger' && 'bg-[var(--color-app-danger)]',
+                    a.tone === 'info' && 'bg-[var(--color-app-primary)]'
+                  )}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[var(--color-app-text)] leading-snug">{a.what}</p>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-[var(--color-app-text-muted)]">
+                    <Clock className="h-3 w-3" />
+                    <span>{a.when}</span>
+                    <span>·</span>
+                    <span>{a.who}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

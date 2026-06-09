@@ -6,8 +6,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     <div
       ref={ref}
       className={cn(
-        "rounded-md border border-[var(--color-neon-cyan-dim)] bg-[var(--color-cyber-panel)] text-[var(--color-text-main)] shadow-[0_0_15px_var(--color-neon-cyan-dim)] relative overflow-hidden",
-        "before:absolute before:top-0 before:left-0 before:w-full before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-[var(--color-neon-cyan)] before:to-transparent before:opacity-50",
+        "rounded-xl border border-[var(--color-app-border)] bg-white text-[var(--color-app-text)] shadow-sm",
         className
       )}
       {...props}
@@ -32,7 +31,7 @@ const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HT
     <h3
       ref={ref}
       className={cn(
-        "text-lg font-mono font-semibold leading-none tracking-widest text-[var(--color-neon-cyan)] uppercase drop-shadow-[0_0_5px_var(--color-neon-cyan)]",
+        "text-base font-semibold leading-tight text-[var(--color-app-text)]",
         className
       )}
       {...props}
@@ -45,7 +44,7 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
   ({ className, ...props }, ref) => (
     <p
       ref={ref}
-      className={cn("text-xs font-mono text-[var(--color-text-muted)] uppercase tracking-wider", className)}
+      className={cn("text-sm text-[var(--color-app-text-muted)]", className)}
       {...props}
     />
   )

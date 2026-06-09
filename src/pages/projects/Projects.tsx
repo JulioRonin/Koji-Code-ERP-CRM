@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  useReactTable, 
-  getCoreRowModel, 
+import {
+  useReactTable,
+  getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   getFilteredRowModel,
   flexRender,
   createColumnHelper,
-  SortingState
+  SortingState,
 } from '@tanstack/react-table';
-import { 
-  Search, 
-  Plus, 
-  MoreHorizontal, 
+import {
+  Search,
+  Plus,
+  MoreHorizontal,
   ArrowUpDown,
   Calendar,
-  Clock
 } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Card } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -44,7 +44,6 @@ import {
 import { ProjectFormModal } from './ProjectFormModal';
 import { useChat } from '@/contexts/ChatContext';
 
-// Mock Data
 type Project = {
   id: string;
   name: string;
@@ -57,13 +56,21 @@ type Project = {
 };
 
 const mockProjects: Project[] = [
-  { id: 'IMC-2026-042', name: 'Eje Principal Ensamblaje', client: 'BRP', status: 'En Producción', progress: 75, startDate: '2026-03-01', deadline: '2026-04-15', manager: 'Carlos M.' },
-  { id: 'IMC-2026-045', name: 'Moldes de Inyección', client: 'Foxconn', status: 'Diseño', progress: 20, startDate: '2026-03-15', deadline: '2026-04-20', manager: 'Ana G.' },
-  { id: 'IMC-2026-048', name: 'Soportes Estructurales', client: 'Aptiv', status: 'Cotización', progress: 10, startDate: '2026-03-25', deadline: '2026-04-05', manager: 'Luis R.' },
-  { id: 'IMC-2026-039', name: 'Carcasas de Aluminio', client: 'Bosch', status: 'Calidad', progress: 95, startDate: '2026-02-10', deadline: '2026-03-30', manager: 'Carlos M.' },
-  { id: 'IMC-2026-035', name: 'Prototipo Motor', client: 'BRP', status: 'Entregado', progress: 100, startDate: '2026-01-15', deadline: '2026-03-10', manager: 'Ana G.' },
-  { id: 'IMC-2026-050', name: 'Herramentales Varios', client: 'Lear', status: 'Cotización', progress: 5, startDate: '2026-03-28', deadline: '2026-05-10', manager: 'Luis R.' },
+  { id: 'IMC-2026-042', name: 'Eje Principal Ensamblaje', client: 'BRP',     status: 'En Producción', progress: 75, startDate: '2026-03-01', deadline: '2026-04-15', manager: 'Carlos M.' },
+  { id: 'IMC-2026-045', name: 'Moldes de Inyección',      client: 'Foxconn', status: 'Diseño',         progress: 20, startDate: '2026-03-15', deadline: '2026-04-20', manager: 'Ana G.' },
+  { id: 'IMC-2026-048', name: 'Soportes Estructurales',   client: 'Aptiv',   status: 'Cotización',     progress: 10, startDate: '2026-03-25', deadline: '2026-04-05', manager: 'Luis R.' },
+  { id: 'IMC-2026-039', name: 'Carcasas de Aluminio',     client: 'Bosch',   status: 'Calidad',        progress: 95, startDate: '2026-02-10', deadline: '2026-03-30', manager: 'Carlos M.' },
+  { id: 'IMC-2026-035', name: 'Prototipo Motor',          client: 'BRP',     status: 'Entregado',      progress: 100, startDate: '2026-01-15', deadline: '2026-03-10', manager: 'Ana G.' },
+  { id: 'IMC-2026-050', name: 'Herramentales Varios',     client: 'Lear',    status: 'Cotización',     progress: 5,  startDate: '2026-03-28', deadline: '2026-05-10', manager: 'Luis R.' },
 ];
+
+const statusVariant: Record<Project['status'], 'default' | 'secondary' | 'success' | 'outline' | 'warning'> = {
+  'En Producción': 'default',
+  'Diseño':         'secondary',
+  'Calidad':        'success',
+  'Entregado':      'outline',
+  'Cotización':     'warning',
+};
 
 const columnHelper = createColumnHelper<Project>();
 
@@ -77,50 +84,36 @@ export function Projects() {
 
   const columns = [
     columnHelper.accessor('id', {
-      header: 'ID Proyecto',
-      cell: info => <span className="font-mono font-medium text-[var(--color-neon-cyan)]">{info.getValue()}</span>,
+      header: 'ID',
+      cell: info => <span className="font-mono text-xs text-[var(--color-app-text-muted)]">{info.getValue()}</span>,
     }),
     columnHelper.accessor('name', {
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="-ml-4 h-8 data-[state=open]:bg-[var(--color-neon-cyan-dim)]/20 font-mono text-[var(--color-neon-cyan)] hover:text-[var(--color-neon-cyan)]"
-          >
-            Nombre
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: info => <span className="font-medium text-[var(--color-text-main)]">{info.getValue()}</span>,
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="-ml-3 h-8"
+        >
+          Nombre <ArrowUpDown className="ml-1.5 h-3 w-3" />
+        </Button>
+      ),
+      cell: info => <span className="font-medium">{info.getValue()}</span>,
     }),
     columnHelper.accessor('client', {
       header: 'Cliente',
-      cell: info => <span className="text-[var(--color-text-main)]">{info.getValue()}</span>,
+      cell: info => <span className="text-[var(--color-app-text-muted)]">{info.getValue()}</span>,
     }),
     columnHelper.accessor('status', {
       header: 'Estado',
-      cell: info => {
-        const status = info.getValue();
-        return (
-          <Badge variant={
-            status === 'En Producción' ? 'default' :
-            status === 'Diseño' ? 'secondary' :
-            status === 'Calidad' ? 'success' : 
-            status === 'Entregado' ? 'outline' : 'warning'
-          }>
-            {status}
-          </Badge>
-        );
-      },
+      cell: info => <Badge variant={statusVariant[info.getValue()]}>{info.getValue()}</Badge>,
     }),
     columnHelper.accessor('progress', {
       header: 'Progreso',
       cell: info => (
-        <div className="flex items-center gap-2 w-full max-w-[120px]">
-          <Progress value={info.getValue()} className="h-2" />
-          <span className="text-xs font-mono text-[var(--color-text-muted)] w-8">{info.getValue()}%</span>
+        <div className="flex items-center gap-2 w-32">
+          <Progress value={info.getValue()} className="h-1.5" />
+          <span className="text-xs text-[var(--color-app-text-muted)] tabular-nums w-9 text-right">{info.getValue()}%</span>
         </div>
       ),
     }),
@@ -129,8 +122,8 @@ export function Projects() {
       cell: info => {
         const date = new Date(info.getValue());
         return (
-          <div className="flex items-center font-mono text-[var(--color-text-muted)]">
-            <Calendar className="mr-2 h-4 w-4 text-[var(--color-neon-cyan)]" />
+          <div className="flex items-center gap-2 text-sm text-[var(--color-app-text-muted)]">
+            <Calendar className="h-3.5 w-3.5" />
             {isValid(date) ? format(date, 'dd MMM yyyy', { locale: es }) : 'N/A'}
           </div>
         );
@@ -143,21 +136,21 @@ export function Projects() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0 text-[var(--color-neon-cyan)] hover:text-[var(--color-neon-cyan)] hover:bg-[var(--color-neon-cyan-dim)]/20">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
                 <span className="sr-only">Abrir menú</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-[var(--color-cyber-panel)] border-[var(--color-neon-cyan-dim)] text-[var(--color-text-main)]">
-              <DropdownMenuLabel className="text-[var(--color-neon-cyan)] font-mono uppercase tracking-wider text-xs">Acciones</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(project.id)} className="hover:bg-[var(--color-neon-cyan-dim)]/20 focus:bg-[var(--color-neon-cyan-dim)]/20 cursor-pointer">
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(project.id)}>
                 Copiar ID
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-[var(--color-neon-cyan-dim)]" />
-              <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}`)} className="hover:bg-[var(--color-neon-cyan-dim)]/20 focus:bg-[var(--color-neon-cyan-dim)]/20 cursor-pointer">
-                Ver Detalles
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}`)}>
+                Ver detalles
               </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-[var(--color-neon-cyan-dim)]/20 focus:bg-[var(--color-neon-cyan-dim)]/20 cursor-pointer">Editar Proyecto</DropdownMenuItem>
+              <DropdownMenuItem>Editar proyecto</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -174,10 +167,7 @@ export function Projects() {
     getSortedRowModel: getSortedRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     getFilteredRowModel: getFilteredRowModel(),
-    state: {
-      sorting,
-      globalFilter,
-    },
+    state: { sorting, globalFilter },
   });
 
   const handleCreateProject = (newProject: any) => {
@@ -194,64 +184,65 @@ export function Projects() {
     };
     setData([project, ...data]);
     setIsModalOpen(false);
-    
-    // Notification
-    sendSystemMessage('2', `🚀 NUEVO PROYECTO REGISTRADO: [${project.id}] ${project.name} para el cliente ${project.client}. Responsable: ${project.manager}.`, 'PROJECT');
+
+    sendSystemMessage(
+      '2',
+      `🚀 Nuevo proyecto registrado: [${project.id}] ${project.name} para ${project.client}. Responsable: ${project.manager}.`,
+      'PROJECT'
+    );
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-mono font-bold tracking-widest text-[var(--color-neon-cyan)] uppercase drop-shadow-[0_0_8px_var(--color-neon-cyan)]">Gestión de Proyectos</h1>
-          <p className="text-sm font-mono text-[var(--color-text-muted)] uppercase tracking-wider">Administra órdenes de trabajo, cotizaciones y seguimiento de producción.</p>
+          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Proyectos</h1>
+          <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
+            Administra órdenes de trabajo, cotizaciones y seguimiento de producción.
+          </p>
         </div>
         <Button onClick={() => setIsModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Nuevo Proyecto
+          <Plus className="h-4 w-4 mr-1.5" /> Nuevo proyecto
         </Button>
       </div>
 
-      <div className="flex items-center py-4">
+      <div className="flex items-center">
         <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-neon-cyan)]" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
           <Input
             placeholder="Buscar proyectos..."
-            value={globalFilter ?? ""}
-            onChange={(event) => setGlobalFilter(event.target.value)}
-            className="pl-9 bg-[var(--color-cyber-panel)] border-[var(--color-neon-cyan-dim)] text-[var(--color-text-main)] focus-visible:ring-[var(--color-neon-cyan)] placeholder:text-[var(--color-text-muted)]"
+            value={globalFilter ?? ''}
+            onChange={e => setGlobalFilter(e.target.value)}
+            className="pl-9"
           />
         </div>
       </div>
 
-      <div className="rounded-md border border-[var(--color-neon-cyan-dim)] bg-[var(--color-cyber-panel)] shadow-[0_0_15px_var(--color-neon-cyan-dim)] overflow-hidden">
+      <Card className="p-0">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
+            {table.getHeaderGroups().map(headerGroup => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  )
-                })}
+                {headerGroup.headers.map(header => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map(row => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/projects/${row.original.id}`)}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                  {row.getVisibleCells().map(cell => (
+                    <TableCell key={cell.id} onClick={cell.column.id === 'actions' ? e => e.stopPropagation() : undefined}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -259,37 +250,27 @@ export function Projects() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center font-mono text-[var(--color-text-muted)]">
+                <TableCell colSpan={columns.length} className="h-24 text-center text-[var(--color-app-text-muted)]">
                   No se encontraron resultados.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-      </div>
-      
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
+      </Card>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
           Anterior
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
+        <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
           Siguiente
         </Button>
       </div>
 
-      <ProjectFormModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <ProjectFormModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateProject}
       />
     </div>

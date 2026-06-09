@@ -2,8 +2,6 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format, isValid } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +15,6 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -34,27 +31,19 @@ import {
 } from '@/components/ui/select';
 import { CyberDatePicker } from '@/components/ui/CyberDatePicker';
 
-const projectSchema = z.object({
-  name: z.string().min(3, {
-    message: "El nombre del proyecto debe tener al menos 3 caracteres.",
-  }),
-  client: z.string().min(2, {
-    message: "El nombre del cliente debe tener al menos 2 caracteres.",
-  }),
-  description: z.string().optional(),
-  manager: z.string({
-    message: "Por favor selecciona un Project Manager.",
-  }),
-  startDate: z.date({
-    message: "La fecha de inicio es requerida.",
-  }),
-  deadline: z.date({
-    message: "La fecha de entrega es requerida.",
-  }),
-}).refine((data) => data.deadline > data.startDate, {
-  message: "La fecha de entrega debe ser posterior a la fecha de inicio.",
-  path: ["deadline"],
-});
+const projectSchema = z
+  .object({
+    name: z.string().min(3, { message: 'El nombre del proyecto debe tener al menos 3 caracteres.' }),
+    client: z.string().min(2, { message: 'El nombre del cliente debe tener al menos 2 caracteres.' }),
+    description: z.string().optional(),
+    manager: z.string({ message: 'Por favor selecciona un Project Manager.' }),
+    startDate: z.date({ message: 'La fecha de inicio es requerida.' }),
+    deadline: z.date({ message: 'La fecha de entrega es requerida.' }),
+  })
+  .refine(data => data.deadline > data.startDate, {
+    message: 'La fecha de entrega debe ser posterior a la fecha de inicio.',
+    path: ['deadline'],
+  });
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
 
@@ -68,10 +57,10 @@ export function ProjectFormModal({ isOpen, onClose, onSubmit }: ProjectFormModal
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      name: "",
-      client: "",
-      description: "",
-      manager: "",
+      name: '',
+      client: '',
+      description: '',
+      manager: '',
       startDate: undefined,
       deadline: undefined,
     },
@@ -86,20 +75,20 @@ export function ProjectFormModal({ isOpen, onClose, onSubmit }: ProjectFormModal
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
+          <DialogTitle>Crear nuevo proyecto</DialogTitle>
           <DialogDescription>
             Ingresa los detalles iniciales del proyecto. Podrás agregar más información después.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Nombre del Proyecto</FormLabel>
+                    <FormLabel>Nombre del proyecto</FormLabel>
                     <FormControl>
                       <Input placeholder="Ej. Eje Principal Ensamblaje" {...field} />
                     </FormControl>
@@ -147,13 +136,13 @@ export function ProjectFormModal({ isOpen, onClose, onSubmit }: ProjectFormModal
                 name="startDate"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Fecha de Inicio</FormLabel>
+                    <FormLabel>Fecha de inicio</FormLabel>
                     <FormControl>
-                        <CyberDatePicker 
-                            value={field.value} 
-                            onChange={field.onChange} 
-                            placeholder="DD / MM / YYYY"
-                        />
+                      <CyberDatePicker
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="DD / MM / YYYY"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -164,13 +153,13 @@ export function ProjectFormModal({ isOpen, onClose, onSubmit }: ProjectFormModal
                 name="deadline"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Fecha de Entrega</FormLabel>
+                    <FormLabel>Fecha de entrega</FormLabel>
                     <FormControl>
-                        <CyberDatePicker 
-                            value={field.value} 
-                            onChange={field.onChange} 
-                            placeholder="DD / MM / YYYY"
-                        />
+                      <CyberDatePicker
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="DD / MM / YYYY"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -181,7 +170,7 @@ export function ProjectFormModal({ isOpen, onClose, onSubmit }: ProjectFormModal
                 name="description"
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Descripción / Notas (Opcional)</FormLabel>
+                    <FormLabel>Descripción / notas (opcional)</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder="Detalles adicionales sobre el proyecto..."
@@ -195,12 +184,10 @@ export function ProjectFormModal({ isOpen, onClose, onSubmit }: ProjectFormModal
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose} className="border-cyber-border text-cyber-muted hover:bg-cyber-dark/50 hover:text-cyber-neon font-cyber">
+              <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-cyber-neon text-cyber-dark hover:bg-cyber-neon/90 font-cyber">
-                Crear Proyecto
-              </Button>
+              <Button type="submit">Crear proyecto</Button>
             </DialogFooter>
           </form>
         </Form>

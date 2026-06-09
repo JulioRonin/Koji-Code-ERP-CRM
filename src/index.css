@@ -1,115 +1,169 @@
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* =====================================================================
+   KOJI CODE ERP — DESIGN TOKENS
+   Industrial / Professional theme. Clean, neutral, print-friendly.
+   ===================================================================== */
 @theme {
-  --font-sans: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Rajdhani", ui-monospace, SFMono-Regular, monospace;
-  
-  --color-erp-bg: #070b19;
-  --color-erp-sidebar: #0f1225;
-  --color-erp-panel: #121833;
-  --color-erp-cyan: #00f0ff;
-  --color-erp-purple: #b026ff;
-  --color-erp-text: #a8b2d1;
-  --color-erp-text-bright: #e2e8f0;
-  --color-erp-border: #1e293b;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Backwards compatibility for other pages */
-  --color-cyber-bg: var(--color-erp-bg);
-  --color-cyber-dark: var(--color-erp-bg);
-  --color-cyber-panel: var(--color-erp-panel);
-  --color-cyber-border: var(--color-erp-border);
-  
-  --color-neon-cyan: var(--color-erp-cyan);
-  --color-neon-cyan-dim: rgba(0, 240, 255, 0.2);
-  --color-neon-red: #ff2a2a;
-  --color-neon-red-dim: rgba(255, 42, 42, 0.2);
-  --color-neon-purple: var(--color-erp-purple);
-  --color-neon-purple-dim: rgba(176, 38, 255, 0.2);
+  /* === Brand palette === */
+  --color-app-bg: #f6f7f9;          /* page background */
+  --color-app-surface: #ffffff;      /* cards / panels */
+  --color-app-surface-alt: #f1f5f9;  /* subtle backgrounds, table headers */
+  --color-app-sidebar: #0f172a;      /* dark navy sidebar */
+  --color-app-sidebar-hover: #1e293b;
 
-  --color-cyber-neon: var(--color-erp-cyan);
-  --color-cyber-accent: var(--color-erp-cyan);
-  --color-cyber-red: #ff2a2a;
-  --color-cyber-purple: var(--color-erp-purple);
-  
-  --color-text-main: var(--color-erp-text-bright);
-  --color-text-muted: var(--color-erp-text);
-  --color-cyber-text: var(--color-erp-text-bright);
-  --color-cyber-muted: var(--color-erp-text);
+  --color-app-border: #e2e8f0;
+  --color-app-border-strong: #cbd5e1;
 
-  --shadow-glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
-  --shadow-glow-cyan-lg: 0 0 15px rgba(0, 240, 255, 0.6), 0 0 30px rgba(0, 240, 255, 0.4);
-  --shadow-glow-purple: 0 0 10px rgba(176, 38, 255, 0.5);
+  --color-app-text: #0f172a;         /* primary text */
+  --color-app-text-muted: #475569;   /* secondary */
+  --color-app-text-subtle: #94a3b8;  /* tertiary */
+  --color-app-text-on-dark: #e2e8f0;
 
-  --background-image-grid-pattern: linear-gradient(to right, #1e293b 1px, transparent 1px), linear-gradient(to bottom, #1e293b 1px, transparent 1px);
-  --background-image-circuit-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83.83v58.34h-58.34l-.83-.83V0h58.34zM27 24v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm14.12 11.29l1.41-1.41 2.12 2.12-1.41 1.41-2.12-2.12zm-28.24 0l-2.12 2.12 1.41 1.41 2.12-2.12-1.41-1.41zm28.24-22.58l-1.41-1.41-2.12 2.12 1.41 1.41 2.12-2.12zM12.88 12.71l2.12-2.12-1.41-1.41-2.12 2.12 1.41 1.41z' fill='%231e293b' fill-opacity='0.2' fill-rule='evenodd'/%3E%3C/svg%3E");
+  --color-app-primary: #0369a1;      /* steel/industrial blue */
+  --color-app-primary-hover: #075985;
+  --color-app-primary-soft: #e0f2fe;
+  --color-app-primary-fg: #ffffff;
+
+  --color-app-success: #15803d;
+  --color-app-success-soft: #dcfce7;
+  --color-app-warning: #b45309;
+  --color-app-warning-soft: #fef3c7;
+  --color-app-danger: #b91c1c;
+  --color-app-danger-soft: #fee2e2;
+  --color-app-info: #1d4ed8;
+  --color-app-info-soft: #dbeafe;
+
+  /* === Legacy aliases — keeps old `cyber-*` / `erp-*` / `neon-*` classes working
+     without screaming neon. They now render in the new neutral palette. === */
+  --color-erp-bg: var(--color-app-bg);
+  --color-erp-sidebar: var(--color-app-sidebar);
+  --color-erp-panel: var(--color-app-surface);
+  --color-erp-cyan: var(--color-app-primary);
+  --color-erp-purple: var(--color-app-text-muted);
+  --color-erp-text: var(--color-app-text-muted);
+  --color-erp-text-bright: var(--color-app-text);
+  --color-erp-border: var(--color-app-border);
+  --color-erp-red-neon: var(--color-app-danger);
+
+  --color-cyber-bg: var(--color-app-bg);
+  --color-cyber-dark: var(--color-app-bg);
+  --color-cyber-panel: var(--color-app-surface);
+  --color-cyber-border: var(--color-app-border);
+  --color-cyber-neon: var(--color-app-primary);
+  --color-cyber-accent: var(--color-app-info);
+  --color-cyber-red: var(--color-app-danger);
+  --color-cyber-purple: var(--color-app-text-muted);
+  --color-cyber-text: var(--color-app-text);
+  --color-cyber-muted: var(--color-app-text-muted);
+
+  --color-neon-cyan: var(--color-app-primary);
+  --color-neon-cyan-dim: var(--color-app-border);
+  --color-neon-red: var(--color-app-danger);
+  --color-neon-red-dim: var(--color-app-danger-soft);
+  --color-neon-purple: var(--color-app-info);
+  --color-neon-purple-dim: var(--color-app-info-soft);
+
+  --color-text-main: var(--color-app-text);
+  --color-text-muted: var(--color-app-text-muted);
+  --color-bg-main: var(--color-app-bg);
+
+  /* Drop all neon glow — keep var name so existing code compiles, but value is subtle. */
+  --shadow-glow-cyan: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-glow-cyan-lg: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-glow-purple: 0 1px 2px rgba(15, 23, 42, 0.06);
+
+  --background-image-grid-pattern: none;
+  --background-image-circuit-pattern: none;
 }
 
+/* =====================================================================
+   BASE
+   ===================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  background-color: var(--color-app-bg);
+  color: var(--color-app-text);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-app-primary);
+  color: var(--color-app-primary-fg);
+}
+
+/* =====================================================================
+   UTILITIES — kept for back-compat. Drop the neon side effects.
+   ===================================================================== */
 @layer utilities {
-  .bg-grid {
-    background-size: 40px 40px;
-  }
-  
-  .text-glow {
-    text-shadow: 0 0 5px rgba(0, 240, 255, 0.8);
+  .bg-grid { background-size: 0; }
+  .text-glow { text-shadow: none; }
+  .clip-path-polygon { clip-path: none; }
+  .clip-path-btn { clip-path: none; }
+
+  /* New, useful card surface */
+  .surface {
+    background-color: var(--color-app-surface);
+    border: 1px solid var(--color-app-border);
+    border-radius: 0.75rem;
   }
 
-  .clip-path-polygon {
-    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
-  }
-  
-  .clip-path-btn {
-    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  /* Soft panel for KPIs */
+  .surface-soft {
+    background-color: var(--color-app-surface-alt);
+    border: 1px solid var(--color-app-border);
+    border-radius: 0.75rem;
   }
 }
 
-body {
-  background-color: var(--color-erp-bg);
-  color: var(--color-erp-text);
-  font-family: 'Rajdhani', sans-serif;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: var(--color-erp-bg); 
-}
+/* =====================================================================
+   SCROLLBARS
+   ===================================================================== */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-erp-border); 
-  border-radius: 4px;
+  background: #cbd5e1;
+  border-radius: 8px;
+  border: 2px solid var(--color-app-bg);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-erp-text); 
-}
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* Progress Bar Custom Styles */
+/* =====================================================================
+   PROGRESS BAR (legacy classes used in some places)
+   ===================================================================== */
 .progress-bar-container {
   position: relative;
-  border: 1px solid var(--color-erp-purple);
-  border-radius: 4px;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  height: 20px;
+  border: 1px solid var(--color-app-border);
+  border-radius: 9999px;
+  background: var(--color-app-surface-alt);
+  height: 8px;
+  overflow: hidden;
+  padding: 0;
+  display: block;
 }
-
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, rgba(0,240,255,0.8) 0%, rgba(0,240,255,0.4) 100%);
-  box-shadow: var(--shadow-glow-cyan);
-  border-radius: 2px;
+  background: var(--color-app-primary);
+  border-radius: 9999px;
+  box-shadow: none;
+  transition: width 240ms ease;
 }
+.progress-bar-decor { display: none; }
 
-.progress-bar-decor {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 10px;
-  border-right: 2px solid var(--color-erp-purple);
-  background-color: var(--color-erp-cyan);
-  box-shadow: var(--shadow-glow-cyan);
+/* =====================================================================
+   PRINT (PMO reports / packing labels)
+   ===================================================================== */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #ffffff !important; color: #000000 !important; }
+  .surface, .surface-soft { box-shadow: none !important; border-color: #d4d4d8 !important; }
 }

@@ -1,37 +1,49 @@
 import React from 'react';
+import { FileText, Settings as SettingsIcon, Construction } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-export function Projects() {
+function Placeholder({
+  title,
+  description,
+  icon: Icon,
+}: {
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight text-cyber-neon font-cyber">Proyectos</h1>
-      <p className="text-sm text-cyber-muted">Gestión de proyectos y órdenes de trabajo.</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-[var(--color-app-text)]">{title}</h1>
+        <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">{description}</p>
+      </div>
+      <Card>
+        <CardContent className="p-12 flex flex-col items-center justify-center text-center gap-3">
+          <div className="h-12 w-12 rounded-full bg-[var(--color-app-surface-alt)] flex items-center justify-center">
+            <Icon className="h-5 w-5 text-[var(--color-app-text-muted)]" />
+          </div>
+          <h3 className="text-base font-medium text-[var(--color-app-text)]">Módulo en construcción</h3>
+          <p className="text-sm text-[var(--color-app-text-muted)] max-w-sm">
+            Este módulo estará disponible próximamente como parte del roadmap de la plataforma.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
+}
+
+export function Projects() {
+  return <Placeholder title="Proyectos" description="Gestión de proyectos y órdenes de trabajo." icon={Construction} />;
 }
 
 export function Chat() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight text-cyber-neon font-cyber">Chat Interno</h1>
-      <p className="text-sm text-cyber-muted">Comunicación entre departamentos.</p>
-    </div>
-  );
+  return <Placeholder title="Chat interno" description="Comunicación entre departamentos." icon={Construction} />;
 }
 
 export function Billing() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight text-cyber-neon font-cyber">Facturación</h1>
-      <p className="text-sm text-cyber-muted">Emisión de CFDI 4.0 y control de pagos.</p>
-    </div>
-  );
+  return <Placeholder title="Facturación" description="Emisión de CFDI 4.0 y control de pagos." icon={FileText} />;
 }
 
 export function Settings() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight text-cyber-neon font-cyber">Configuración</h1>
-      <p className="text-sm text-cyber-muted">Ajustes del sistema y gestión de usuarios.</p>
-    </div>
-  );
+  return <Placeholder title="Configuración" description="Ajustes del sistema, branding y gestión de usuarios." icon={SettingsIcon} />;
 }

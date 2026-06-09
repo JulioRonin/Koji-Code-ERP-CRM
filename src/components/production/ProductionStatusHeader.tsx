@@ -1,92 +1,89 @@
 import React, { useState } from 'react';
-import { 
-  BarChart3, 
-  CheckCircle2, 
-  Clock, 
-  Target,
-  Box,
-  ChevronDown
-} from 'lucide-react';
+import { CheckCircle2, Clock, Target, Box } from 'lucide-react';
 import { PROJECTS, INITIAL_BOMS } from '@/components/purchasing/BOMManager';
 import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
 
 export function ProductionStatusHeader() {
   const [selectedProjectId, setSelectedProjectId] = useState(PROJECTS[0].id);
-  const project = PROJECTS.find(p => p.id === selectedProjectId);
   const bom = INITIAL_BOMS.find(b => b.projectId === selectedProjectId);
-  
-  // Mocking status data for demonstration
+
   const totalParts = bom ? bom.items.length : 0;
   const assignedParts = Math.floor(totalParts * 0.8);
   const finishedParts = Math.floor(totalParts * 0.3);
   const progress = totalParts > 0 ? (finishedParts / totalParts) * 100 : 0;
 
   return (
-    <div className="bg-cyber-panel/40 border border-cyber-border rounded-xl p-6 backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.4)]">
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8">
-        
-        {/* Project Selector */}
-        <div className="space-y-3 w-full xl:w-1/3">
-          <div className="flex items-center gap-2">
-            <Target className="h-4 w-4 text-cyber-neon" />
-            <span className="text-[10px] font-mono font-bold text-cyber-neon uppercase tracking-widest">Monitoreo por Proyecto</span>
-          </div>
-          <div className="relative group">
-            <select 
+    <Card className="p-0">
+      <CardContent className="p-5">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+          {/* Project selector */}
+          <div className="w-full xl:w-1/3 space-y-2">
+            <div className="flex items-center gap-2 text-xs text-[var(--color-app-text-muted)]">
+              <Target className="h-3.5 w-3.5" />
+              <span>Monitoreo por proyecto</span>
+            </div>
+            <select
               value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="w-full bg-black/60 border border-cyber-neon/30 text-white font-cyber text-sm uppercase rounded-lg p-3 appearance-none focus:ring-1 focus:ring-cyber-neon outline-none cursor-pointer group-hover:border-cyber-neon/60 transition-all"
+              onChange={e => setSelectedProjectId(e.target.value)}
+              className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm text-[var(--color-app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)] transition-colors"
             >
               {PROJECTS.map(p => (
-                <option key={p.id} value={p.id}>{p.id} - {p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.id} — {p.name}
+                </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-cyber-neon pointer-events-none transition-transform group-hover:translate-y-[-40%]" />
+          </div>
+
+          {/* KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 w-full">
+            <Kpi icon={Box}        label="Total piezas" value={totalParts}    suffix="items" />
+            <Kpi icon={Clock}      label="Asignadas"    value={assignedParts} suffix="WIP" />
+            <Kpi icon={CheckCircle2} label="Terminadas"  value={finishedParts} suffix="listo" tone="success" />
+            <div className="space-y-2 rounded-md bg-[var(--color-app-surface-alt)] p-3 border border-[var(--color-app-border)]">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-[var(--color-app-text-muted)]">Progreso global</span>
+                <span className="text-sm font-semibold">{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="h-1.5" />
+            </div>
           </div>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-        {/* Global KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 flex-1 w-full">
-          <div className="space-y-1 bg-black/20 p-3 rounded-lg border border-white/5 hover:border-cyber-neon/20 transition-all">
-            <p className="text-[9px] text-cyber-muted uppercase font-mono tracking-tighter flex items-center gap-1">
-              <Box className="h-3 w-3" /> Total Piezas
-            </p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold text-cyber-text font-mono tracking-tighter">{totalParts}</span>
-              <span className="text-[9px] text-cyber-muted font-mono uppercase">Items</span>
-            </div>
-          </div>
-
-          <div className="space-y-1 bg-black/20 p-3 rounded-lg border border-white/5 hover:border-cyber-neon/20 transition-all">
-            <p className="text-[9px] text-cyber-muted uppercase font-mono tracking-tighter flex items-center gap-1">
-              <Clock className="h-3 w-3" /> Asignadas
-            </p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold text-cyber-accent font-mono tracking-tighter">{assignedParts}</span>
-              <span className="text-[9px] text-cyber-muted font-mono uppercase">WIP</span>
-            </div>
-          </div>
-
-          <div className="space-y-1 bg-black/20 p-3 rounded-lg border border-white/5 hover:border-cyber-neon/20 transition-all">
-            <p className="text-[9px] text-cyber-muted uppercase font-mono tracking-tighter flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" /> Terminadas
-            </p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold text-emerald-400 font-mono tracking-tighter">{finishedParts}</span>
-              <span className="text-[9px] text-cyber-muted font-mono uppercase">Listo</span>
-            </div>
-          </div>
-
-          <div className="space-y-2 bg-black/20 p-3 rounded-lg border border-white/5 flex flex-col justify-center">
-            <div className="flex justify-between items-center mb-1">
-              <p className="text-[9px] text-cyber-muted uppercase font-mono tracking-tighter">Progreso Global</p>
-              <span className="text-xs font-bold text-cyber-neon font-cyber">{Math.round(progress)}%</span>
-            </div>
-            <Progress value={progress} className="h-1.5" />
-          </div>
-        </div>
-
+function Kpi({
+  icon: Icon,
+  label,
+  value,
+  suffix,
+  tone,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  suffix: string;
+  tone?: 'success';
+}) {
+  return (
+    <div className="rounded-md bg-[var(--color-app-surface-alt)] p-3 border border-[var(--color-app-border)]">
+      <div className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </div>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span
+          className={
+            tone === 'success'
+              ? 'text-xl font-semibold text-[var(--color-app-success)]'
+              : 'text-xl font-semibold text-[var(--color-app-text)]'
+          }
+        >
+          {value}
+        </span>
+        <span className="text-xs text-[var(--color-app-text-muted)]">{suffix}</span>
       </div>
     </div>
   );
