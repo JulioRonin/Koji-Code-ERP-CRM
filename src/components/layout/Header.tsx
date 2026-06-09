@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Radio, LogOut, Settings, Shield, UserCircle } from 'lucide-react';
+import { LogOut, Settings, Shield, UserCircle, Search, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   DropdownMenu,
@@ -9,7 +9,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 export function Header() {
@@ -17,76 +16,79 @@ export function Header() {
   const navigate = useNavigate();
 
   return (
-    <header className="h-20 flex items-center justify-between px-8 border-b border-erp-purple/20 bg-erp-bg/80 backdrop-blur-sm shrink-0">
-      <div className="flex flex-col">
-        <h2 className="text-xl font-black text-erp-text-bright tracking-widest uppercase">Desktop Manufacturing Pipeline</h2>
-        <div className="h-[1px] w-full bg-gradient-to-r from-erp-cyan/50 to-transparent"></div>
+    <header className="h-16 flex items-center justify-between px-6 border-b border-[var(--color-app-border)] bg-white shrink-0">
+      {/* Search */}
+      <div className="flex items-center gap-3 flex-1 max-w-md">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-app-text-subtle)]" />
+          <input
+            type="text"
+            placeholder="Buscar proyectos, partes, órdenes..."
+            className="w-full h-9 pl-9 pr-3 rounded-md border border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)] text-sm text-[var(--color-app-text)] placeholder:text-[var(--color-app-text-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)] focus:bg-white transition-colors"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center space-x-6">
-        <div className="flex items-center space-x-2 text-[10px] font-mono font-bold tracking-[0.2em] text-erp-cyan">
-          <Radio className="w-3 h-3 animate-pulse" />
-          <span>PRODUCTION_NOMINAL</span>
-        </div>
-        <div className="flex items-center space-x-2 text-[10px] font-mono font-bold tracking-[0.2em] text-erp-text-bright bg-erp-panel/60 px-3 py-1.5 rounded border border-erp-border">
-          <div className="w-1.5 h-1.5 rounded-full bg-erp-cyan shadow-[var(--shadow-glow-cyan)] animate-pulse"></div>
-          <span>SYSTEM LIVE</span>
-        </div>
+      {/* Right cluster */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="relative h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--color-app-text-muted)] hover:bg-[var(--color-app-surface-alt)] transition-colors"
+          aria-label="Notificaciones"
+        >
+          <Bell className="h-4 w-4" />
+          <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[var(--color-app-danger)]" />
+        </button>
+
+        <div className="h-6 w-px bg-[var(--color-app-border)]" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="w-10 h-10 rounded-full bg-erp-panel border border-erp-purple/50 flex items-center justify-center hover:border-erp-cyan transition-all shadow-[var(--shadow-glow-purple)] group relative overflow-hidden">
-              <div className="absolute inset-0 bg-erp-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              {user?.avatar ? (
-                <span className="text-sm font-black text-erp-cyan">{user.avatar}</span>
-              ) : (
-                <User className="w-5 h-5 text-erp-purple group-hover:text-erp-cyan transition-colors" />
-              )}
+            <button className="flex items-center gap-2.5 pl-1 pr-2.5 py-1 rounded-md hover:bg-[var(--color-app-surface-alt)] transition-colors">
+              <div className="h-7 w-7 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-xs font-semibold">
+                {user?.avatar || user?.name?.[0] || 'U'}
+              </div>
+              <div className="hidden md:flex flex-col text-left leading-tight">
+                <span className="text-sm font-medium text-[var(--color-app-text)]">{user?.name}</span>
+                <span className="text-[11px] text-[var(--color-app-text-muted)]">{user?.role}</span>
+              </div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64 bg-erp-sidebar border-erp-purple/30 text-erp-text font-mono shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
-            <DropdownMenuLabel className="p-4 bg-erp-panel/40">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-erp-cyan/10 border border-erp-cyan flex items-center justify-center text-erp-cyan text-lg font-black italic">
-                   {user?.avatar}
-                </div>
-                <div className="flex flex-col">
-                  <p className="text-xs font-black text-white uppercase tracking-wider">{user?.name}</p>
-                  <p className="text-[9px] text-erp-cyan font-bold uppercase tracking-tight">{user?.role}</p>
-                </div>
-              </div>
+          <DropdownMenuContent align="end" className="w-56 bg-white border border-[var(--color-app-border)] text-[var(--color-app-text)] shadow-md">
+            <DropdownMenuLabel className="px-3 py-2">
+              <div className="text-sm font-medium">{user?.name}</div>
+              <div className="text-xs text-[var(--color-app-text-muted)]">{user?.department}</div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-erp-purple/20" />
-            
-            <div className="p-1">
-              <DropdownMenuItem 
-                onClick={() => navigate('/settings')}
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-erp-cyan/10 focus:bg-erp-cyan/10 group rounded-md"
-              >
-                <UserCircle className="w-4 h-4 text-erp-purple group-hover:text-erp-cyan" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-erp-text group-hover:text-white">Perfil de Usuario</span>
-              </DropdownMenuItem>
-              
-              <DropdownMenuItem 
-                onClick={() => navigate('/settings')}
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-erp-cyan/10 focus:bg-erp-cyan/10 group rounded-md"
-              >
-                <Shield className="w-4 h-4 text-erp-purple group-hover:text-erp-cyan" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-erp-text group-hover:text-white">Seguridad</span>
-              </DropdownMenuItem>
-            </div>
-
-            <DropdownMenuSeparator className="bg-erp-purple/20" />
-            
-            <div className="p-1">
-              <DropdownMenuItem 
-                onClick={logout}
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-erp-red-neon/10 focus:bg-erp-red-neon/10 group rounded-md"
-              >
-                <LogOut className="w-4 h-4 text-erp-red-neon animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-erp-red-neon">Desconectarse</span>
-              </DropdownMenuItem>
-            </div>
+            <DropdownMenuSeparator className="bg-[var(--color-app-border)]" />
+            <DropdownMenuItem
+              onClick={() => navigate('/settings')}
+              className="gap-2 cursor-pointer"
+            >
+              <UserCircle className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+              <span>Mi perfil</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate('/settings')}
+              className="gap-2 cursor-pointer"
+            >
+              <Shield className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+              <span>Seguridad</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate('/settings')}
+              className="gap-2 cursor-pointer"
+            >
+              <Settings className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+              <span>Configuración</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-[var(--color-app-border)]" />
+            <DropdownMenuItem
+              onClick={logout}
+              className="gap-2 cursor-pointer text-[var(--color-app-danger)] focus:text-[var(--color-app-danger)]"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Cerrar sesión</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

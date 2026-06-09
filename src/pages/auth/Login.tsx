@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Factory, Shield, Ruler, ShoppingCart, Users, Briefcase, ChevronRight, ArrowLeft, Lock, Mail } from 'lucide-react';
+import {
+  Factory,
+  Shield,
+  Ruler,
+  ShoppingCart,
+  Users,
+  Briefcase,
+  ChevronRight,
+  ArrowLeft,
+  Lock,
+  Mail,
+  HardHat,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { DEPARTMENTS } from '@/data/crmData';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/lib/utils';
 
 export function Login() {
   const [step, setStep] = useState(1);
@@ -26,9 +37,9 @@ export function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     const success = await login(selectedDept, email, password);
-    
+
     if (success) {
       if (selectedDept === 'Técnico') {
         navigate('/technician-portal');
@@ -48,66 +59,55 @@ export function Login() {
       case 'Diseño': return Ruler;
       case 'Producción': return Factory;
       case 'Calidad': return Shield;
-      case 'Técnico': return Users;
-      default: return Factory;
+      case 'Técnico': return HardHat;
+      default: return Users;
     }
   };
 
   return (
-    <div className="min-h-screen bg-cyber-dark flex items-center justify-center p-4 relative overflow-hidden font-mono">
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]"></div>
-      <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-cyber-neon/10 blur-[120px] rounded-full"></div>
-      <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-cyber-accent/10 blur-[120px] rounded-full"></div>
-      
-      <div className="w-full max-w-xl relative z-10">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center mb-8"
-        >
-          <div className="w-20 h-20 bg-black/40 border border-cyber-neon rounded-2xl flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(0,240,255,0.2)] group transition-all hover:scale-110">
-            <Factory className="w-10 h-10 text-cyber-neon group-hover:animate-pulse" />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[var(--color-app-bg)]">
+      <div className="w-full max-w-md">
+        {/* Brand */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="h-12 w-12 rounded-xl bg-[var(--color-app-primary)] flex items-center justify-center mb-4 shadow-sm">
+            <Factory className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-4xl font-black text-white tracking-widest uppercase drop-shadow-[0_0_15px_rgba(0,240,255,0.5)]">KOJI CODE ERP</h1>
-          <div className="flex items-center gap-3 mt-2">
-            <div className="h-[1px] w-8 bg-cyber-neon/50"></div>
-            <p className="text-cyber-muted font-bold tracking-[0.3em] uppercase text-[10px]">Access Control Terminal</p>
-            <div className="h-[1px] w-8 bg-cyber-neon/50"></div>
-          </div>
-        </motion.div>
+          <h1 className="text-2xl font-semibold text-[var(--color-app-text)]">Koji Code ERP</h1>
+          <p className="text-sm text-[var(--color-app-text-muted)] mt-1">Plataforma de manufactura CNC</p>
+        </div>
 
         <AnimatePresence mode="wait">
           {step === 1 ? (
             <motion.div
               key="step1"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
             >
-              <Card className="border-cyber-border bg-black/60 backdrop-blur-xl shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyber-neon to-transparent"></div>
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-xl text-center text-white uppercase tracking-widest font-black">Selecciona Departamento</CardTitle>
-                  <CardDescription className="text-center text-cyber-muted text-[10px] uppercase font-bold tracking-tighter">Identifícate para habilitar los protocolos de seguridad</CardDescription>
+                  <CardTitle className="text-lg">Selecciona tu departamento</CardTitle>
+                  <CardDescription>Elige tu rol para continuar al inicio de sesión.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 p-6">
-                  {DEPARTMENTS.map((dept) => {
+                <CardContent className="grid grid-cols-1 gap-2">
+                  {DEPARTMENTS.map(dept => {
                     const Icon = getDeptIcon(dept);
                     return (
                       <button
                         key={dept}
                         onClick={() => handleDepartmentSelect(dept)}
-                        className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10 hover:border-cyber-neon hover:bg-cyber-neon/5 transition-all group"
+                        className="flex items-center justify-between p-3 rounded-md border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)] hover:bg-[var(--color-app-primary-soft)]/40 transition-colors group"
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className="w-5 h-5 text-cyber-muted group-hover:text-cyber-neon transition-colors" />
-                          <span className="text-xs font-bold text-gray-300 group-hover:text-white uppercase tracking-wider">{dept}</span>
+                          <div className="h-8 w-8 rounded-md bg-[var(--color-app-surface-alt)] flex items-center justify-center group-hover:bg-[var(--color-app-primary-soft)] transition-colors">
+                            <Icon className="h-4 w-4 text-[var(--color-app-text-muted)] group-hover:text-[var(--color-app-primary)]" />
+                          </div>
+                          <span className="text-sm font-medium text-[var(--color-app-text)]">{dept}</span>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-cyber-muted group-hover:text-cyber-neon transition-transform group-hover:translate-x-1" />
+                        <ChevronRight className="h-4 w-4 text-[var(--color-app-text-subtle)] group-hover:text-[var(--color-app-primary)] group-hover:translate-x-0.5 transition-all" />
                       </button>
-                    )
+                    );
                   })}
                 </CardContent>
               </Card>
@@ -115,74 +115,73 @@ export function Login() {
           ) : (
             <motion.div
               key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
             >
-              <Card className="border-cyber-border bg-black/60 backdrop-blur-xl shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyber-accent to-transparent"></div>
-                <CardHeader className="relative">
-                   <button 
+              <Card>
+                <CardHeader>
+                  <button
+                    type="button"
                     onClick={() => setStep(1)}
-                    className="absolute left-6 top-8 text-cyber-muted hover:text-cyber-neon transition-colors flex items-center gap-1 text-[10px] uppercase font-bold"
+                    className="inline-flex items-center gap-1 text-sm text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)] transition-colors w-fit"
                   >
-                    <ArrowLeft className="w-3 h-3" /> Volver
+                    <ArrowLeft className="h-3.5 w-3.5" /> Volver
                   </button>
-                  <CardTitle className="text-xl text-center text-white uppercase tracking-widest font-black mt-4">{selectedDept}</CardTitle>
-                  <CardDescription className="text-center text-cyber-muted text-[10px] uppercase font-bold tracking-tighter">Ingresa tus credenciales de acceso</CardDescription>
+                  <CardTitle className="text-lg mt-2">{selectedDept}</CardTitle>
+                  <CardDescription>Ingresa tus credenciales para acceder.</CardDescription>
                 </CardHeader>
                 <form onSubmit={handleLogin}>
-                  <CardContent className="space-y-4 p-6">
+                  <CardContent className="space-y-4">
                     {error && (
-                      <div className="p-3 bg-cyber-red/10 border border-cyber-red/30 rounded text-[10px] text-cyber-red font-bold uppercase text-center animate-shake">
+                      <div className="p-3 bg-[var(--color-app-danger-soft)] border border-[var(--color-app-danger)]/30 rounded-md text-sm text-[var(--color-app-danger)]">
                         {error}
                       </div>
                     )}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-cyber-neon uppercase tracking-widest flex items-center gap-2">
-                        <Mail className="w-3 h-3" /> Dirección de Correo
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-[var(--color-app-text)] flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" /> Correo electrónico
                       </label>
                       <input
                         type="email"
                         required
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-black/40 border border-cyber-border rounded px-4 py-3 text-sm text-white focus:outline-none focus:border-cyber-neon focus:ring-1 focus:ring-cyber-neon/50 transition-all"
-                        placeholder="usuario@roninstudio.com"
+                        onChange={e => setEmail(e.target.value)}
+                        className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm text-[var(--color-app-text)] placeholder:text-[var(--color-app-text-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)] transition-colors"
+                        placeholder="usuario@empresa.com"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-cyber-neon uppercase tracking-widest flex items-center gap-2">
-                        <Lock className="w-3 h-3" /> Contraseña de Sistema
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-[var(--color-app-text)] flex items-center gap-1.5">
+                        <Lock className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" /> Contraseña
                       </label>
                       <input
                         type="password"
                         required
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-black/40 border border-cyber-border rounded px-4 py-3 text-sm text-white focus:outline-none focus:border-cyber-neon focus:ring-1 focus:ring-cyber-neon/50 transition-all"
+                        onChange={e => setPassword(e.target.value)}
+                        className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm text-[var(--color-app-text)] placeholder:text-[var(--color-app-text-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)] transition-colors"
                         placeholder="••••••••"
                       />
                     </div>
                   </CardContent>
-                  <CardFooter className="p-6 pt-0">
-                    <Button 
-                      type="submit" 
-                      disabled={isLoading}
-                      className="w-full h-12 bg-cyber-neon text-cyber-dark hover:bg-cyber-neon/80 font-black uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(0,240,255,0.3)] transition-all active:scale-[0.98]"
-                    >
-                      {isLoading ? 'PROTOCOL INITIATED...' : 'AUTENTICAR ACCESO'}
+                  <CardFooter className="flex-col gap-3 items-stretch">
+                    <Button type="submit" disabled={isLoading} className="w-full">
+                      {isLoading ? 'Verificando...' : 'Iniciar sesión'}
                     </Button>
+                    <p className="text-xs text-center text-[var(--color-app-text-muted)]">
+                      ¿Problemas para acceder? Contacta a tu administrador.
+                    </p>
                   </CardFooter>
                 </form>
               </Card>
             </motion.div>
           )}
         </AnimatePresence>
-        
-        <p className="text-center text-[9px] text-cyber-muted/40 mt-8 uppercase font-bold tracking-[0.4em]">
-          Secure Terminal // IMC ERP OS v2.0.4
+
+        <p className="text-center text-xs text-[var(--color-app-text-subtle)] mt-6">
+          Koji Code ERP · v2.0
         </p>
       </div>
     </div>
