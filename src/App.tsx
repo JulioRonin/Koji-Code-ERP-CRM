@@ -10,12 +10,16 @@ import { Login } from './pages/auth/Login';
 import { Dashboard } from './pages/dashboard/Dashboard';
 import { Projects } from './pages/projects/Projects';
 import { ProjectDetails } from './pages/projects/ProjectDetails';
+import { NewProjectWizard } from './pages/projects/NewProjectWizard';
 import { Purchasing } from './pages/purchasing/Purchasing';
 import { Design } from './pages/design/Design';
 import { Production } from './pages/production/Production';
+import { WorkOrderDetails } from './pages/production/WorkOrderDetails';
 import { Quality } from './pages/quality/Quality';
 import { Technicians } from './pages/technicians/Technicians';
 import { Personnel } from './pages/crm/Personnel';
+import { Shipping } from './pages/shipping/Shipping';
+import { ClientPortal } from './pages/client-portal/ClientPortal';
 import { 
   Billing, 
   Settings 
@@ -74,7 +78,10 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        
+
+        {/* Public Client Portal (magic-link, no auth guard) */}
+        <Route path="/cliente/:token" element={<ClientPortal />} />
+
         {/* Technician Specific Terminal */}
         <Route path="/technician-portal" element={
           <ProtectedRoute>
@@ -95,7 +102,13 @@ export default function App() {
                <Projects />
             </ProtectedRoute>
           } />
-          
+
+          <Route path="projects/new" element={
+            <ProtectedRoute allowedDepartments={['Producción', 'Diseño']}>
+               <NewProjectWizard />
+            </ProtectedRoute>
+          } />
+
           <Route path="projects/:id" element={
             <ProtectedRoute allowedDepartments={['Producción', 'Diseño']}>
                <ProjectDetails />
@@ -117,6 +130,18 @@ export default function App() {
           <Route path="production" element={
             <ProtectedRoute allowedDepartments={['Producción']}>
                 <Production />
+            </ProtectedRoute>
+          } />
+
+          <Route path="production/wo/:id" element={
+            <ProtectedRoute allowedDepartments={['Producción']}>
+                <WorkOrderDetails />
+            </ProtectedRoute>
+          } />
+
+          <Route path="shipping" element={
+            <ProtectedRoute allowedDepartments={['Producción']}>
+                <Shipping />
             </ProtectedRoute>
           } />
 

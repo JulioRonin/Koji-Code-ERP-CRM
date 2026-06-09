@@ -192,9 +192,14 @@ export function Projects() {
             Administra órdenes de trabajo, cotizaciones y seguimiento de producción.
           </p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-1.5" /> Nuevo proyecto
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsModalOpen(true)}>
+            Crear rápido
+          </Button>
+          <Button onClick={() => navigate('/projects/new')}>
+            <Plus className="h-4 w-4 mr-1.5" /> Nuevo proyecto
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center">

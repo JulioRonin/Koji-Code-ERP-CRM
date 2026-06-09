@@ -123,20 +123,40 @@ y manejan el fallback transparentemente.
 
 ## Estado por módulo
 
-| Módulo | UI redesign | Capa de datos |
-|---|---|---|
-| Dashboard         | ✅ | ✅ Hooks |
-| Proyectos (lista) | ✅ | ✅ Hooks |
-| Proyecto detalle  | ✅ | 🟡 Mock (pendiente migración) |
-| Diseño            | ✅ | 🟡 Mock |
-| Compras           | ✅ | ✅ Hooks (requisiciones) |
-| Producción        | ✅ | ✅ Hooks (máquinas + WO) |
-| Calidad           | ✅ | ✅ Hooks |
-| Personal          | ✅ | 🟡 Mock (schema rico pendiente) |
-| Técnicos          | ✅ | 🟡 Mock |
-| Chat              | ✅ | 🟡 Mock (in-memory) |
-| Auth              | n/a | ✅ Supabase Auth + fallback |
+| Módulo | UI redesign | Capa de datos | Funcionalidad |
+|---|---|---|---|
+| Dashboard           | ✅ | ✅ Hooks | KPIs derivados de proyectos / WO / inspecciones / NCRs |
+| Proyectos (lista)   | ✅ | ✅ Hooks | Tabla, búsqueda, creación rápida + wizard de intake |
+| **Intake wizard**   | ✅ | ✅ Hooks | Datos básicos → OC → BOM Excel → planos → confirmar |
+| Proyecto detalle    | ✅ | ✅ Hooks | Detalle + **portal cliente** (magic link) |
+| Diseño              | ✅ | 🟡 Mock | — |
+| Compras             | ✅ | ✅ Hooks | Requisiciones, BOMs |
+| Producción          | ✅ | ✅ Hooks | Máquinas + WO + link a detalle |
+| **WO detalle**      | ✅ | ✅ Hooks | Etapas con start/pause/complete y time tracking |
+| Calidad             | ✅ | ✅ Hooks | Inspecciones, NCRs, instrumentos |
+| **Embarques**       | ✅ | ✅ Hooks | Packing list + cajas con etiquetas QR imprimibles |
+| **Portal cliente**  | ✅ | ✅ Hooks | Ruta pública `/cliente/:token` con timeline visual |
+| Personal            | ✅ | 🟡 Mock | Schema rico (portfolio) pendiente |
+| Técnicos            | ✅ | 🟡 Mock | — |
+| Chat                | ✅ | 🟡 Mock (in-memory) | — |
+| Auth                | n/a | ✅ Supabase Auth + fallback | Dual-mode |
 
-**Siguiente (Fase 3):** Wizard de intake de proyecto (OC + BOM Excel + planos),
-etapas de work order con time tracking real, portal cliente con magic link,
-generador de etiquetas con QR, integración n8n.
+### Workflow end-to-end (Fase 3)
+
+1. **PM crea proyecto** vía wizard (`/projects/new`) — sube OC del cliente,
+   BOM en Excel y planos 2D/3D.
+2. **Compras** ve los items del BOM en `Compras > BOM/Listas`, levanta
+   requisiciones, emite POs.
+3. **Producción** crea Work Orders por pieza, accede al detalle de cada WO
+   (`/production/wo/:id`) y carga la plantilla de etapas CNC. El técnico
+   inicia/pausa/completa cada etapa — el tiempo real se registra automáticamente.
+4. **Calidad** registra inspecciones por pieza, abre NCRs si rechaza.
+5. **Embarque** (`/shipping`) — empaqueta en cajas, genera etiquetas QR que
+   se pueden imprimir. Cada QR linka al portal del cliente.
+6. **Portal cliente** (`/cliente/:token`) — el cliente abre el link y ve el
+   avance: timeline, KPIs, inspecciones, documentos compartidos. Sin login.
+
+**Siguiente (Fase 4):** Integración n8n (cola `automation_events` ya existe,
+falta el webhook out), reporte PMO PDF profesional con envío automático
+semanal, mejoras al chat (cableado a Supabase realtime), migración de
+Personnel/Técnicos a hooks reales.

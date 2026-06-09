@@ -26,6 +26,7 @@ import { ProductionStatusHeader } from '@/components/production/ProductionStatus
 import { ProductionProjectView } from '@/components/production/ProductionProjectView';
 import { cn } from '@/lib/utils';
 import { useMachines, useWorkOrders } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 
 const machineLeftColor: Record<string, string> = {
   Operando: 'border-l-[var(--color-app-success)]',
@@ -53,6 +54,7 @@ export function Production() {
   const [searchTerm, setSearchTerm] = useState('');
   const { data: machines } = useMachines();
   const { data: workOrders } = useWorkOrders();
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-6">
@@ -193,7 +195,9 @@ export function Production() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="outline" size="sm">Reportar avance</Button>
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/production/wo/${wo.id}`)}>
+                            Ver detalle
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}

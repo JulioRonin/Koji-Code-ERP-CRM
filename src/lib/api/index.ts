@@ -15,3 +15,7 @@ export * from './purchasing';
 export * from './production';
 export * from './quality';
 export * from './profiles';
+export * from './projectFiles';
+export * from './workOrderStages';
+export * from './shipments';
+export * from './clientPortal';
