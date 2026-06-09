@@ -45,37 +45,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { BOMManager } from '@/components/purchasing/BOMManager';
 import { cn } from '@/lib/utils';
+import { useRequisitions } from '@/lib/api';
+import type { Requisition, Priority, RequisitionStatus } from '@/types/database';
 
-type Requisition = {
-  id: string;
-  project: string;
-  description: string;
-  requester: string;
-  date: string;
-  status: 'Pendiente' | 'Cotizando' | 'Aprobada' | 'Rechazada' | 'Ordenada';
-  priority: 'Alta' | 'Media' | 'Baja';
-};
-
-const mockRequisitions: Requisition[] = [
-  { id: 'REQ-2026-101', project: 'IMC-2026-042', description: 'Acero 4140 (20 barras)', requester: 'Carlos M.', date: '2026-03-28', status: 'Pendiente', priority: 'Alta' },
-  { id: 'REQ-2026-102', project: 'IMC-2026-045', description: 'Insertos de carburo', requester: 'Ana G.', date: '2026-03-27', status: 'Cotizando', priority: 'Media' },
-  { id: 'REQ-2026-103', project: 'IMC-2026-039', description: 'Aluminio 6061 T6', requester: 'Luis R.', date: '2026-03-25', status: 'Aprobada', priority: 'Alta' },
-  { id: 'REQ-2026-104', project: 'Mantenimiento', description: 'Aceite soluble (2 tambos)', requester: 'Pedro S.', date: '2026-03-24', status: 'Ordenada', priority: 'Media' },
-  { id: 'REQ-2026-105', project: 'IMC-2026-048', description: 'Tornillería especial', requester: 'Carlos M.', date: '2026-03-22', status: 'Rechazada', priority: 'Baja' },
-];
-
-const priorityVariant: Record<Requisition['priority'], 'destructive' | 'warning' | 'secondary'> = {
+const priorityVariant: Record<Priority, 'destructive' | 'warning' | 'secondary'> = {
   Alta: 'destructive',
   Media: 'warning',
   Baja: 'secondary',
 };
 
-const statusVariant: Record<Requisition['status'], 'secondary' | 'warning' | 'success' | 'default' | 'destructive'> = {
+const statusVariant: Record<RequisitionStatus, 'secondary' | 'warning' | 'success' | 'default' | 'destructive' | 'outline'> = {
   Pendiente: 'secondary',
   Cotizando: 'warning',
   Aprobada: 'success',
   Ordenada: 'default',
   Rechazada: 'destructive',
+  Cerrada: 'outline',
 };
 
 const columnHelper = createColumnHelper<Requisition>();
@@ -92,25 +77,26 @@ export function Purchasing() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('requisitions');
+  const { data: requisitions } = useRequisitions();
 
   const columns = [
     columnHelper.accessor('id', {
       header: 'ID req.',
       cell: info => <span className="font-mono text-xs">{info.getValue()}</span>,
     }),
-    columnHelper.accessor('project', {
+    columnHelper.accessor('project_id', {
       header: 'Proyecto',
-      cell: info => <span className="font-mono text-xs">{info.getValue()}</span>,
+      cell: info => <span className="font-mono text-xs">{info.getValue() ?? '—'}</span>,
     }),
     columnHelper.accessor('description', {
       header: 'Descripción',
       cell: info => <span>{info.getValue()}</span>,
     }),
-    columnHelper.accessor('requester', {
+    columnHelper.accessor('requester_id', {
       header: 'Solicitante',
-      cell: info => <span className="text-[var(--color-app-text-muted)]">{info.getValue()}</span>,
+      cell: info => <span className="text-[var(--color-app-text-muted)]">{info.getValue() ?? '—'}</span>,
     }),
-    columnHelper.accessor('date', {
+    columnHelper.accessor('created_at', {
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -167,7 +153,7 @@ export function Purchasing() {
   ];
 
   const table = useReactTable({
-    data: mockRequisitions,
+    data: requisitions,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),

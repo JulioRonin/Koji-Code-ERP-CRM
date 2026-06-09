@@ -1,20 +1,142 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Koji Code ERP
 
-# Run and deploy your AI Studio app
+ERP / CRM para talleres CNC. Cubre cotización, diseño, compras, producción,
+calidad, embarque y reportes PMO para clientes.
 
-This contains everything you need to run your app locally.
+Stack: **React 19 + Vite + Tailwind + Supabase**, listo para desplegarse en
+**Vercel**.
 
-View your app in AI Studio: https://ai.studio/apps/4f4207b5-539a-4c92-bcc7-f0825e25f069
+---
 
-## Run Locally
+## Modos de operación
 
-**Prerequisites:**  Node.js
+La app tiene **dos modos** que se activan automáticamente según las variables
+de entorno:
 
+| Modo | Cuándo | Qué hace |
+|---|---|---|
+| **Demo** | No hay `VITE_SUPABASE_URL` configurada | Usa datos mock locales. Útil para demos sin backend. El header muestra el chip `Modo demo`. |
+| **Producción** | Hay `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` | Conecta a Supabase real, auth real, datos reales. |
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Esto permite que el sitio funcione en Vercel desde el primer push, aunque
+todavía no tengas el proyecto de Supabase creado.
+
+---
+
+## Desarrollo local
+
+```bash
+npm install
+npm run dev          # http://localhost:3000
+npm run lint         # tsc --noEmit
+npm run build        # produce dist/
+```
+
+Variables (todas opcionales para modo demo):
+
+```bash
+cp .env.example .env.local
+# Edita .env.local con tus URLs / keys
+```
+
+---
+
+## Despliegue en Vercel
+
+1. **Conecta el repo** en [vercel.com/new](https://vercel.com/new).
+   Vercel detecta Vite automáticamente — no necesitas tocar build settings;
+   `vercel.json` ya configura las rewrites de SPA y caché de assets.
+
+2. **(Opcional) Agrega las variables de entorno** en
+   `Project Settings → Environment Variables`:
+
+   | Variable | Requerida | Descripción |
+   |---|---|---|
+   | `VITE_SUPABASE_URL`      | Para producción | URL del proyecto Supabase |
+   | `VITE_SUPABASE_ANON_KEY` | Para producción | Anon key pública |
+   | `VITE_N8N_WEBHOOK_URL`   | Opcional | Webhook para automatizaciones |
+
+   Sin estas variables el sitio carga en **modo demo**, lo cual está bien
+   para mostrarlo a clientes/equipo antes de tener Supabase.
+
+3. **Push** al branch — Vercel hace deploy automático.
+
+---
+
+## Setup de Supabase (cuando quieras pasar a modo producción)
+
+```bash
+# 1. Crea el proyecto en https://supabase.com/dashboard
+# 2. Aplica el schema:
+psql $SUPABASE_DB_URL < database_schema.sql
+# o pega su contenido en el SQL editor del dashboard.
+
+# 3. Copia URL y anon key a Vercel (paso 2 de arriba) y a tu .env.local
+```
+
+El schema (`database_schema.sql`) cubre el workflow completo:
+
+- `customers`, `suppliers`, `profiles`
+- `projects`, `project_files` (OC cliente, planos, fotos)
+- `bom_items`, `requisitions`, `purchase_orders` (+ items)
+- `machines`, `work_orders`, `work_order_stages`, `time_entries`
+- `quality_inspections`, `ncrs`, `measurement_instruments`
+- `shipments`, `shipping_labels` (+ items) — para etiquetas con QR
+- `pmo_reports` — snapshots para portal del cliente
+- `chat_channels`, `chat_messages`
+- `automation_events` — cola consumida por n8n
+
+Incluye triggers `updated_at`, RLS base, función `is_admin()`, y seed inicial
+de canales de chat.
+
+---
+
+## Arquitectura
+
+```
+src/
+├── lib/
+│   ├── supabase.ts          # Cliente único; expone `isSupabaseConfigured`
+│   └── api/                 # Capa de datos con fallback Supabase ↔ mock
+│       ├── projects.ts      # useProjects, useProject, useCreateProject, ...
+│       ├── bom.ts           # useBomItems, useUpdateBomStatus, ...
+│       ├── purchasing.ts    # useRequisitions, useSuppliers
+│       ├── production.ts    # useMachines, useWorkOrders
+│       ├── quality.ts       # useInspections, useNcrs, useInstruments, ...
+│       ├── profiles.ts      # useProfiles, useProfile
+│       └── mocks.ts         # Fuente única de los mocks de demo
+├── types/database.ts        # Tipos del schema (espejean la DB)
+├── contexts/
+│   ├── AuthContext.tsx      # Supabase Auth + fallback demo
+│   └── ChatContext.tsx
+├── pages/                   # Una página por módulo
+└── components/
+    ├── layout/              # Shell, Sidebar, Header
+    └── ui/                  # Componentes base (shadcn-style)
+```
+
+**Regla de oro:** los componentes **nunca** importan `supabase` directo.
+Pasan por hooks de `src/lib/api/*` que devuelven `{ data, loading, error, refetch }`
+y manejan el fallback transparentemente.
+
+---
+
+## Estado por módulo
+
+| Módulo | UI redesign | Capa de datos |
+|---|---|---|
+| Dashboard         | ✅ | ✅ Hooks |
+| Proyectos (lista) | ✅ | ✅ Hooks |
+| Proyecto detalle  | ✅ | 🟡 Mock (pendiente migración) |
+| Diseño            | ✅ | 🟡 Mock |
+| Compras           | ✅ | ✅ Hooks (requisiciones) |
+| Producción        | ✅ | ✅ Hooks (máquinas + WO) |
+| Calidad           | ✅ | ✅ Hooks |
+| Personal          | ✅ | 🟡 Mock (schema rico pendiente) |
+| Técnicos          | ✅ | 🟡 Mock |
+| Chat              | ✅ | 🟡 Mock (in-memory) |
+| Auth              | n/a | ✅ Supabase Auth + fallback |
+
+**Siguiente (Fase 3):** Wizard de intake de proyecto (OC + BOM Excel + planos),
+etapas de work order con time tracking real, portal cliente con magic link,
+generador de etiquetas con QR, integración n8n.

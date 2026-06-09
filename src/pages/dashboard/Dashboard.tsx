@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import {
   TrendingUp,
   TrendingDown,
@@ -23,78 +25,91 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { useProjects, useWorkOrders, useNcrs, useInspections } from '@/lib/api';
+import type { ProjectStatus } from '@/types/database';
 
-// Mock data — en español, números realistas para una planta CNC
-const kpis = [
-  {
-    label: 'Proyectos activos',
-    value: '14',
-    delta: '+2',
-    trend: 'up' as const,
-    sublabel: 'vs. mes anterior',
-    icon: Factory,
-  },
-  {
-    label: 'Piezas en producción',
-    value: '3,482',
-    delta: '+186',
-    trend: 'up' as const,
-    sublabel: 'esta semana',
-    icon: Package,
-  },
-  {
-    label: 'A tiempo (OTD)',
-    value: '94.2%',
-    delta: '−1.8%',
-    trend: 'down' as const,
-    sublabel: 'últimos 30 días',
-    icon: CheckCircle2,
-  },
-  {
-    label: 'NCRs abiertas',
-    value: '3',
-    delta: '+1',
-    trend: 'down' as const,
-    sublabel: 'requieren acción',
-    icon: AlertTriangle,
-  },
-];
-
-type ProjectRow = {
-  id: string;
-  name: string;
-  client: string;
-  status: 'En Producción' | 'Diseño' | 'Calidad' | 'Cotización' | 'Entregado';
-  progress: number;
-  deadline: string;
-  pm: string;
+const statusBadge: Partial<Record<ProjectStatus, { variant: 'default' | 'success' | 'warning' | 'secondary' | 'outline'; label: string }>> = {
+  'En Producción': { variant: 'default',   label: 'En producción' },
+  'Diseño':        { variant: 'secondary', label: 'Diseño' },
+  'Compras':       { variant: 'secondary', label: 'Compras' },
+  'Calidad':       { variant: 'success',   label: 'Calidad' },
+  'Embarque':      { variant: 'success',   label: 'Embarque' },
+  'Cotización':    { variant: 'warning',   label: 'Cotización' },
+  'Entregado':     { variant: 'outline',   label: 'Entregado' },
+  'Cancelado':     { variant: 'outline',   label: 'Cancelado' },
 };
-
-const activeProjects: ProjectRow[] = [
-  { id: 'IMC-2026-042', name: 'Eje Principal Ensamblaje', client: 'BRP', status: 'En Producción', progress: 75, deadline: '15 abr 2026', pm: 'Carlos M.' },
-  { id: 'IMC-2026-045', name: 'Moldes de Inyección', client: 'Foxconn', status: 'Diseño', progress: 22, deadline: '20 abr 2026', pm: 'Ana G.' },
-  { id: 'IMC-2026-039', name: 'Carcasas de Aluminio', client: 'Bosch', status: 'Calidad', progress: 95, deadline: '30 mar 2026', pm: 'Carlos M.' },
-  { id: 'IMC-2026-048', name: 'Soportes Estructurales', client: 'Aptiv', status: 'Cotización', progress: 8, deadline: '05 may 2026', pm: 'Luis R.' },
-  { id: 'IMC-2026-050', name: 'Herramentales Varios', client: 'Lear', status: 'Diseño', progress: 14, deadline: '10 may 2026', pm: 'Luis R.' },
-];
-
-const statusBadge: Record<ProjectRow['status'], { variant: 'default' | 'success' | 'warning' | 'secondary' | 'outline'; label: string }> = {
-  'En Producción':  { variant: 'default',  label: 'En producción' },
-  'Diseño':         { variant: 'secondary', label: 'Diseño' },
-  'Calidad':        { variant: 'success',  label: 'Calidad' },
-  'Cotización':     { variant: 'warning',  label: 'Cotización' },
-  'Entregado':      { variant: 'outline',  label: 'Entregado' },
-};
-
-const recentActivity = [
-  { id: 1, when: 'hace 12 min', who: 'Sistema', what: 'Inspección final aprobada · IMC-2026-039 · Carcasa Alum.', tone: 'success' as const },
-  { id: 2, when: 'hace 1 h',     who: 'Marcos D.', what: 'NCR abierta · IMC-2026-048 · Soporte A (tolerancia +0.05mm)', tone: 'danger' as const },
-  { id: 3, when: 'hace 2 h',     who: 'Compras',   what: 'PO-2026-129 emitida · Acero 4140 (20 barras)', tone: 'info' as const },
-  { id: 4, when: 'hace 3 h',     who: 'Carlos M.', what: 'Avance reportado · WO-2026-089 · 325/500 piezas', tone: 'info' as const },
-];
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { data: projects } = useProjects();
+  const { data: workOrders } = useWorkOrders();
+  const { data: openNcrs } = useNcrs();
+  const { data: inspections } = useInspections();
+
+  // KPIs derivados de datos reales
+  const kpis = useMemo(() => {
+    const activeProjectsCount = projects.filter(
+      p => p.status !== 'Entregado' && p.status !== 'Cancelado'
+    ).length;
+
+    const partsInProduction = workOrders
+      .filter(w => w.status === 'En Proceso' || w.status === 'Setup')
+      .reduce((acc, w) => acc + Number(w.quantity || 0), 0);
+
+    const finishedRecently = inspections.filter(i => i.result === 'Aprobado').length;
+    const totalChecked = inspections.length || 1;
+    const otd = ((finishedRecently / totalChecked) * 100).toFixed(1);
+
+    const openNcrCount = openNcrs.filter(n => n.status !== 'Cerrada').length;
+
+    return [
+      { label: 'Proyectos activos',      value: String(activeProjectsCount), delta: '', trend: 'up' as const,   sublabel: 'en pipeline',      icon: Factory },
+      { label: 'Piezas en producción',   value: partsInProduction.toLocaleString(), delta: '', trend: 'up' as const, sublabel: 'cantidad WO activa', icon: Package },
+      { label: 'Aprobación QA',          value: `${otd}%`,                   delta: '', trend: 'up' as const,   sublabel: 'inspecciones realizadas', icon: CheckCircle2 },
+      { label: 'NCRs abiertas',          value: String(openNcrCount),        delta: '', trend: 'down' as const, sublabel: 'requieren acción',       icon: AlertTriangle },
+    ];
+  }, [projects, workOrders, inspections, openNcrs]);
+
+  // Top 5 proyectos activos por deadline próximo
+  const activeProjects = useMemo(() => {
+    return [...projects]
+      .filter(p => p.status !== 'Entregado' && p.status !== 'Cancelado')
+      .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+      .slice(0, 5);
+  }, [projects]);
+
+  // Feed de actividad sintético (mientras no haya audit_logs cableado)
+  const recentActivity = useMemo(() => {
+    const out: { id: string; when: string; who: string; what: string; tone: 'success' | 'danger' | 'info' }[] = [];
+    openNcrs.slice(0, 1).forEach(n => {
+      out.push({
+        id: `act-ncr-${n.id}`,
+        when: formatRelativo(n.created_at),
+        who: 'Calidad',
+        what: `NCR ${n.severity.toLowerCase()} abierta · ${n.project_id} · ${n.issue_description.slice(0, 60)}...`,
+        tone: 'danger',
+      });
+    });
+    inspections.slice(0, 1).forEach(i => {
+      out.push({
+        id: `act-qa-${i.id}`,
+        when: formatRelativo(i.inspection_date),
+        who: 'Sistema',
+        what: `Inspección ${i.result.toLowerCase()} · ${i.project_id}`,
+        tone: i.result === 'Aprobado' ? 'success' : 'danger',
+      });
+    });
+    workOrders.slice(0, 2).forEach(w => {
+      out.push({
+        id: `act-wo-${w.id}`,
+        when: formatRelativo(w.updated_at),
+        who: 'Producción',
+        what: `Avance ${w.id} · ${w.completed_qty}/${w.quantity} pzas`,
+        tone: 'info',
+      });
+    });
+    return out.slice(0, 4);
+  }, [openNcrs, inspections, workOrders]);
 
   return (
     <div className="space-y-6">
@@ -131,19 +146,23 @@ export function Dashboard() {
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-1.5 text-xs">
-                {kpi.trend === 'up' ? (
-                  <TrendingUp className="h-3.5 w-3.5 text-[var(--color-app-success)]" />
-                ) : (
-                  <TrendingDown className="h-3.5 w-3.5 text-[var(--color-app-danger)]" />
+                {kpi.delta && (
+                  <>
+                    {kpi.trend === 'up' ? (
+                      <TrendingUp className="h-3.5 w-3.5 text-[var(--color-app-success)]" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5 text-[var(--color-app-danger)]" />
+                    )}
+                    <span
+                      className={cn(
+                        'font-medium',
+                        kpi.trend === 'up' ? 'text-[var(--color-app-success)]' : 'text-[var(--color-app-danger)]'
+                      )}
+                    >
+                      {kpi.delta}
+                    </span>
+                  </>
                 )}
-                <span
-                  className={cn(
-                    'font-medium',
-                    kpi.trend === 'up' ? 'text-[var(--color-app-success)]' : 'text-[var(--color-app-danger)]'
-                  )}
-                >
-                  {kpi.delta}
-                </span>
                 <span className="text-[var(--color-app-text-muted)]">{kpi.sublabel}</span>
               </div>
             </CardContent>
@@ -175,37 +194,38 @@ export function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activeProjects.map(p => (
-                  <TableRow
-                    key={p.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/projects/${p.id}`)}
-                  >
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium text-[var(--color-app-text)]">{p.name}</span>
-                        <span className="text-xs text-[var(--color-app-text-muted)] font-mono">{p.id}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)]">{p.client}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusBadge[p.status].variant}>
-                        {statusBadge[p.status].label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress value={p.progress} className="h-1.5 w-24" />
-                        <span className="text-xs font-medium text-[var(--color-app-text-muted)] tabular-nums w-9 text-right">
-                          {p.progress}%
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)] text-sm">
-                      {p.deadline}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {activeProjects.map(p => {
+                  const badge = statusBadge[p.status] ?? { variant: 'secondary' as const, label: p.status };
+                  return (
+                    <TableRow
+                      key={p.id}
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/projects/${p.id}`)}
+                    >
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-[var(--color-app-text)]">{p.name}</span>
+                          <span className="text-xs text-[var(--color-app-text-muted)] font-mono">{p.id}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-[var(--color-app-text-muted)]">{p.client_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={badge.variant}>{badge.label}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress value={p.progress} className="h-1.5 w-24" />
+                          <span className="text-xs font-medium text-[var(--color-app-text-muted)] tabular-nums w-9 text-right">
+                            {p.progress}%
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-[var(--color-app-text-muted)] text-sm">
+                        {format(new Date(p.deadline), 'dd MMM yyyy', { locale: es })}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -244,4 +264,21 @@ export function Dashboard() {
       </div>
     </div>
   );
+}
+
+function formatRelativo(iso: string): string {
+  try {
+    const date = new Date(iso);
+    const diffMs = Date.now() - date.getTime();
+    const diffMin = Math.round(diffMs / 60000);
+    if (diffMin < 1) return 'justo ahora';
+    if (diffMin < 60) return `hace ${diffMin} min`;
+    const diffH = Math.round(diffMin / 60);
+    if (diffH < 24) return `hace ${diffH} h`;
+    const diffD = Math.round(diffH / 24);
+    if (diffD < 30) return `hace ${diffD} d`;
+    return format(date, 'dd MMM', { locale: es });
+  } catch {
+    return iso;
+  }
 }

@@ -25,27 +25,9 @@ import {
 import { PROJECTS, INITIAL_BOMS } from '@/components/purchasing/BOMManager';
 import { cn } from '@/lib/utils';
 import { useChat } from '@/contexts/ChatContext';
+import { useInspections, useNcrs, useInstruments } from '@/lib/api';
 
 type QualityStatus = 'PENDIENTE' | 'EN REVISIÓN' | 'APROBADO' | 'RECHAZADO (NCR)';
-
-const mockInspections = [
-  { id: 'QA-2026-055', project: 'IMC-2026-042', part: 'Eje Principal', type: 'Primera Pieza', inspector: 'Elena V.', date: '2026-03-29', result: 'Aprobado' },
-  { id: 'QA-2026-056', project: 'IMC-2026-048', part: 'Soporte A',     type: 'En Proceso',    inspector: 'Marcos D.', date: '2026-03-29', result: 'Rechazado' },
-  { id: 'QA-2026-057', project: 'IMC-2026-039', part: 'Carcasa Alum.', type: 'Final',          inspector: 'Elena V.', date: '2026-03-28', result: 'Aprobado' },
-  { id: 'QA-2026-058', project: 'IMC-2026-045', part: 'Molde Base',    type: 'Recibo Material', inspector: 'Marcos D.', date: '2026-03-28', result: 'Aprobado' },
-];
-
-const mockNCRs = [
-  { id: 'NCR-2026-012', project: 'IMC-2026-048', issue: 'Tolerancia de diámetro exterior fuera de rango (+0.05mm)', severity: 'Alta',  status: 'Abierta',          date: '2026-03-29' },
-  { id: 'NCR-2026-011', project: 'IMC-2026-035', issue: 'Acabado superficial rugoso en cara frontal',                severity: 'Media', status: 'En Investigación', date: '2026-03-25' },
-  { id: 'NCR-2026-010', project: 'IMC-2026-042', issue: 'Material recibido sin certificado de calidad',              severity: 'Baja',  status: 'Cerrada',          date: '2026-03-20' },
-];
-
-const mockInstruments = [
-  { id: 'INS-001', name: 'Vernier digital 6"',     brand: 'Mitutoyo', lastCal: '2026-01-15', nextCal: '2027-01-15', status: 'Calibrado' },
-  { id: 'INS-002', name: 'Micrómetro 0-25mm',      brand: 'Starrett', lastCal: '2025-06-12', nextCal: '2026-06-12', status: 'Calibrado' },
-  { id: 'INS-003', name: 'CMM Bridge Type',         brand: 'Zeiss',    lastCal: '2025-04-01', nextCal: '2026-04-01', status: 'Vencido' },
-];
 
 const severityVariant: Record<string, 'destructive' | 'warning' | 'secondary'> = {
   Alta: 'destructive',
@@ -75,6 +57,10 @@ export function Quality() {
   const [activeTab, setActiveTab] = useState<Tab>('project_control');
   const [selectedProjectId, setSelectedProjectId] = useState(PROJECTS[0].id);
   const [partStatuses, setPartStatuses] = useState<Record<string, QualityStatus>>({});
+
+  const { data: inspections } = useInspections();
+  const { data: ncrs } = useNcrs();
+  const { data: instruments } = useInstruments();
 
   const projectBOM = INITIAL_BOMS.find(b => b.projectId === selectedProjectId);
   const parts = projectBOM ? projectBOM.items : [];
@@ -277,17 +263,21 @@ export function Quality() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockInspections.map(insp => (
+                {inspections.map(insp => (
                   <TableRow key={insp.id}>
                     <TableCell className="font-mono text-xs">{insp.id}</TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium">{insp.part}</span>
-                        <span className="text-xs text-[var(--color-app-text-muted)] font-mono">{insp.project}</span>
+                        <span className="font-medium">{insp.inspection_type}</span>
+                        <span className="text-xs text-[var(--color-app-text-muted)] font-mono">{insp.project_id}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)]">{insp.inspector}</TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)]">{insp.date}</TableCell>
+                    <TableCell className="text-[var(--color-app-text-muted)]">
+                      {insp.inspector_id ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-[var(--color-app-text-muted)]">
+                      {new Date(insp.inspection_date).toLocaleDateString('es-MX')}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={insp.result === 'Aprobado' ? 'success' : 'destructive'}>
                         {insp.result}
@@ -321,12 +311,12 @@ export function Quality() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockNCRs.map(ncr => (
+                {ncrs.map(ncr => (
                   <TableRow key={ncr.id}>
                     <TableCell className="font-mono text-xs text-[var(--color-app-danger)]">{ncr.id}</TableCell>
                     <TableCell className="max-w-md">
-                      <p className="font-medium">{ncr.project}</p>
-                      <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">{ncr.issue}</p>
+                      <p className="font-medium">{ncr.project_id}</p>
+                      <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">{ncr.issue_description}</p>
                     </TableCell>
                     <TableCell>
                       <Badge variant={severityVariant[ncr.severity]}>{ncr.severity}</Badge>
@@ -366,12 +356,12 @@ export function Quality() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockInstruments.map(tool => (
+                {instruments.map(tool => (
                   <TableRow key={tool.id}>
                     <TableCell className="font-mono text-xs">{tool.id}</TableCell>
                     <TableCell className="font-medium">{tool.name}</TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)]">{tool.brand}</TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)]">{tool.lastCal}</TableCell>
+                    <TableCell className="text-[var(--color-app-text-muted)]">{tool.brand ?? '—'}</TableCell>
+                    <TableCell className="text-[var(--color-app-text-muted)]">{tool.last_calibration ?? '—'}</TableCell>
                     <TableCell
                       className={cn(
                         'text-sm',
@@ -380,7 +370,7 @@ export function Quality() {
                           : 'text-[var(--color-app-text-muted)]'
                       )}
                     >
-                      {tool.nextCal}
+                      {tool.next_calibration ?? '—'}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant={tool.status === 'Calibrado' ? 'success' : 'destructive'}>{tool.status}</Badge>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogOut, Settings, Shield, UserCircle, Search, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,15 @@ export function Header() {
 
       {/* Right cluster */}
       <div className="flex items-center gap-3">
+        {!isSupabaseConfigured && (
+          <span
+            className="hidden md:inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-app-warning)] bg-[var(--color-app-warning-soft)] px-2.5 py-1 rounded-md"
+            title="Conecta Supabase configurando VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-app-warning)]" />
+            Modo demo
+          </span>
+        )}
         <button
           type="button"
           className="relative h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--color-app-text-muted)] hover:bg-[var(--color-app-surface-alt)] transition-colors"

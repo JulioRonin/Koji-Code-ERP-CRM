@@ -43,33 +43,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ProjectFormModal } from './ProjectFormModal';
 import { useChat } from '@/contexts/ChatContext';
+import { useProjects, useCreateProject } from '@/lib/api';
+import type { Project, ProjectStatus } from '@/types/database';
 
-type Project = {
-  id: string;
-  name: string;
-  client: string;
-  status: 'Cotización' | 'Diseño' | 'En Producción' | 'Calidad' | 'Entregado';
-  progress: number;
-  startDate: string;
-  deadline: string;
-  manager: string;
-};
-
-const mockProjects: Project[] = [
-  { id: 'IMC-2026-042', name: 'Eje Principal Ensamblaje', client: 'BRP',     status: 'En Producción', progress: 75, startDate: '2026-03-01', deadline: '2026-04-15', manager: 'Carlos M.' },
-  { id: 'IMC-2026-045', name: 'Moldes de Inyección',      client: 'Foxconn', status: 'Diseño',         progress: 20, startDate: '2026-03-15', deadline: '2026-04-20', manager: 'Ana G.' },
-  { id: 'IMC-2026-048', name: 'Soportes Estructurales',   client: 'Aptiv',   status: 'Cotización',     progress: 10, startDate: '2026-03-25', deadline: '2026-04-05', manager: 'Luis R.' },
-  { id: 'IMC-2026-039', name: 'Carcasas de Aluminio',     client: 'Bosch',   status: 'Calidad',        progress: 95, startDate: '2026-02-10', deadline: '2026-03-30', manager: 'Carlos M.' },
-  { id: 'IMC-2026-035', name: 'Prototipo Motor',          client: 'BRP',     status: 'Entregado',      progress: 100, startDate: '2026-01-15', deadline: '2026-03-10', manager: 'Ana G.' },
-  { id: 'IMC-2026-050', name: 'Herramentales Varios',     client: 'Lear',    status: 'Cotización',     progress: 5,  startDate: '2026-03-28', deadline: '2026-05-10', manager: 'Luis R.' },
-];
-
-const statusVariant: Record<Project['status'], 'default' | 'secondary' | 'success' | 'outline' | 'warning'> = {
+const statusVariant: Record<ProjectStatus, 'default' | 'secondary' | 'success' | 'outline' | 'warning'> = {
   'En Producción': 'default',
   'Diseño':         'secondary',
+  'Compras':        'secondary',
   'Calidad':        'success',
+  'Embarque':       'success',
   'Entregado':      'outline',
   'Cotización':     'warning',
+  'Cancelado':      'outline',
 };
 
 const columnHelper = createColumnHelper<Project>();
@@ -80,7 +65,9 @@ export function Projects() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [data, setData] = useState(() => [...mockProjects]);
+  const { data: projects, loading, refetch } = useProjects();
+  const { create: createProject } = useCreateProject();
+  const data = projects;
 
   const columns = [
     columnHelper.accessor('id', {
@@ -100,7 +87,7 @@ export function Projects() {
       ),
       cell: info => <span className="font-medium">{info.getValue()}</span>,
     }),
-    columnHelper.accessor('client', {
+    columnHelper.accessor('client_name', {
       header: 'Cliente',
       cell: info => <span className="text-[var(--color-app-text-muted)]">{info.getValue()}</span>,
     }),
@@ -170,24 +157,28 @@ export function Projects() {
     state: { sorting, globalFilter },
   });
 
-  const handleCreateProject = (newProject: any) => {
-    const nextId = `IMC-${new Date().getFullYear()}-${String(data.length + 1).padStart(3, '0')}`;
-    const project: Project = {
-      id: nextId,
+  const handleCreateProject = async (newProject: any) => {
+    const startDate = isValid(newProject.startDate)
+      ? format(newProject.startDate, 'yyyy-MM-dd')
+      : format(new Date(), 'yyyy-MM-dd');
+    const deadline = isValid(newProject.deadline)
+      ? format(newProject.deadline, 'yyyy-MM-dd')
+      : format(new Date(), 'yyyy-MM-dd');
+
+    const project = await createProject({
       name: newProject.name,
-      client: newProject.client,
-      status: 'Cotización',
-      progress: 0,
-      startDate: isValid(newProject.startDate) ? format(newProject.startDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-      deadline: isValid(newProject.deadline) ? format(newProject.deadline, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-      manager: newProject.manager,
-    };
-    setData([project, ...data]);
+      client_name: newProject.client,
+      manager_id: null,
+      description: newProject.description ?? null,
+      start_date: startDate,
+      deadline,
+    });
+    await refetch();
     setIsModalOpen(false);
 
     sendSystemMessage(
       '2',
-      `🚀 Nuevo proyecto registrado: [${project.id}] ${project.name} para ${project.client}. Responsable: ${project.manager}.`,
+      `🚀 Nuevo proyecto registrado: [${project.id}] ${project.name} para ${project.client_name}. Responsable: ${newProject.manager}.`,
       'PROJECT'
     );
   };
