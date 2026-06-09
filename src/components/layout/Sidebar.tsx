@@ -12,6 +12,8 @@ import {
   Settings,
   Users,
   HardHat,
+  Truck,
+  FileBarChart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +32,8 @@ const navItems: NavItem[] = [
   { name: 'Compras', path: '/purchasing', icon: ShoppingCart, departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción'] },
   { name: 'Producción', path: '/production', icon: Factory, departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción'] },
   { name: 'Calidad', path: '/quality', icon: ShieldCheck, departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción', 'Calidad'] },
+  { name: 'Embarques', path: '/shipping', icon: Truck, departments: ['Administrador', 'Administración / PM', 'Producción'] },
+  { name: 'PMO', path: '/pmo', icon: FileBarChart, departments: ['Administrador', 'Administración / PM', 'Producción'] },
   { name: 'Técnicos', path: '/technicians', icon: HardHat, departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción'] },
   { name: 'Personal', path: '/personnel', icon: Users, departments: ['Administrador', 'Administración / PM', 'Compras'] },
   { name: 'Chat', path: '/chat', icon: MessageSquare, departments: ['ALL'] },

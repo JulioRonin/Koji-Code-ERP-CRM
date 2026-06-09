@@ -40,6 +40,11 @@ import {
 import { cn } from '@/lib/utils';
 import { GanttChart } from '@/components/projects/GanttChart';
 import { ProjectReport } from '@/components/projects/ProjectReport';
+import {
+  useGenerateClientPortalToken,
+  useClientPortalToken,
+} from '@/lib/api';
+import { Share2, Copy, ExternalLink } from 'lucide-react';
 
 const getMockProject = (id: string) => ({
   id,
@@ -95,6 +100,26 @@ export function ProjectDetails() {
   const [newNote, setNewNote] = useState('');
   const [isMasterPlanOpen, setIsMasterPlanOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const { data: portalToken, refetch: refetchToken } = useClientPortalToken(initialProject.id);
+  const { generate: generateToken, loading: generatingToken } = useGenerateClientPortalToken();
+
+  const portalUrl = portalToken
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/cliente/${portalToken}`
+    : null;
+
+  const handleGenerateToken = async () => {
+    await generateToken(initialProject.id);
+    await refetchToken();
+  };
+
+  const handleCopyPortalLink = () => {
+    if (!portalUrl) return;
+    navigator.clipboard.writeText(portalUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   const handleAddNote = () => {
     if (!newNote.trim()) return;
@@ -315,6 +340,44 @@ export function ProjectDetails() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Share2 className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Portal del cliente
+              </CardTitle>
+              <CardDescription>Enlace seguro de solo lectura para tu cliente.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {portalUrl ? (
+                <>
+                  <div className="flex items-center gap-2 p-2 bg-[var(--color-app-surface-alt)] rounded-md text-xs font-mono text-[var(--color-app-text-muted)] truncate">
+                    {portalUrl}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={handleCopyPortalLink}>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" /> {copied ? 'Copiado' : 'Copiar enlace'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => window.open(portalUrl, '_blank')}>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-[var(--color-app-text-muted)]">
+                    Comparte este enlace con tu cliente — verá el avance del proyecto sin necesidad de cuenta.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-[var(--color-app-text-muted)]">
+                    Aún no has generado el portal para este proyecto.
+                  </p>
+                  <Button onClick={handleGenerateToken} disabled={generatingToken} className="w-full">
+                    {generatingToken ? 'Generando...' : 'Generar enlace para el cliente'}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
 

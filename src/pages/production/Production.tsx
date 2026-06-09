@@ -25,25 +25,15 @@ import {
 import { ProductionStatusHeader } from '@/components/production/ProductionStatusHeader';
 import { ProductionProjectView } from '@/components/production/ProductionProjectView';
 import { cn } from '@/lib/utils';
-
-const mockMachines = [
-  { id: 'CNC-001', type: 'Centro de Maquinado 3 ejes', status: 'Operando', currentJob: 'Eje Principal (OP1)', operator: 'Juan P.', progress: 65, efficiency: 92 },
-  { id: 'CNC-002', type: 'Torno CNC',                  status: 'Setup',     currentJob: 'Bujes Bronce',     operator: 'Raúl M.',  progress: 0,  efficiency: 78 },
-  { id: 'CNC-003', type: 'Centro de Maquinado 5 ejes', status: 'Mantenimiento', currentJob: '—',            operator: '—',         progress: 0,  efficiency: 0 },
-  { id: 'CNC-004', type: 'Torno Suizo',                status: 'Operando',  currentJob: 'Pernos Especiales', operator: 'Diego T.', progress: 88, efficiency: 95 },
-];
-
-const mockWorkOrders = [
-  { id: 'WO-2026-089', project: 'IMC-2026-042', part: 'Eje Principal', qty: 500, completed: 325, machine: 'CNC-001', status: 'En Proceso' },
-  { id: 'WO-2026-090', project: 'IMC-2026-045', part: 'Bujes Bronce',  qty: 1200, completed: 0,    machine: 'CNC-002', status: 'Setup' },
-  { id: 'WO-2026-091', project: 'IMC-2026-039', part: 'Carcasa Alum.', qty: 50,   completed: 50,   machine: 'CNC-003', status: 'Completado' },
-  { id: 'WO-2026-092', project: 'IMC-2026-048', part: 'Pernos',        qty: 5000, completed: 4400, machine: 'CNC-004', status: 'En Proceso' },
-];
+import { useMachines, useWorkOrders } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 
 const machineLeftColor: Record<string, string> = {
   Operando: 'border-l-[var(--color-app-success)]',
   Setup: 'border-l-[var(--color-app-warning)]',
   Mantenimiento: 'border-l-[var(--color-app-danger)]',
+  Disponible: 'border-l-[var(--color-app-border-strong)]',
+  Fuera_Servicio: 'border-l-[var(--color-app-danger)]',
 };
 
 const statusBadgeVariant: Record<string, 'success' | 'default' | 'warning'> = {
@@ -62,6 +52,9 @@ type Tab = (typeof tabs)[number]['id'];
 export function Production() {
   const [activeTab, setActiveTab] = useState<Tab>('floor');
   const [searchTerm, setSearchTerm] = useState('');
+  const { data: machines } = useMachines();
+  const { data: workOrders } = useWorkOrders();
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-6">
@@ -102,43 +95,46 @@ export function Production() {
         <>
           {/* Machine cards */}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {mockMachines.map(m => (
-              <Card
-                key={m.id}
-                className={cn('border-l-4 p-0', machineLeftColor[m.status])}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base">{m.id}</CardTitle>
-                  {m.status === 'Operando' && <PlayCircle className="h-4 w-4 text-[var(--color-app-success)]" />}
-                  {m.status === 'Setup' && <Settings className="h-4 w-4 text-[var(--color-app-warning)]" />}
-                  {m.status === 'Mantenimiento' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
-                </CardHeader>
-                <CardContent className="space-y-3 pb-5">
-                  <p className="text-xs text-[var(--color-app-text-muted)]">{m.type}</p>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-[var(--color-app-text-muted)]">Estado</span>
-                      <span className="font-medium">{m.status}</span>
+            {machines.map(m => {
+              const activeWO = workOrders.find(w => w.machine_id === m.id && w.status === 'En Proceso');
+              const progress = activeWO ? Math.round((activeWO.completed_qty / activeWO.quantity) * 100) : 0;
+              return (
+                <Card
+                  key={m.id}
+                  className={cn('border-l-4 p-0', machineLeftColor[m.status])}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-base">{m.id}</CardTitle>
+                    {m.status === 'Operando' && <PlayCircle className="h-4 w-4 text-[var(--color-app-success)]" />}
+                    {m.status === 'Setup' && <Settings className="h-4 w-4 text-[var(--color-app-warning)]" />}
+                    {m.status === 'Mantenimiento' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
+                    {m.status === 'Fuera_Servicio' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
+                  </CardHeader>
+                  <CardContent className="space-y-3 pb-5">
+                    <p className="text-xs text-[var(--color-app-text-muted)]">{m.type}</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-[var(--color-app-text-muted)]">Estado</span>
+                        <span className="font-medium">{m.status}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[var(--color-app-text-muted)]">Ubicación</span>
+                        <span className="font-medium">{m.location ?? '—'}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--color-app-text-muted)]">OEE</span>
-                      <span className="font-medium">{m.efficiency}%</span>
+                    <div className="space-y-1.5 pt-3 border-t border-[var(--color-app-border)]">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-[var(--color-app-text-muted)] truncate max-w-[140px]">
+                          {activeWO ? activeWO.id : 'Sin orden activa'}
+                        </span>
+                        <span className="font-medium tabular-nums">{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-1" />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--color-app-text-muted)]">Operador</span>
-                      <span className="font-medium">{m.operator}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 pt-3 border-t border-[var(--color-app-border)]">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[var(--color-app-text-muted)] truncate max-w-[140px]">{m.currentJob}</span>
-                      <span className="font-medium tabular-nums">{m.progress}%</span>
-                    </div>
-                    <Progress value={m.progress} className="h-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Active work orders */}
@@ -174,30 +170,37 @@ export function Production() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockWorkOrders.map(wo => (
-                    <TableRow key={wo.id}>
-                      <TableCell className="font-mono text-xs">{wo.id}</TableCell>
-                      <TableCell className="font-mono text-xs">{wo.project}</TableCell>
-                      <TableCell>{wo.part}</TableCell>
-                      <TableCell className="text-[var(--color-app-text-muted)]">{wo.machine}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusBadgeVariant[wo.status] ?? 'secondary'}>
-                          {wo.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1 w-36">
-                          <Progress value={(wo.completed / wo.qty) * 100} className="h-1.5" />
-                          <span className="text-xs text-[var(--color-app-text-muted)] tabular-nums">
-                            {wo.completed} / {wo.qty}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm">Reportar avance</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {workOrders
+                    .filter(wo =>
+                      searchTerm
+                        ? wo.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          wo.project_id.toLowerCase().includes(searchTerm.toLowerCase())
+                        : true
+                    )
+                    .map(wo => (
+                      <TableRow key={wo.id}>
+                        <TableCell className="font-mono text-xs">{wo.id}</TableCell>
+                        <TableCell className="font-mono text-xs">{wo.project_id}</TableCell>
+                        <TableCell className="font-mono text-xs">{wo.bom_item_id}</TableCell>
+                        <TableCell className="text-[var(--color-app-text-muted)]">{wo.machine_id ?? '—'}</TableCell>
+                        <TableCell>
+                          <Badge variant={statusBadgeVariant[wo.status] ?? 'secondary'}>{wo.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 w-36">
+                            <Progress value={(wo.completed_qty / wo.quantity) * 100} className="h-1.5" />
+                            <span className="text-xs text-[var(--color-app-text-muted)] tabular-nums">
+                              {wo.completed_qty} / {wo.quantity}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/production/wo/${wo.id}`)}>
+                            Ver detalle
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>

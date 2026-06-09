@@ -1,0 +1,507 @@
+/**
+ * Tipos TypeScript del schema de Supabase.
+ * Espejean `database_schema.sql`. Cuando ejecutes `apply_migration` en
+ * Supabase, puedes regenerar este archivo automáticamente con:
+ *   npx supabase gen types typescript --project-id <PROJECT_ID> > src/types/database.ts
+ */
+
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
+// ============================================================================
+// ENUMS / STATUS LITERALS
+// ============================================================================
+
+export type ProjectStatus =
+  | 'Cotización'
+  | 'Diseño'
+  | 'Compras'
+  | 'En Producción'
+  | 'Calidad'
+  | 'Embarque'
+  | 'Entregado'
+  | 'Cancelado';
+
+export type BomStatus = 'Pendiente' | 'Solicitado' | 'Tránsito' | 'Recibido' | 'Stock';
+export type ManufacturingStatus = 'PENDIENTE' | 'EN PROCESO' | 'CALIDAD' | 'TERMINADO' | 'RECHAZADO';
+export type Priority = 'Alta' | 'Media' | 'Baja';
+export type WorkOrderPriority = 'Normal' | 'Alta' | 'Urgente' | 'Crítica';
+export type WorkOrderStatus =
+  | 'Pendiente'
+  | 'Setup'
+  | 'En Proceso'
+  | 'Pausado'
+  | 'Calidad'
+  | 'Completado'
+  | 'Cancelado';
+export type StageStatus = 'Pendiente' | 'En Proceso' | 'Pausado' | 'Completado' | 'Saltado';
+export type RequisitionStatus =
+  | 'Pendiente'
+  | 'Cotizando'
+  | 'Aprobada'
+  | 'Rechazada'
+  | 'Ordenada'
+  | 'Cerrada';
+export type PoStatus =
+  | 'Borrador'
+  | 'Emitida'
+  | 'Confirmada'
+  | 'Tránsito'
+  | 'Recibida_Parcial'
+  | 'Recibida'
+  | 'Cerrada'
+  | 'Cancelada';
+export type MachineStatus =
+  | 'Disponible'
+  | 'Operando'
+  | 'Setup'
+  | 'Mantenimiento'
+  | 'Fuera_Servicio';
+export type InspectionType = 'Recibo Material' | 'Primera Pieza' | 'En Proceso' | 'Final';
+export type InspectionResult = 'Aprobado' | 'Rechazado' | 'Con Observaciones';
+export type NcrSeverity = 'Baja' | 'Media' | 'Alta' | 'Crítica';
+export type NcrStatus = 'Abierta' | 'En Investigación' | 'Acción Correctiva' | 'Cerrada';
+export type InstrumentStatus = 'Calibrado' | 'Por Calibrar' | 'Vencido' | 'Fuera de Servicio';
+export type ShipmentStatus = 'Preparando' | 'Listo' | 'En Tránsito' | 'Entregado' | 'Cancelado';
+export type ProjectFileCategory =
+  | 'OC_Cliente'
+  | 'BOM'
+  | 'Plano_2D'
+  | 'Modelo_3D'
+  | 'Cotizacion'
+  | 'Contrato'
+  | 'Foto'
+  | 'Reporte_QA'
+  | 'Otro';
+export type MessageType = 'USER' | 'SYSTEM' | 'PROJECT' | 'QUALITY' | 'PURCHASE' | 'PRODUCTION';
+export type PmoReportType = 'Semanal' | 'Quincenal' | 'Mensual' | 'Cierre' | 'Ad-hoc';
+
+// ============================================================================
+// TABLA: profiles
+// ============================================================================
+
+export interface ProfileMetadata {
+  bio?: string;
+  skills?: { name: string; level: number }[];
+  certifications?: string[];
+  experience?: string;
+  bonus?: number;
+  efficiency?: number;
+  shift?: string;
+}
+
+export interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  avatar_url: string | null;
+  role: string;
+  department: string;
+  phone: string | null;
+  status: string;
+  join_date: string;
+  bio: string | null;
+  salary: number;
+  pin_code: string | null;
+  metadata: ProfileMetadata;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: customers
+// ============================================================================
+
+export interface Customer {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  phone: string | null;
+  tax_id: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: suppliers
+// ============================================================================
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  phone: string | null;
+  tax_id: string | null;
+  address: string | null;
+  payment_terms: string | null;
+  rating: number | null;
+  is_certified: boolean;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: projects
+// ============================================================================
+
+export interface Project {
+  id: string;
+  name: string;
+  customer_id: string | null;
+  client_name: string;
+  status: ProjectStatus;
+  progress: number;
+  purchase_order: string | null;
+  quote_amount: number | null;
+  currency: string;
+  start_date: string;
+  deadline: string;
+  delivered_at: string | null;
+  manager_id: string | null;
+  description: string | null;
+  client_portal_token: string | null;
+  client_portal_expires: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: project_files
+// ============================================================================
+
+export interface ProjectFile {
+  id: string;
+  project_id: string;
+  bom_item_id: string | null;
+  category: ProjectFileCategory;
+  file_name: string;
+  storage_path: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  uploaded_by: string | null;
+  is_client_visible: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+// ============================================================================
+// TABLA: bom_items
+// ============================================================================
+
+export interface BomItem {
+  id: string;
+  project_id: string;
+  part_number: string;
+  description: string | null;
+  category: string;
+  material: string | null;
+  quantity: number;
+  uom: string;
+  bom_status: BomStatus;
+  manufacturing_status: ManufacturingStatus;
+  drawing_url: string | null;
+  model_url: string | null;
+  assigned_technician_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: requisitions
+// ============================================================================
+
+export interface Requisition {
+  id: string;
+  project_id: string | null;
+  bom_item_id: string | null;
+  description: string;
+  quantity: number;
+  uom: string;
+  requester_id: string | null;
+  priority: Priority;
+  status: RequisitionStatus;
+  notes: string | null;
+  needed_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: purchase_orders
+// ============================================================================
+
+export interface PurchaseOrder {
+  id: string;
+  supplier_id: string;
+  project_id: string | null;
+  status: PoStatus;
+  total_amount: number;
+  currency: string;
+  issued_at: string | null;
+  expected_delivery: string | null;
+  received_at: string | null;
+  issued_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  purchase_order_id: string;
+  requisition_id: string | null;
+  bom_item_id: string | null;
+  description: string;
+  quantity: number;
+  uom: string;
+  unit_price: number;
+  line_total: number;
+  received_qty: number;
+  created_at: string;
+}
+
+// ============================================================================
+// TABLA: machines
+// ============================================================================
+
+export interface Machine {
+  id: string;
+  type: string;
+  status: MachineStatus;
+  location: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: work_orders
+// ============================================================================
+
+export interface WorkOrder {
+  id: string;
+  project_id: string;
+  bom_item_id: string;
+  machine_id: string | null;
+  assigned_technician_id: string | null;
+  quantity: number;
+  completed_qty: number;
+  priority: WorkOrderPriority;
+  status: WorkOrderStatus;
+  planned_start: string | null;
+  planned_end: string | null;
+  actual_start: string | null;
+  actual_end: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkOrderStage {
+  id: string;
+  work_order_id: string;
+  sequence: number;
+  name: string;
+  status: StageStatus;
+  estimated_minutes: number | null;
+  actual_minutes: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  operator_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TimeEntry {
+  id: string;
+  work_order_id: string;
+  stage_id: string | null;
+  operator_id: string | null;
+  started_at: string;
+  ended_at: string | null;
+  duration_minutes: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+// ============================================================================
+// TABLA: calidad
+// ============================================================================
+
+export interface QualityInspection {
+  id: string;
+  project_id: string;
+  bom_item_id: string;
+  work_order_id: string | null;
+  inspection_type: InspectionType;
+  inspector_id: string | null;
+  inspection_date: string;
+  result: InspectionResult;
+  sample_size: number | null;
+  notes: string | null;
+  report_url: string | null;
+  created_at: string;
+}
+
+export interface Ncr {
+  id: string;
+  project_id: string;
+  bom_item_id: string;
+  inspection_id: string | null;
+  issue_description: string;
+  severity: NcrSeverity;
+  status: NcrStatus;
+  root_cause: string | null;
+  action_plan: string | null;
+  notify_customer: boolean;
+  created_by: string | null;
+  closed_by: string | null;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export interface MeasurementInstrument {
+  id: string;
+  name: string;
+  brand: string | null;
+  serial_number: string | null;
+  last_calibration: string | null;
+  next_calibration: string | null;
+  status: InstrumentStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: embarques
+// ============================================================================
+
+export interface Shipment {
+  id: string;
+  project_id: string;
+  status: ShipmentStatus;
+  carrier: string | null;
+  tracking_number: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  ship_to_address: string | null;
+  packing_list_url: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShippingLabel {
+  id: string;
+  shipment_id: string;
+  box_number: string;
+  weight_kg: number | null;
+  dimensions_cm: string | null;
+  qr_token: string;
+  label_pdf_url: string | null;
+  printed_at: string | null;
+  created_at: string;
+}
+
+export interface ShippingLabelItem {
+  id: string;
+  label_id: string;
+  bom_item_id: string | null;
+  description: string;
+  quantity: number;
+  uom: string;
+  created_at: string;
+}
+
+// ============================================================================
+// TABLA: PMO + chat + automatización
+// ============================================================================
+
+export interface PmoReport {
+  id: string;
+  project_id: string;
+  report_type: PmoReportType;
+  period_start: string | null;
+  period_end: string | null;
+  progress_snapshot: number | null;
+  summary: string | null;
+  pdf_url: string | null;
+  sent_to_client: boolean;
+  sent_at: string | null;
+  generated_by: string | null;
+  created_at: string;
+}
+
+export interface ChatChannel {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  project_id: string | null;
+  is_archived: boolean;
+  created_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  channel_id: string;
+  user_id: string | null;
+  content: string;
+  message_type: MessageType;
+  created_at: string;
+}
+
+export interface AutomationEvent {
+  id: string;
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  payload: Json | null;
+  delivered: boolean;
+  delivered_at: string | null;
+  error: string | null;
+  created_at: string;
+}
+
+// ============================================================================
+// Database schema helper (formato compatible con supabase-js)
+// ============================================================================
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles:                { Row: Profile;                Insert: Partial<Profile>;                Update: Partial<Profile> };
+      customers:               { Row: Customer;               Insert: Partial<Customer>;               Update: Partial<Customer> };
+      suppliers:               { Row: Supplier;               Insert: Partial<Supplier>;               Update: Partial<Supplier> };
+      projects:                { Row: Project;                Insert: Partial<Project>;                Update: Partial<Project> };
+      project_files:           { Row: ProjectFile;            Insert: Partial<ProjectFile>;            Update: Partial<ProjectFile> };
+      bom_items:               { Row: BomItem;                Insert: Partial<BomItem>;                Update: Partial<BomItem> };
+      requisitions:            { Row: Requisition;            Insert: Partial<Requisition>;            Update: Partial<Requisition> };
+      purchase_orders:         { Row: PurchaseOrder;          Insert: Partial<PurchaseOrder>;          Update: Partial<PurchaseOrder> };
+      purchase_order_items:    { Row: PurchaseOrderItem;      Insert: Partial<PurchaseOrderItem>;      Update: Partial<PurchaseOrderItem> };
+      machines:                { Row: Machine;                Insert: Partial<Machine>;                Update: Partial<Machine> };
+      work_orders:             { Row: WorkOrder;              Insert: Partial<WorkOrder>;              Update: Partial<WorkOrder> };
+      work_order_stages:       { Row: WorkOrderStage;         Insert: Partial<WorkOrderStage>;         Update: Partial<WorkOrderStage> };
+      time_entries:            { Row: TimeEntry;              Insert: Partial<TimeEntry>;              Update: Partial<TimeEntry> };
+      quality_inspections:     { Row: QualityInspection;      Insert: Partial<QualityInspection>;      Update: Partial<QualityInspection> };
+      ncrs:                    { Row: Ncr;                    Insert: Partial<Ncr>;                    Update: Partial<Ncr> };
+      measurement_instruments: { Row: MeasurementInstrument;  Insert: Partial<MeasurementInstrument>;  Update: Partial<MeasurementInstrument> };
+      shipments:               { Row: Shipment;               Insert: Partial<Shipment>;               Update: Partial<Shipment> };
+      shipping_labels:         { Row: ShippingLabel;          Insert: Partial<ShippingLabel>;          Update: Partial<ShippingLabel> };
+      shipping_label_items:    { Row: ShippingLabelItem;      Insert: Partial<ShippingLabelItem>;      Update: Partial<ShippingLabelItem> };
+      pmo_reports:             { Row: PmoReport;              Insert: Partial<PmoReport>;              Update: Partial<PmoReport> };
+      chat_channels:           { Row: ChatChannel;            Insert: Partial<ChatChannel>;            Update: Partial<ChatChannel> };
+      chat_messages:           { Row: ChatMessage;            Insert: Partial<ChatMessage>;            Update: Partial<ChatMessage> };
+      automation_events:       { Row: AutomationEvent;        Insert: Partial<AutomationEvent>;        Update: Partial<AutomationEvent> };
+    };
+  };
+}

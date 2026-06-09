@@ -22,13 +22,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PROJECTS, INITIAL_BOMS } from '@/components/purchasing/BOMManager';
-import { mockTechnicians } from '@/pages/technicians/Technicians';
+import { useProfiles } from '@/lib/api';
 
 export function ProductionProjectView() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<any>(null);
+  const { data: technicians } = useProfiles('Técnico');
 
   const selectedProject = PROJECTS.find(p => p.id === selectedProjectId);
   const projectBOM = INITIAL_BOMS.find(b => b.projectId === selectedProjectId);
@@ -178,8 +179,8 @@ export function ProductionProjectView() {
                 <label className="text-sm font-medium">Asignar técnico</label>
                 <select className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]">
                   <option value="">Selecciona técnico...</option>
-                  {mockTechnicians.map(tech => (
-                    <option key={tech.id} value={tech.id}>{tech.name} — {tech.role}</option>
+                  {technicians.map(tech => (
+                    <option key={tech.id} value={tech.id}>{tech.full_name} — {tech.role}</option>
                   ))}
                 </select>
               </div>
