@@ -94,7 +94,19 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* Evita zoom inesperado en inputs en iOS y rebote del scroll */
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
 }
+
+/* Safe areas (notch / barra inferior en iOS standalone) */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 
 ::selection {
   background: var(--color-app-primary);
