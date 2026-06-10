@@ -6,8 +6,9 @@ import {
   ChevronDown,
   Loader2,
   AlertTriangle,
+  Info,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays, differenceInCalendarDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -39,6 +40,7 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savedFlash, setSavedFlash] = useState<string | null>(null); // task.id que acaba de guardarse
   const { update } = useUpdateMasterPlanTaskProgress();
   const { update: updateDates, loading: savingDates } = useUpdateMasterPlanTaskDates();
 
@@ -46,18 +48,57 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
   const [localProgress, setLocalProgress] = useState<Record<string, number>>({});
   const [editingDates, setEditingDates] = useState<Record<string, { start: string; end: string }>>({});
 
+  /** Duración en días entre dos fechas YYYY-MM-DD (inclusive). */
+  const durationDays = (start: string, end: string): number => {
+    try {
+      const s = parseISO(start);
+      const e = parseISO(end);
+      return Math.max(1, differenceInCalendarDays(e, s));
+    } catch {
+      return 1;
+    }
+  };
+
+  /** Helpers para sincronizar fechas al editar duración (mantiene start, ajusta end). */
+  const setDuration = (taskId: string, currentStart: string, durationD: number) => {
+    const start = parseISO(currentStart);
+    const end = format(addDays(start, Math.max(1, durationD)), 'yyyy-MM-dd');
+    setEditingDates(prev => ({
+      ...prev,
+      [taskId]: { start: currentStart, end },
+    }));
+  };
+
+  /** Detecta si la nueva fecha de inicio viola alguna dependencia. */
+  const violatesDependency = (task: MasterPlanTask, newStart: string): string | null => {
+    if (!task.dependencies || task.dependencies.length === 0) return null;
+    const newStartDate = parseISO(newStart);
+    for (const depWbs of task.dependencies) {
+      const dep = tasks.find(t => t.wbs_code === depWbs);
+      if (!dep) continue;
+      const depEnd = parseISO(dep.end_date);
+      if (newStartDate < depEnd) {
+        return `Depende de ${depWbs} que termina ${format(depEnd, 'dd MMM yyyy', { locale: es })}.`;
+      }
+    }
+    return null;
+  };
+
   const getProgress = (t: MasterPlanTask) => localProgress[t.id] ?? t.progress;
 
   const handleSaveDates = async (task: MasterPlanTask) => {
     const draft = editingDates[task.id];
     if (!draft) return;
-    if (!draft.start || !draft.end) return;
+    if (!draft.start || !draft.end) {
+      setError('Captura fechas válidas de inicio y fin.');
+      return;
+    }
     if (new Date(draft.end) < new Date(draft.start)) {
       setError('La fecha de fin debe ser igual o posterior a la de inicio.');
       return;
     }
-    if (draft.start === task.start_date && draft.end === task.end_date) {
-      // No hay cambio real
+    if (draft.start === task.start_date.slice(0, 10) && draft.end === task.end_date.slice(0, 10)) {
+      // No hay cambio real, solo descartamos el borrador
       setEditingDates(prev => {
         const next = { ...prev };
         delete next[task.id];
@@ -69,12 +110,16 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
     setError(null);
     try {
       await updateDates(tasks, task.id, draft.start, draft.end);
-      await onUpdated?.();
+      // Limpia el draft ANTES del refetch para que el nuevo valor venga del backend
       setEditingDates(prev => {
         const next = { ...prev };
         delete next[task.id];
         return next;
       });
+      await onUpdated?.();
+      // Flash visual de éxito
+      setSavedFlash(task.id);
+      setTimeout(() => setSavedFlash(v => (v === task.id ? null : v)), 2200);
     } catch (err) {
       setError((err as Error).message || 'No se pudieron guardar las fechas.');
     } finally {
@@ -121,6 +166,12 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
           <button onClick={() => setError(null)} className="opacity-70 hover:opacity-100">
             ×
           </button>
+        </div>
+      )}
+      {savedFlash && (
+        <div className="flex items-center gap-2 p-2.5 rounded-md bg-[var(--color-app-success-soft)] text-sm text-[var(--color-app-success)]">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span className="leading-snug">Fechas actualizadas. Las dependientes se reacomodaron en automático.</span>
         </div>
       )}
       {tasks.map(task => {
@@ -276,80 +327,115 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
                   ))}
                 </div>
 
-                {/* Fechas editables con cascada */}
-                <div className="pt-1 border-t border-[var(--color-app-border)] pt-3 space-y-2">
-                  <p className="text-[10px] uppercase text-[var(--color-app-text-muted)] flex items-center justify-between">
-                    Fechas
-                    <span className="text-[var(--color-app-text-subtle)] normal-case font-normal">
-                      Cambiar mueve las dependientes en automático
-                    </span>
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
-                        Inicio
-                      </label>
-                      <input
-                        type="date"
-                        value={(editingDates[task.id]?.start ?? task.start_date).slice(0, 10)}
-                        onChange={e =>
-                          setEditingDates(prev => ({
-                            ...prev,
-                            [task.id]: {
-                              start: e.target.value,
-                              end: prev[task.id]?.end ?? task.end_date,
-                            },
-                          }))
-                        }
-                        className="w-full h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
-                        Fin
-                      </label>
-                      <input
-                        type="date"
-                        value={(editingDates[task.id]?.end ?? task.end_date).slice(0, 10)}
-                        onChange={e =>
-                          setEditingDates(prev => ({
-                            ...prev,
-                            [task.id]: {
-                              start: prev[task.id]?.start ?? task.start_date,
-                              end: e.target.value,
-                            },
-                          }))
-                        }
-                        className="w-full h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
-                      />
-                    </div>
-                  </div>
-                  {editingDates[task.id] &&
-                    (editingDates[task.id].start !== task.start_date ||
-                      editingDates[task.id].end !== task.end_date) && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleSaveDates(task)}
-                          disabled={savingDates}
-                          className="h-7 px-2.5 rounded-md text-xs font-medium bg-[var(--color-app-primary)] text-white hover:bg-[var(--color-app-primary-hover)] disabled:opacity-50"
-                        >
-                          {savingDates ? 'Guardando…' : 'Guardar y propagar'}
-                        </button>
-                        <button
-                          onClick={() =>
-                            setEditingDates(prev => {
-                              const next = { ...prev };
-                              delete next[task.id];
-                              return next;
-                            })
-                          }
-                          className="h-7 px-2.5 rounded-md text-xs font-medium border border-[var(--color-app-border)] hover:bg-[var(--color-app-surface-alt)]"
-                        >
-                          Descartar
-                        </button>
+                {/* Fechas y duración editables con cascada */}
+                {(() => {
+                  // Normalizar las fechas guardadas a yyyy-MM-dd (puede venir con hora)
+                  const taskStart = task.start_date.slice(0, 10);
+                  const taskEnd = task.end_date.slice(0, 10);
+                  const currentStart = editingDates[task.id]?.start ?? taskStart;
+                  const currentEnd = editingDates[task.id]?.end ?? taskEnd;
+                  const currentDuration = durationDays(currentStart, currentEnd);
+                  const hasChange = currentStart !== taskStart || currentEnd !== taskEnd;
+                  const depViolation = hasChange ? violatesDependency(task, currentStart) : null;
+
+                  return (
+                    <div className="pt-3 border-t border-[var(--color-app-border)] space-y-2">
+                      <p className="text-[10px] uppercase text-[var(--color-app-text-muted)] flex items-center justify-between">
+                        Fechas y duración
+                        <span className="text-[var(--color-app-text-subtle)] normal-case font-normal">
+                          Cambiar mueve las dependientes automáticamente
+                        </span>
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                            Inicio
+                          </label>
+                          <input
+                            type="date"
+                            value={currentStart}
+                            onChange={e => {
+                              const newStart = e.target.value;
+                              // Mantén la duración actual al cambiar el inicio
+                              const dur = durationDays(currentStart, currentEnd);
+                              const newEnd = format(addDays(parseISO(newStart), dur), 'yyyy-MM-dd');
+                              setEditingDates(prev => ({
+                                ...prev,
+                                [task.id]: { start: newStart, end: newEnd },
+                              }));
+                            }}
+                            className="w-full h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                            Duración (días)
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={currentDuration}
+                            onChange={e => {
+                              const days = Math.max(1, Number(e.target.value) || 1);
+                              setDuration(task.id, currentStart, days);
+                            }}
+                            className="w-full h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs text-center focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                            Fin
+                          </label>
+                          <input
+                            type="date"
+                            value={currentEnd}
+                            onChange={e =>
+                              setEditingDates(prev => ({
+                                ...prev,
+                                [task.id]: { start: currentStart, end: e.target.value },
+                              }))
+                            }
+                            className="w-full h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                          />
+                        </div>
                       </div>
-                    )}
-                </div>
+
+                      {depViolation && (
+                        <div className="flex items-start gap-1.5 text-[11px] text-[var(--color-app-warning)] bg-[var(--color-app-warning-soft)]/60 p-2 rounded-md">
+                          <Info className="h-3.5 w-3.5 shrink-0 mt-px" />
+                          <span>
+                            <strong>Conflicto:</strong> {depViolation} Si guardas, la tarea iniciará antes de que termine su predecesora.
+                          </span>
+                        </div>
+                      )}
+
+                      {hasChange && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveDates(task)}
+                            disabled={savingDates || savingId === task.id}
+                            className="h-7 px-2.5 rounded-md text-xs font-medium bg-[var(--color-app-primary)] text-white hover:bg-[var(--color-app-primary-hover)] disabled:opacity-50"
+                          >
+                            {savingId === task.id ? 'Guardando…' : 'Guardar y propagar'}
+                          </button>
+                          <button
+                            onClick={() =>
+                              setEditingDates(prev => {
+                                const next = { ...prev };
+                                delete next[task.id];
+                                return next;
+                              })
+                            }
+                            disabled={savingId === task.id}
+                            className="h-7 px-2.5 rounded-md text-xs font-medium border border-[var(--color-app-border)] hover:bg-[var(--color-app-surface-alt)] disabled:opacity-50"
+                          >
+                            Descartar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {task.dependencies && task.dependencies.length > 0 && (
                   <div className="pt-1">

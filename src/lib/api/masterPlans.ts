@@ -50,86 +50,147 @@ export interface MasterPlanTemplate {
   tasks: TemplateTask[];
 }
 
-/** Plantilla estándar para piezas CNC. Cubre el ciclo completo. */
+/**
+ * Plantilla estándar para piezas CNC.
+ *
+ * Duraciones calibradas con benchmarks de la industria (taller pequeño-medio,
+ * lote 50-500 pzas, materiales comunes: aceros 4140/1018, Al 6061, Inox 304).
+ * Para piezas exóticas, lotes >1000 pzas o aleaciones especiales, ajusta
+ * manualmente en el wizard.
+ *
+ * Critical path típico: 1.1→1.2→2.1→2.2→2.3→4.1→4.2→4.3→5.2→5.3→6.1→6.2 ≈ 22 días
+ */
 export const TEMPLATE_CNC: MasterPlanTemplate = {
   id: 'CNC-Estándar',
   name: 'CNC estándar',
-  description: 'Plan típico para lotes de piezas maquinadas — desde recepción de OC hasta entrega.',
+  description: 'Lotes 50-500 pzas, aceros / Al / Inox comunes. Ciclo completo de ~22 días.',
   defaultRiskSummary:
-    'Riesgos típicos: retrasos en recepción de materia prima, no conformidades en primera pieza, ' +
-    'tiempos de tratamiento térmico variables.',
+    'Riesgos típicos del proyecto:\n' +
+    '· Retrasos en recepción de materia prima por escasez o cambios de proveedor (+3-5 días)\n' +
+    '· Rechazo en inspección de primera pieza por tolerancias críticas (+1-2 días de re-setup)\n' +
+    '· Variabilidad en tiempos de tratamiento térmico (±2 días)\n' +
+    '· Cambios de ingeniería tardíos del cliente que invalidan programa CAM',
   tasks: [
-    { wbs: '1.1', name: 'Revisión de OC del cliente',          department: 'Compras',    duration_days: 1, is_milestone: true },
-    { wbs: '1.2', name: 'Kick-off interno y planeación',       department: 'Producción', duration_days: 1, depends_on: ['1.1'] },
-    { wbs: '2.1', name: 'Solicitud de materia prima',          department: 'Compras',    duration_days: 1, depends_on: ['1.2'] },
-    { wbs: '2.2', name: 'Compra y recepción de materiales',    department: 'Compras',    duration_days: 10, depends_on: ['2.1'] },
-    { wbs: '2.3', name: 'Inspección de materia prima',          department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['2.2'] },
-    { wbs: '3.1', name: 'Revisión técnica de planos',          department: 'Diseño',     duration_days: 2, depends_on: ['1.2'] },
-    { wbs: '3.2', name: 'Programación CAM',                    department: 'Diseño',     duration_days: 3, depends_on: ['3.1'] },
-    { wbs: '3.3', name: 'Aprobación interna de programa',       department: 'Producción', duration_days: 1, is_milestone: true, depends_on: ['3.2'] },
-    { wbs: '4.1', name: 'Setup y preparación de máquina',       department: 'Producción', duration_days: 1, depends_on: ['2.3', '3.3'] },
-    { wbs: '4.2', name: 'Maquinado del lote',                  department: 'Producción', duration_days: 10, depends_on: ['4.1'] },
-    { wbs: '4.3', name: 'Tratamientos / acabados',             department: 'Producción', duration_days: 3, depends_on: ['4.2'] },
-    { wbs: '5.1', name: 'Inspección de primera pieza',          department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['4.2'] },
-    { wbs: '5.2', name: 'Inspección final dimensional',         department: 'Calidad',    duration_days: 2, depends_on: ['4.3'] },
-    { wbs: '5.3', name: 'Liberación de calidad',                department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['5.2'] },
-    { wbs: '6.1', name: 'Empaque y etiquetado',                department: 'Embarque',   duration_days: 1, depends_on: ['5.3'] },
-    { wbs: '6.2', name: 'Embarque y entrega al cliente',        department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['6.1'] },
+    // Fase 1 — Iniciación (1 día)
+    { wbs: '1.1', name: 'Revisión de OC y arranque administrativo',  department: 'Compras',    duration_days: 1, is_milestone: true },
+    { wbs: '1.2', name: 'Kick-off técnico interno',                  department: 'Producción', duration_days: 1, depends_on: ['1.1'] },
+
+    // Fase 2 — Procura (5 días total: solicitar 1 + comprar/recibir 3 + inspección 1)
+    { wbs: '2.1', name: 'Solicitud y emisión de PO',                 department: 'Compras',    duration_days: 1, depends_on: ['1.2'] },
+    { wbs: '2.2', name: 'Recepción de materia prima en almacén',     department: 'Compras',    duration_days: 3, depends_on: ['2.1'] },
+    { wbs: '2.3', name: 'Verificación dimensional y certificados',    department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['2.2'] },
+
+    // Fase 3 — Ingeniería (4 días, en paralelo con procura — arranca en 1.2)
+    { wbs: '3.1', name: 'Revisión técnica de planos 2D/3D',          department: 'Diseño',     duration_days: 1, depends_on: ['1.2'] },
+    { wbs: '3.2', name: 'Programación CAM y simulación',             department: 'Diseño',     duration_days: 2, depends_on: ['3.1'] },
+    { wbs: '3.3', name: 'Aprobación interna del programa',            department: 'Producción', duration_days: 1, is_milestone: true, depends_on: ['3.2'] },
+
+    // Fase 4 — Manufactura (depende de 2.3 Y 3.3 — el más tardío)
+    { wbs: '4.1', name: 'Setup de máquina y herramental',            department: 'Producción', duration_days: 1, depends_on: ['2.3', '3.3'] },
+    { wbs: '4.2', name: 'Maquinado del lote completo',               department: 'Producción', duration_days: 5, depends_on: ['4.1'] },
+    { wbs: '4.3', name: 'Tratamientos térmicos / acabados',           department: 'Producción', duration_days: 3, depends_on: ['4.2'] },
+
+    // Fase 5 — Calidad (en paralelo con 4.3 donde aplique)
+    { wbs: '5.1', name: 'Inspección de primera pieza (PPAP)',        department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['4.1'] },
+    { wbs: '5.2', name: 'Inspección dimensional final del lote',     department: 'Calidad',    duration_days: 2, depends_on: ['4.3'] },
+    { wbs: '5.3', name: 'Liberación formal de calidad',               department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['5.2'] },
+
+    // Fase 6 — Embarque (2 días)
+    { wbs: '6.1', name: 'Empaque, etiquetado y packing list',         department: 'Embarque',   duration_days: 1, depends_on: ['5.3'] },
+    { wbs: '6.2', name: 'Embarque y entrega al cliente',             department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['6.1'] },
   ],
 };
 
+/**
+ * Moldes de inyección. Critical path ~80 días.
+ * Calibrado para moldes de complejidad media (cavidad simple-doble, sin
+ * mecanismos complejos). Para moldes con corredera, levantadores o
+ * multi-cavidad agregar 15-25% al ciclo de manufactura.
+ */
 export const TEMPLATE_MOLDES: MasterPlanTemplate = {
   id: 'Moldes',
   name: 'Moldes de inyección',
-  description: 'Plan para fabricación de moldes — incluye diseño extendido, prueba T0 y ajustes.',
+  description: 'Cavidad simple-doble, complejidad media. Ciclo ~80 días incluyendo T0 y ajustes.',
   defaultRiskSummary:
-    'Riesgos típicos: cambios de diseño durante manufactura, retrasos en componentes especiales (resortes, ' +
-    'guías), pruebas T0 con defectos que requieren ajustes.',
+    'Riesgos típicos del proyecto:\n' +
+    '· Cambios de geometría tardíos del cliente que invalidan trabajo en cavidad\n' +
+    '· Retrasos en componentes especiales (resortes, guías, eyectores) +5-7 días\n' +
+    '· T0 con defectos críticos que requieren maquinar nueva cavidad (+10-15 días)\n' +
+    '· Tratamiento térmico con distorsión que requiere re-rectificado',
   tasks: [
-    { wbs: '1.1', name: 'Revisión de OC y especificaciones',      department: 'Compras',    duration_days: 2, is_milestone: true },
-    { wbs: '2.1', name: 'Diseño detallado del molde',              department: 'Diseño',     duration_days: 10, depends_on: ['1.1'] },
-    { wbs: '2.2', name: 'Aprobación de diseño con cliente',        department: 'Diseño',     duration_days: 3, is_milestone: true, depends_on: ['2.1'] },
-    { wbs: '3.1', name: 'Compra de aceros y componentes',          department: 'Compras',    duration_days: 15, depends_on: ['2.2'] },
-    { wbs: '3.2', name: 'Recepción y verificación',                department: 'Calidad',    duration_days: 2, depends_on: ['3.1'] },
-    { wbs: '4.1', name: 'Programación CAM',                        department: 'Diseño',     duration_days: 4, depends_on: ['2.2'] },
-    { wbs: '4.2', name: 'Maquinado de placas',                     department: 'Producción', duration_days: 12, depends_on: ['3.2', '4.1'] },
-    { wbs: '4.3', name: 'Maquinado de cavidad y postizos',         department: 'Producción', duration_days: 15, depends_on: ['4.2'] },
-    { wbs: '4.4', name: 'Tratamiento térmico',                     department: 'Producción', duration_days: 5, depends_on: ['4.3'] },
-    { wbs: '4.5', name: 'Acabados y pulido',                       department: 'Producción', duration_days: 7, depends_on: ['4.4'] },
-    { wbs: '5.1', name: 'Ensamble del molde',                      department: 'Producción', duration_days: 3, depends_on: ['4.5'] },
-    { wbs: '5.2', name: 'Prueba T0 / Try-out',                     department: 'Calidad',    duration_days: 2, is_milestone: true, depends_on: ['5.1'] },
-    { wbs: '5.3', name: 'Ajustes finales',                         department: 'Producción', duration_days: 4, depends_on: ['5.2'] },
-    { wbs: '6.1', name: 'Empaque y embarque',                      department: 'Embarque',   duration_days: 2, is_milestone: true, depends_on: ['5.3'] },
+    // Fase 1 — Iniciación (2 días)
+    { wbs: '1.1', name: 'Revisión de OC y especificaciones',        department: 'Compras',    duration_days: 1, is_milestone: true },
+    { wbs: '1.2', name: 'Kick-off técnico con cliente',              department: 'Producción', duration_days: 1, depends_on: ['1.1'] },
+
+    // Fase 2 — Diseño (8 días)
+    { wbs: '2.1', name: 'Diseño detallado del molde (CAD)',          department: 'Diseño',     duration_days: 6, depends_on: ['1.2'] },
+    { wbs: '2.2', name: 'Aprobación de diseño con cliente',          department: 'Diseño',     duration_days: 2, is_milestone: true, depends_on: ['2.1'] },
+
+    // Fase 3 — Procura (10 días) y CAM (3 días) en paralelo
+    { wbs: '3.1', name: 'Compra de acero P20 / H13 y componentes',   department: 'Compras',    duration_days: 8, depends_on: ['2.2'] },
+    { wbs: '3.2', name: 'Recepción y verificación de materiales',     department: 'Calidad',    duration_days: 2, depends_on: ['3.1'] },
+    { wbs: '3.3', name: 'Programación CAM (placas + cavidad)',       department: 'Diseño',     duration_days: 3, depends_on: ['2.2'] },
+
+    // Fase 4 — Manufactura (~30 días)
+    { wbs: '4.1', name: 'Maquinado de placas (porta-molde)',         department: 'Producción', duration_days: 6, depends_on: ['3.2', '3.3'] },
+    { wbs: '4.2', name: 'Maquinado de cavidad y núcleo',             department: 'Producción', duration_days: 10, depends_on: ['4.1'] },
+    { wbs: '4.3', name: 'EDM (chispa / hilo)',                        department: 'Producción', duration_days: 5, depends_on: ['4.2'] },
+    { wbs: '4.4', name: 'Tratamiento térmico (templado + revenido)',  department: 'Producción', duration_days: 4, depends_on: ['4.3'] },
+    { wbs: '4.5', name: 'Rectificado y pulido espejo',                department: 'Producción', duration_days: 5, depends_on: ['4.4'] },
+
+    // Fase 5 — Try-out y validación (10 días)
+    { wbs: '5.1', name: 'Ensamble del molde',                        department: 'Producción', duration_days: 2, depends_on: ['4.5'] },
+    { wbs: '5.2', name: 'Prueba T0 / Try-out en máquina',            department: 'Calidad',    duration_days: 2, is_milestone: true, depends_on: ['5.1'] },
+    { wbs: '5.3', name: 'Ajustes finales y validación dimensional',  department: 'Producción', duration_days: 3, depends_on: ['5.2'] },
+    { wbs: '5.4', name: 'Aprobación final del cliente',              department: 'Calidad',    duration_days: 2, is_milestone: true, depends_on: ['5.3'] },
+
+    // Fase 6 — Embarque
+    { wbs: '6.1', name: 'Empaque, manuales y embarque',              department: 'Embarque',   duration_days: 2, is_milestone: true, depends_on: ['5.4'] },
   ],
 };
 
+/**
+ * Herramentales (fixtures, jigs, dispositivos). Ciclo rápido ~13 días.
+ */
 export const TEMPLATE_HERRAMENTALES: MasterPlanTemplate = {
   id: 'Herramentales',
   name: 'Herramentales',
-  description: 'Fixtures, jigs y herramentales de manufactura — ciclo rápido.',
-  defaultRiskSummary: 'Riesgos típicos: cambios en geometría de la pieza objetivo, ajustes finales en sitio.',
+  description: 'Fixtures, jigs y dispositivos de manufactura. Ciclo ~13 días.',
+  defaultRiskSummary:
+    'Riesgos típicos del proyecto:\n' +
+    '· Cambios en geometría de la pieza objetivo durante manufactura\n' +
+    '· Ajustes finales requeridos en sitio (validación con producción real)\n' +
+    '· Disponibilidad de la pieza patrón para pruebas de fixture',
   tasks: [
-    { wbs: '1.1', name: 'Revisión de OC',                  department: 'Compras',    duration_days: 1 },
-    { wbs: '2.1', name: 'Compra de materiales',             department: 'Compras',    duration_days: 5, depends_on: ['1.1'] },
-    { wbs: '3.1', name: 'Diseño y CAM',                     department: 'Diseño',     duration_days: 3, depends_on: ['1.1'] },
-    { wbs: '4.1', name: 'Maquinado',                        department: 'Producción', duration_days: 7, depends_on: ['2.1', '3.1'] },
-    { wbs: '5.1', name: 'Inspección y verificación',        department: 'Calidad',    duration_days: 1, depends_on: ['4.1'] },
-    { wbs: '6.1', name: 'Embarque',                         department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['5.1'] },
+    { wbs: '1.1', name: 'Revisión de OC y kickoff',           department: 'Compras',    duration_days: 1, is_milestone: true },
+    { wbs: '2.1', name: 'Diseño y programación CAM',          department: 'Diseño',     duration_days: 2, depends_on: ['1.1'] },
+    { wbs: '3.1', name: 'Compra y recepción de materiales',   department: 'Compras',    duration_days: 3, depends_on: ['1.1'] },
+    { wbs: '4.1', name: 'Maquinado del herramental',          department: 'Producción', duration_days: 4, depends_on: ['2.1', '3.1'] },
+    { wbs: '4.2', name: 'Ensamble y ajustes',                 department: 'Producción', duration_days: 1, depends_on: ['4.1'] },
+    { wbs: '5.1', name: 'Inspección dimensional y validación', department: 'Calidad',   duration_days: 1, is_milestone: true, depends_on: ['4.2'] },
+    { wbs: '6.1', name: 'Embarque o entrega',                 department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['5.1'] },
   ],
 };
 
+/**
+ * Prototipo rápido. Ciclo corto ~7 días para validación de concepto.
+ */
 export const TEMPLATE_PROTOTIPO: MasterPlanTemplate = {
   id: 'Prototipo',
   name: 'Prototipo rápido',
-  description: 'Ciclo corto para prototipos y validación de concepto.',
-  defaultRiskSummary: 'Riesgos típicos: cambios iterativos del cliente, geometría no validada.',
+  description: 'Pieza única o lote piloto (1-10 pzas) para validación. Ciclo ~7 días.',
+  defaultRiskSummary:
+    'Riesgos típicos del proyecto:\n' +
+    '· Cambios iterativos del cliente durante el ciclo (típico en prototipos)\n' +
+    '· Geometría no validada que requiere ajuste de programa CAM en máquina\n' +
+    '· Materiales no estándar con tiempos de entrega impredecibles',
   tasks: [
-    { wbs: '1.1', name: 'Kick-off técnico',                department: 'Diseño',     duration_days: 1 },
-    { wbs: '2.1', name: 'Materiales en stock o compra ágil', department: 'Compras',  duration_days: 3, depends_on: ['1.1'] },
-    { wbs: '3.1', name: 'Programación CAM',                department: 'Diseño',     duration_days: 1, depends_on: ['1.1'] },
-    { wbs: '4.1', name: 'Maquinado',                       department: 'Producción', duration_days: 3, depends_on: ['2.1', '3.1'] },
-    { wbs: '5.1', name: 'Validación dimensional',           department: 'Calidad',    duration_days: 1, depends_on: ['4.1'] },
-    { wbs: '6.1', name: 'Entrega al cliente',               department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['5.1'] },
+    { wbs: '1.1', name: 'Kick-off técnico y revisión de plano',  department: 'Diseño',     duration_days: 1, is_milestone: true },
+    { wbs: '2.1', name: 'Materia prima (stock o compra urgente)', department: 'Compras',    duration_days: 2, depends_on: ['1.1'] },
+    { wbs: '2.2', name: 'Programación CAM y simulación',          department: 'Diseño',     duration_days: 1, depends_on: ['1.1'] },
+    { wbs: '3.1', name: 'Setup y maquinado',                      department: 'Producción', duration_days: 2, depends_on: ['2.1', '2.2'] },
+    { wbs: '4.1', name: 'Validación dimensional del prototipo',   department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['3.1'] },
+    { wbs: '5.1', name: 'Entrega al cliente',                     department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['4.1'] },
   ],
 };
 
@@ -408,8 +469,16 @@ export function useCreateMasterPlan() {
 
 /**
  * Re-calcula fechas de tareas dependientes a partir de una tarea cambiada.
- * Forward pass: para cada tarea, su start_date debe ser >= al max end_date de
- * sus dependencias. Si una tarea se mueve, mantiene su duración original.
+ *
+ * Estrategia ASAP (PMI standard): cada tarea debe arrancar EXACTAMENTE cuando
+ * sus dependencias terminan. Esto incluye los dos sentidos:
+ *
+ *   1. Si una predecesora se retrasa → empuja a la dependiente hacia adelante
+ *   2. Si una predecesora se adelanta → jala a la dependiente hacia atrás
+ *      (a menos que tenga otra dependencia que la sostenga)
+ *
+ * Las tareas sin dependencias mantienen sus fechas (son anclas).
+ * La tarea cambiada manualmente queda fija.
  *
  * Devuelve la lista nueva (no muta la original).
  */
@@ -419,23 +488,28 @@ export function cascadeDates(
   newStart: string,
   newEnd: string
 ): MasterPlanTask[] {
-  const byWbs = new Map<string, MasterPlanTask>();
   const updated: MasterPlanTask[] = tasks.map(t => ({ ...t }));
+  const byWbs = new Map<string, MasterPlanTask>();
   updated.forEach(t => byWbs.set(t.wbs_code, t));
 
   const changed = updated.find(t => t.id === changedTaskId);
   if (!changed) return updated;
   changed.start_date = newStart;
   changed.end_date = newEnd;
+  const changedWbs = changed.wbs_code;
 
-  // Forward pass — itera hasta estabilidad
+  // Forward pass ASAP — itera hasta estabilidad
   let mutating = true;
-  let safety = 50;
+  let safety = 100;
   while (mutating && safety-- > 0) {
     mutating = false;
     for (const task of updated) {
+      // No tocar la tarea que el usuario movió manualmente
+      if (task.wbs_code === changedWbs) continue;
+      // Tareas sin dependencias quedan donde están (son anclas)
       if (!task.dependencies || task.dependencies.length === 0) continue;
-      // Max end_date entre dependencias
+
+      // Max end_date entre dependencias = inicio "ideal" de esta tarea
       let maxDepEnd: Date | null = null;
       for (const depWbs of task.dependencies) {
         const dep = byWbs.get(depWbs);
@@ -446,12 +520,12 @@ export function cascadeDates(
       if (!maxDepEnd) continue;
 
       const currentStart = new Date(task.start_date);
-      if (maxDepEnd.getTime() > currentStart.getTime()) {
-        // Mueve la tarea conservando su duración
-        const oldStart = new Date(task.start_date);
-        const oldEnd = new Date(task.end_date);
-        const durationMs = oldEnd.getTime() - oldStart.getTime();
+      const currentEnd = new Date(task.end_date);
+      const durationMs = currentEnd.getTime() - currentStart.getTime();
 
+      // Re-alinear si hay gap (anterior o posterior). Tolerancia de 0.5 día.
+      const diffMs = maxDepEnd.getTime() - currentStart.getTime();
+      if (Math.abs(diffMs) > 12 * 60 * 60 * 1000) {
         task.start_date = maxDepEnd.toISOString().slice(0, 10);
         const newEndDate = new Date(maxDepEnd.getTime() + durationMs);
         task.end_date = newEndDate.toISOString().slice(0, 10);
@@ -501,12 +575,20 @@ export function useUpdateMasterPlanTaskDates() {
         }
 
         // Persistencia uno por uno (Postgres no soporta UPDATE batch trivial sin UPSERT)
+        // .select('id') es CRÍTICO para detectar RLS silenciosas (sin error pero 0 filas)
         for (const d of dirty) {
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('master_plan_tasks')
             .update({ start_date: d.start_date, end_date: d.end_date, updated_at: now })
-            .eq('id', d.id);
+            .eq('id', d.id)
+            .select('id');
           if (error) throw error;
+          if (!data || data.length === 0) {
+            throw new Error(
+              `No se actualizó la actividad ${d.wbs_code}. Verifica que tu profiles.role sea ` +
+                `"Administrador" o "Administración / PM" en Supabase.`
+            );
+          }
         }
 
         // Actualiza baseline_end si la última tarea se movió
@@ -516,10 +598,11 @@ export function useUpdateMasterPlanTaskDates() {
             recalculated[0].end_date
           );
           const planId = recalculated[0].master_plan_id;
-          await supabase
+          const { error: planErr } = await supabase
             .from('master_plans')
             .update({ baseline_end: maxEnd, updated_at: now })
             .eq('id', planId);
+          if (planErr) throw planErr;
         }
 
         setState({ loading: false, error: null });

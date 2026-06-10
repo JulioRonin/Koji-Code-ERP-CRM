@@ -817,6 +817,22 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Admins pueden actualizar perfiles del personal (sólo UPDATE; INSERT lo hace
+-- el trigger handle_new_user al registrar un auth.user). Sin política dedicada
+-- la actualización fallaba en silencio para los Administradores.
+DROP POLICY IF EXISTS "admin update profiles" ON public.profiles;
+CREATE POLICY "admin update profiles" ON public.profiles
+    FOR UPDATE TO authenticated
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
+
+-- Cada usuario puede actualizar su propio perfil (datos personales).
+DROP POLICY IF EXISTS "self update profile" ON public.profiles;
+CREATE POLICY "self update profile" ON public.profiles
+    FOR UPDATE TO authenticated
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
+
 -- Compras puede escribir el catálogo de precios y cotizaciones
 CREATE OR REPLACE FUNCTION public.is_purchasing()
 RETURNS BOOLEAN
@@ -888,7 +904,15 @@ CREATE OR REPLACE FUNCTION public.emit_event(
     p_entity_id    TEXT,
     p_payload      JSONB
 ) RETURNS UUID
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql
+SECURITY DEFINER
+-- SECURITY DEFINER + search_path acotado: el INSERT a automation_events
+-- debe correr con privilegios del owner (postgres) y NO con los del usuario
+-- que disparó el trigger. Sin esto cualquier UPDATE del usuario que dispare
+-- emit_event (p.ej. cambio de estado de proyecto) rebotaba con
+-- "new row violates row-level security policy for table automation_events"
+-- y la transacción completa se hacía rollback.
+SET search_path = public, pg_temp AS $$
 DECLARE
     v_id UUID;
 BEGIN

@@ -1,8 +1,9 @@
+import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
 import { MOCK_PROFILES } from './mocks';
-import type { Profile } from '@/types/database';
-import type { AsyncState } from './types';
+import type { Profile, ProfileMetadata } from '@/types/database';
+import type { AsyncState, MutationState } from './types';
 
 export function useProfiles(department?: string): AsyncState<Profile[]> {
   return useAsync<Profile[]>(
@@ -33,4 +34,54 @@ export function useProfile(id: string | undefined): AsyncState<Profile | null> {
     null,
     [id]
   );
+}
+
+export interface UpdateProfileInput {
+  full_name?: string;
+  email?: string;
+  role?: string;
+  department?: string;
+  phone?: string | null;
+  status?: string;
+  bio?: string | null;
+  salary?: number;
+  metadata?: ProfileMetadata;
+}
+
+/**
+ * Actualiza un perfil. Sólo los administradores pueden hacerlo (gated por
+ * RLS en Supabase via is_admin()). Detecta bloqueos silenciosos con
+ * .select('id') para lanzar un error visible en lugar de fingir éxito.
+ */
+export function useUpdateProfile() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const update = useCallback(async (id: string, input: UpdateProfileInput): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        setState({ loading: false, error: null });
+        return;
+      }
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ ...input, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(
+          'No se actualizó el perfil. Sólo los administradores pueden editar la información ' +
+            'del personal. Verifica que tu profiles.role sea "Administrador" en Supabase.'
+        );
+      }
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const error = err as Error;
+      setState({ loading: false, error });
+      throw error;
+    }
+  }, []);
+
+  return { update, ...state };
 }
