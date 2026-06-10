@@ -575,12 +575,20 @@ export function useUpdateMasterPlanTaskDates() {
         }
 
         // Persistencia uno por uno (Postgres no soporta UPDATE batch trivial sin UPSERT)
+        // .select('id') es CRÍTICO para detectar RLS silenciosas (sin error pero 0 filas)
         for (const d of dirty) {
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('master_plan_tasks')
             .update({ start_date: d.start_date, end_date: d.end_date, updated_at: now })
-            .eq('id', d.id);
+            .eq('id', d.id)
+            .select('id');
           if (error) throw error;
+          if (!data || data.length === 0) {
+            throw new Error(
+              `No se actualizó la actividad ${d.wbs_code}. Verifica que tu profiles.role sea ` +
+                `"Administrador" o "Administración / PM" en Supabase.`
+            );
+          }
         }
 
         // Actualiza baseline_end si la última tarea se movió
@@ -590,10 +598,11 @@ export function useUpdateMasterPlanTaskDates() {
             recalculated[0].end_date
           );
           const planId = recalculated[0].master_plan_id;
-          await supabase
+          const { error: planErr } = await supabase
             .from('master_plans')
             .update({ baseline_end: maxEnd, updated_at: now })
             .eq('id', planId);
+          if (planErr) throw planErr;
         }
 
         setState({ loading: false, error: null });
