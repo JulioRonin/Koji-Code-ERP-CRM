@@ -904,7 +904,15 @@ CREATE OR REPLACE FUNCTION public.emit_event(
     p_entity_id    TEXT,
     p_payload      JSONB
 ) RETURNS UUID
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql
+SECURITY DEFINER
+-- SECURITY DEFINER + search_path acotado: el INSERT a automation_events
+-- debe correr con privilegios del owner (postgres) y NO con los del usuario
+-- que disparó el trigger. Sin esto cualquier UPDATE del usuario que dispare
+-- emit_event (p.ej. cambio de estado de proyecto) rebotaba con
+-- "new row violates row-level security policy for table automation_events"
+-- y la transacción completa se hacía rollback.
+SET search_path = public, pg_temp AS $$
 DECLARE
     v_id UUID;
 BEGIN
