@@ -83,7 +83,8 @@ export function useAddProjectTask() {
           department: payload.department ?? null,
           progress: 0,
           status: 'pending',
-          sort_order: Date.now(),
+          // Date.now() (13 dígitos) excede INTEGER. Usamos segundos desde 2024.
+          sort_order: Math.floor((Date.now() - 1704067200000) / 1000),
           created_at: now,
           updated_at: now,
         };

@@ -14,6 +14,8 @@ import {
   Zap,
   Users,
   Clock,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,14 +65,29 @@ const DEPT_COLORS: Record<string, string> = {
   Embarque:   '#0d9488',
 };
 
+// Task editable en el wizard. Extiende TemplateTask con id local y flag custom.
+import type { TemplateTask } from '@/lib/api';
+interface EditableTask extends TemplateTask {
+  uid: string;
+  isCustom?: boolean;
+}
+
+function tasksToEditable(template: MasterPlanTemplate): EditableTask[] {
+  return template.tasks.map((t, i) => ({ ...t, uid: `tpl-${t.wbs}-${i}` }));
+}
+
 export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPlanWizardProps) {
   const [step, setStep] = useState(1);
   const [template, setTemplate] = useState<MasterPlanTemplate>(MASTER_PLAN_TEMPLATES[0]);
   const [methodology, setMethodology] = useState<MasterPlanMethodology>('PMI-Predictivo');
+  const [planningMode, setPlanningMode] = useState<'forward' | 'backward'>('backward');
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [riskSummary, setRiskSummary] = useState<string>(MASTER_PLAN_TEMPLATES[0].defaultRiskSummary);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editableTasks, setEditableTasks] = useState<EditableTask[]>(() =>
+    tasksToEditable(MASTER_PLAN_TEMPLATES[0])
+  );
   const [meetingConfigs, setMeetingConfigs] = useState<MeetingTemplateConfig[]>(
     DEFAULT_MEETING_CONFIGS.map(c => ({ ...c }))
   );
@@ -78,13 +95,42 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
   const { create } = useCreateMasterPlan();
   const { create: createMeetings } = useCreateMeetings();
 
+  // Cuando cambia la plantilla, resetea tasks editables
+  React.useEffect(() => {
+    setEditableTasks(tasksToEditable(template));
+    setRiskSummary(template.defaultRiskSummary);
+  }, [template.id]);
+
+  // Construye una plantilla derivada con los tasks editables (para passar a scheduleTasks)
+  const derivedTemplate: MasterPlanTemplate = useMemo(
+    () => ({
+      ...template,
+      tasks: editableTasks.map(({ uid, isCustom, ...t }) => t),
+    }),
+    [template, editableTasks]
+  );
+
+  // Si está en modo backward, calcula startDate desde el deadline
+  const projectDeadline = parseISO(project.deadline);
+  React.useEffect(() => {
+    if (planningMode !== 'backward') return;
+    // Programa con fecha placeholder para medir duración total
+    const placeholder = new Date(2030, 0, 1);
+    const sched = scheduleTasks(derivedTemplate, placeholder);
+    const end = projectEndDate(sched);
+    const days = Math.ceil((end.getTime() - placeholder.getTime()) / (1000 * 60 * 60 * 24));
+    const newStart = new Date(projectDeadline);
+    newStart.setDate(newStart.getDate() - days);
+    setStartDate(format(newStart, 'yyyy-MM-dd'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planningMode, derivedTemplate, project.deadline]);
+
   // Cronograma calculado en vivo
   const scheduled = useMemo(() => {
-    return scheduleTasks(template, parseISO(startDate));
-  }, [template, startDate]);
+    return scheduleTasks(derivedTemplate, parseISO(startDate));
+  }, [derivedTemplate, startDate]);
 
   const calculatedEnd = useMemo(() => projectEndDate(scheduled), [scheduled]);
-  const projectDeadline = parseISO(project.deadline);
   const slackDays = Math.round((projectDeadline.getTime() - calculatedEnd.getTime()) / (1000 * 60 * 60 * 24));
 
   const criticalCount = scheduled.filter(t => t.is_critical).length;
@@ -92,7 +138,30 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
 
   const handleTemplateChange = (t: MasterPlanTemplate) => {
     setTemplate(t);
-    setRiskSummary(t.defaultRiskSummary);
+  };
+
+  // ── Edición de tareas en el wizard ───────────────────────────────────
+  const patchTask = (uid: string, patch: Partial<EditableTask>) => {
+    setEditableTasks(prev => prev.map(t => (t.uid === uid ? { ...t, ...patch } : t)));
+  };
+
+  const removeTask = (uid: string) => {
+    setEditableTasks(prev => {
+      const removed = prev.find(t => t.uid === uid);
+      if (!removed) return prev;
+      // Limpia dependencias a la tarea removida
+      return prev
+        .filter(t => t.uid !== uid)
+        .map(t => ({
+          ...t,
+          depends_on: (t.depends_on ?? []).filter(d => d !== removed.wbs),
+        }));
+    });
+  };
+
+  const addCustomTask = (task: Omit<EditableTask, 'uid' | 'isCustom'>) => {
+    const uid = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setEditableTasks(prev => [...prev, { ...task, uid, isCustom: true }]);
   };
 
   const handleSubmit = async () => {
@@ -283,6 +352,51 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
                 ))}
               </div>
 
+              {/* Modo de planeación */}
+              <div className="pt-2 space-y-2">
+                <label className="text-sm font-medium">Modo de planeación</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPlanningMode('backward')}
+                    className={cn(
+                      'text-left p-3 rounded-md border-2 transition-colors',
+                      planningMode === 'backward'
+                        ? 'border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)]/30'
+                        : 'border-[var(--color-app-border)] hover:border-[var(--color-app-primary)]/40'
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Flag className="h-3.5 w-3.5 text-[var(--color-app-primary)]" />
+                      <span className="font-semibold text-sm">Entrega fija</span>
+                      {planningMode === 'backward' && <Check className="h-3.5 w-3.5 ml-auto text-[var(--color-app-primary)]" />}
+                    </div>
+                    <p className="text-xs text-[var(--color-app-text-muted)] leading-snug">
+                      Calculamos el inicio hacia atrás desde el <strong>deadline {format(projectDeadline, 'd MMM yyyy', { locale: es })}</strong>.
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlanningMode('forward')}
+                    className={cn(
+                      'text-left p-3 rounded-md border-2 transition-colors',
+                      planningMode === 'forward'
+                        ? 'border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)]/30'
+                        : 'border-[var(--color-app-border)] hover:border-[var(--color-app-primary)]/40'
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <CalendarRange className="h-3.5 w-3.5 text-[var(--color-app-primary)]" />
+                      <span className="font-semibold text-sm">Inicio fijo</span>
+                      {planningMode === 'forward' && <Check className="h-3.5 w-3.5 ml-auto text-[var(--color-app-primary)]" />}
+                    </div>
+                    <p className="text-xs text-[var(--color-app-text-muted)] leading-snug">
+                      Tú eliges la fecha de inicio y el sistema calcula hacia adelante.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Metodología</label>
@@ -297,11 +411,19 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Fecha de inicio</label>
+                  <label className="text-sm font-medium flex items-center justify-between">
+                    Fecha de inicio
+                    {planningMode === 'backward' && (
+                      <span className="text-[10px] font-normal text-[var(--color-app-text-muted)]">
+                        Calculada desde el deadline
+                      </span>
+                    )}
+                  </label>
                   <Input
                     type="date"
                     value={startDate}
                     onChange={e => setStartDate(e.target.value)}
+                    disabled={planningMode === 'backward'}
                   />
                 </div>
               </div>
@@ -312,10 +434,9 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold mb-1">Cronograma calculado</h3>
+                <h3 className="font-semibold mb-1">Cronograma editable</h3>
                 <p className="text-sm text-[var(--color-app-text-muted)]">
-                  Las dependencias entre actividades determinan las fechas. Las marcadas{' '}
-                  <Badge variant="destructive" className="ml-1">crítica</Badge> están en la ruta crítica.
+                  Ajusta duraciones, agrega actividades o hitos. Las dependencias se recalculan en automático.
                 </p>
               </div>
 
@@ -331,22 +452,34 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
                 />
               </div>
 
-              {/* Gantt schematic */}
-              <Card className="p-0 overflow-hidden">
-                <div className="max-h-[360px] overflow-y-auto">
-                  <GanttPreview tasks={scheduled} startDate={parseISO(startDate)} />
-                </div>
-              </Card>
-
               {slackDays < 0 && (
                 <div className="p-3 bg-[var(--color-app-danger-soft)] rounded-md flex gap-2 text-sm text-[var(--color-app-danger)]">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                   <div>
                     El plan termina <strong>{Math.abs(slackDays)} días después</strong> del deadline del proyecto
-                    ({format(projectDeadline, 'dd MMM', { locale: es })}). Considera arrancar antes o reducir duraciones.
+                    ({format(projectDeadline, 'dd MMM', { locale: es })}). Reduce duraciones o adelanta el inicio.
                   </div>
                 </div>
               )}
+
+              {/* Tabla editable de tareas */}
+              <EditableTaskList
+                editableTasks={editableTasks}
+                scheduled={scheduled}
+                onPatch={patchTask}
+                onRemove={removeTask}
+                onAdd={addCustomTask}
+              />
+
+              {/* Gantt preview */}
+              <Card className="p-0 overflow-hidden">
+                <div className="px-3 py-2 border-b border-[var(--color-app-border)] text-xs font-medium text-[var(--color-app-text-muted)]">
+                  Vista Gantt en vivo
+                </div>
+                <div className="max-h-[280px] overflow-y-auto">
+                  <GanttPreview tasks={scheduled} startDate={parseISO(startDate)} />
+                </div>
+              </Card>
             </div>
           )}
 
@@ -635,6 +768,275 @@ function ReviewRow({ label, value, tone }: { label: string; value: string; tone?
         {value}
       </span>
     </div>
+  );
+}
+
+// ============================================================================
+// EDITABLE TASK LIST — tabla editable de actividades en el wizard
+// ============================================================================
+
+interface EditableTaskListProps {
+  editableTasks: EditableTask[];
+  scheduled: ReturnType<typeof scheduleTasks>;
+  onPatch: (uid: string, patch: Partial<EditableTask>) => void;
+  onRemove: (uid: string) => void;
+  onAdd: (task: Omit<EditableTask, 'uid' | 'isCustom'>) => void;
+}
+
+function EditableTaskList({ editableTasks, scheduled, onPatch, onRemove, onAdd }: EditableTaskListProps) {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [draft, setDraft] = useState({
+    wbs: '',
+    name: '',
+    department: 'Producción' as TemplateTask['department'],
+    duration_days: 2,
+    is_milestone: false,
+    depends_on: [] as string[],
+  });
+
+  // Para mostrar fechas calculadas
+  const scheduledByWbs = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof scheduleTasks>[number]>();
+    scheduled.forEach(s => map.set(s.wbs, s));
+    return map;
+  }, [scheduled]);
+
+  const allWbs = editableTasks.map(t => t.wbs);
+
+  const handleAdd = () => {
+    if (!draft.name.trim() || !draft.wbs.trim()) return;
+    if (allWbs.includes(draft.wbs)) {
+      alert(`El WBS "${draft.wbs}" ya existe. Elige otro código.`);
+      return;
+    }
+    onAdd({
+      wbs: draft.wbs.trim(),
+      name: draft.name.trim(),
+      department: draft.department,
+      duration_days: Math.max(1, draft.duration_days),
+      is_milestone: draft.is_milestone,
+      depends_on: draft.depends_on,
+    });
+    // Reset for next
+    setDraft({
+      wbs: '',
+      name: '',
+      department: 'Producción',
+      duration_days: 2,
+      is_milestone: false,
+      depends_on: [],
+    });
+    setShowAddForm(false);
+  };
+
+  // Sugiere próximo WBS basado en el último número de la primera fase
+  const suggestNextWbs = () => {
+    const customCount = editableTasks.filter(t => t.isCustom).length;
+    return `X.${customCount + 1}`;
+  };
+
+  return (
+    <Card className="p-0 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)]/40">
+        <span className="text-xs font-medium text-[var(--color-app-text-muted)]">
+          Actividades ({editableTasks.length})
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setDraft(prev => ({ ...prev, wbs: suggestNextWbs() }));
+            setShowAddForm(true);
+          }}
+          className="h-7 text-xs"
+        >
+          <Plus className="h-3 w-3 mr-1" /> Agregar
+        </Button>
+      </div>
+
+      <div className="max-h-[320px] overflow-y-auto divide-y divide-[var(--color-app-border)]">
+        {editableTasks.map(task => {
+          const sched = scheduledByWbs.get(task.wbs);
+          const isCritical = sched?.is_critical;
+          return (
+            <div key={task.uid} className="p-2.5 space-y-1.5">
+              <div className="flex items-center gap-2">
+                {/* WBS */}
+                <span className="text-[10px] font-mono text-[var(--color-app-text-muted)] w-12 shrink-0">
+                  {task.wbs}
+                </span>
+                {/* Nombre */}
+                <input
+                  value={task.name}
+                  onChange={e => onPatch(task.uid, { name: e.target.value })}
+                  className="flex-1 h-7 px-2 rounded-md border border-transparent hover:border-[var(--color-app-border)] focus:border-[var(--color-app-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/30 text-xs bg-transparent"
+                />
+                {/* Críticas badge */}
+                {isCritical && (
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-[var(--color-app-danger)] shrink-0"
+                    title="Ruta crítica"
+                  />
+                )}
+                {/* Eliminar */}
+                <button
+                  type="button"
+                  onClick={() => onRemove(task.uid)}
+                  className="p-1 text-[var(--color-app-text-subtle)] hover:text-[var(--color-app-danger)] shrink-0"
+                  title="Eliminar actividad"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-[1fr_72px_72px_auto] gap-2 items-center pl-14">
+                {/* Departamento */}
+                <select
+                  value={task.department}
+                  onChange={e => onPatch(task.uid, { department: e.target.value as TemplateTask['department'] })}
+                  className="h-7 px-1.5 rounded-md border border-[var(--color-app-border-strong)] bg-white text-[11px] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                >
+                  <option value="Compras">Compras</option>
+                  <option value="Diseño">Diseño</option>
+                  <option value="Producción">Producción</option>
+                  <option value="Calidad">Calidad</option>
+                  <option value="Embarque">Embarque</option>
+                </select>
+                {/* Duración */}
+                <div className="flex items-center gap-0.5">
+                  <input
+                    type="number"
+                    min={1}
+                    value={task.duration_days}
+                    onChange={e =>
+                      onPatch(task.uid, { duration_days: Math.max(1, Number(e.target.value) || 1) })
+                    }
+                    className="w-12 h-7 px-1.5 rounded-md border border-[var(--color-app-border-strong)] bg-white text-[11px] text-right focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                  />
+                  <span className="text-[10px] text-[var(--color-app-text-muted)]">d</span>
+                </div>
+                {/* Hito */}
+                <label className="flex items-center gap-1 text-[11px] text-[var(--color-app-text-muted)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={task.is_milestone ?? false}
+                    onChange={e => onPatch(task.uid, { is_milestone: e.target.checked })}
+                    className="h-3.5 w-3.5 accent-[var(--color-app-primary)]"
+                  />
+                  <Flag className="h-3 w-3" />
+                </label>
+                {/* Fechas calculadas */}
+                <span className="text-[10px] text-[var(--color-app-text-muted)] font-mono whitespace-nowrap">
+                  {sched
+                    ? `${format(sched.start_date, 'dd MMM', { locale: es })} → ${format(
+                        sched.end_date,
+                        'dd MMM',
+                        { locale: es }
+                      )}`
+                    : '—'}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Form de nueva tarea */}
+      {showAddForm && (
+        <div className="p-3 border-t-2 border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)]/20 space-y-2">
+          <p className="text-xs font-medium">Nueva actividad</p>
+          <div className="grid grid-cols-[80px_1fr] gap-2">
+            <Input
+              placeholder="WBS"
+              value={draft.wbs}
+              onChange={e => setDraft({ ...draft, wbs: e.target.value })}
+              className="h-8 font-mono text-xs"
+            />
+            <Input
+              placeholder="Nombre de la actividad"
+              value={draft.name}
+              onChange={e => setDraft({ ...draft, name: e.target.value })}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <select
+              value={draft.department}
+              onChange={e => setDraft({ ...draft, department: e.target.value as TemplateTask['department'] })}
+              className="h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+            >
+              <option value="Compras">Compras</option>
+              <option value="Diseño">Diseño</option>
+              <option value="Producción">Producción</option>
+              <option value="Calidad">Calidad</option>
+              <option value="Embarque">Embarque</option>
+            </select>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={1}
+                value={draft.duration_days}
+                onChange={e => setDraft({ ...draft, duration_days: Math.max(1, Number(e.target.value) || 1) })}
+                className="w-14 h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs text-right focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+              />
+              <span className="text-xs text-[var(--color-app-text-muted)]">días</span>
+            </div>
+            <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.is_milestone}
+                onChange={e => setDraft({ ...draft, is_milestone: e.target.checked })}
+                className="h-3.5 w-3.5 accent-[var(--color-app-primary)]"
+              />
+              <Flag className="h-3 w-3 text-[var(--color-app-warning)]" /> Hito
+            </label>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
+              Depende de (opcional)
+            </p>
+            <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+              {editableTasks.map(t => (
+                <button
+                  key={t.uid}
+                  type="button"
+                  onClick={() => {
+                    setDraft(prev => ({
+                      ...prev,
+                      depends_on: prev.depends_on.includes(t.wbs)
+                        ? prev.depends_on.filter(d => d !== t.wbs)
+                        : [...prev.depends_on, t.wbs],
+                    }));
+                  }}
+                  className={cn(
+                    'h-6 px-2 rounded-md border text-[10px] font-mono transition-colors',
+                    draft.depends_on.includes(t.wbs)
+                      ? 'bg-[var(--color-app-primary)] text-white border-[var(--color-app-primary)]'
+                      : 'border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]/40'
+                  )}
+                >
+                  {t.wbs}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddForm(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAdd}
+              disabled={!draft.name.trim() || !draft.wbs.trim()}
+            >
+              <Plus className="h-3 w-3 mr-1" /> Agregar
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 

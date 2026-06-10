@@ -588,8 +588,8 @@ export function ProjectDetails() {
 
       {/* Master Plan dialog (Gantt completo) */}
       <Dialog open={isMasterPlanOpen} onOpenChange={setIsMasterPlanOpen}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
             <DialogTitle>Master Plan · Gantt</DialogTitle>
             <DialogDescription>
               {masterPlan
@@ -597,7 +597,7 @@ export function ProjectDetails() {
                 : 'Sin plan generado'}
             </DialogDescription>
           </DialogHeader>
-          <div className="overflow-auto">
+          <div className="flex-1 overflow-auto px-6 pb-6">
             {ganttTasks.length > 0 ? (
               <GanttChart startDate={masterPlan?.baseline_start ?? project.start_date} tasks={ganttTasks} />
             ) : (
