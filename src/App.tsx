@@ -21,6 +21,8 @@ import { Personnel } from './pages/crm/Personnel';
 import { Shipping } from './pages/shipping/Shipping';
 import { ClientPortal } from './pages/client-portal/ClientPortal';
 import { Pmo } from './pages/pmo/Pmo';
+import { Quotes } from './pages/quotes/Quotes';
+import { QuoteBuilder } from './pages/quotes/QuoteBuilder';
 import { Integrations } from './pages/settings/Integrations';
 import { 
   Billing, 
@@ -150,6 +152,18 @@ export default function App() {
           <Route path="pmo" element={
             <ProtectedRoute allowedDepartments={['Producción']}>
                 <Pmo />
+            </ProtectedRoute>
+          } />
+
+          <Route path="quotes" element={
+            <ProtectedRoute allowedDepartments={['Compras']}>
+                <Quotes />
+            </ProtectedRoute>
+          } />
+
+          <Route path="quotes/:id" element={
+            <ProtectedRoute allowedDepartments={['Compras']}>
+                <QuoteBuilder />
             </ProtectedRoute>
           } />
 

@@ -96,6 +96,74 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
 );
 
 -- ---------------------------------------------------------------------------
+-- 3b. COTIZACIONES — catálogo de precios y quotes
+-- ---------------------------------------------------------------------------
+
+-- Catálogo de precios de materiales (price book del comprador)
+CREATE TABLE IF NOT EXISTS public.material_prices (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    material      TEXT NOT NULL,               -- 'Acero 4140'
+    description   TEXT,                        -- 'Barra redonda 2"'
+    uom           TEXT NOT NULL DEFAULT 'kg',  -- kg, barra, placa, pza
+    unit_price    NUMERIC NOT NULL DEFAULT 0,
+    currency      TEXT DEFAULT 'MXN',
+    supplier_id   UUID REFERENCES public.suppliers(id) ON DELETE SET NULL,
+    supplier_name TEXT,
+    valid_until   DATE,
+    notes         TEXT,
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_material_prices_material ON public.material_prices(material);
+
+CREATE TABLE IF NOT EXISTS public.quotes (
+    id                    TEXT PRIMARY KEY,    -- COT-2026-001
+    customer_id           UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+    client_name           TEXT NOT NULL,
+    project_name          TEXT NOT NULL,
+    status                TEXT NOT NULL DEFAULT 'Borrador'
+                          CHECK (status IN ('Borrador','Enviada','Aprobada','Rechazada','Convertida','Expirada')),
+    currency              TEXT DEFAULT 'MXN',
+    margin_pct            NUMERIC DEFAULT 30,   -- margen default de la cotización
+    tax_pct               NUMERIC DEFAULT 16,   -- IVA
+    machine_rate_per_hour NUMERIC DEFAULT 650,  -- tarifa máquina default
+    valid_until           DATE,
+    notes                 TEXT,
+    subtotal              NUMERIC DEFAULT 0,
+    total                 NUMERIC DEFAULT 0,
+    converted_project_id  TEXT REFERENCES public.projects(id) ON DELETE SET NULL,
+    created_by            UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at            TIMESTAMPTZ DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_quotes_status ON public.quotes(status);
+
+CREATE TABLE IF NOT EXISTS public.quote_items (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    quote_id            TEXT REFERENCES public.quotes(id) ON DELETE CASCADE,
+    part_number         TEXT NOT NULL,
+    description         TEXT,
+    quantity            NUMERIC NOT NULL DEFAULT 1,
+    material_price_id   UUID REFERENCES public.material_prices(id) ON DELETE SET NULL,
+    material_name       TEXT,
+    material_qty        NUMERIC DEFAULT 0,      -- consumo por pieza (en uom del material)
+    material_unit_cost  NUMERIC DEFAULT 0,      -- snapshot del precio al cotizar
+    machining_hours     NUMERIC DEFAULT 0,      -- horas máquina por pieza
+    machine_rate        NUMERIC DEFAULT 0,      -- tarifa usada
+    extra_cost          NUMERIC DEFAULT 0,      -- hardware / tratamientos por pieza
+    margin_pct          NUMERIC,                -- override del margen; NULL usa el de la quote
+    drawing_file        TEXT,                   -- nombre del plano 2D asociado
+    unit_price          NUMERIC DEFAULT 0,      -- calculado
+    line_total          NUMERIC DEFAULT 0,      -- calculado
+    sort_order          INTEGER DEFAULT 0,
+    created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON public.quote_items(quote_id);
+
+-- ---------------------------------------------------------------------------
 -- 4. PROYECTOS
 -- ---------------------------------------------------------------------------
 
@@ -515,6 +583,7 @@ BEGIN
     FOR t IN
         SELECT unnest(ARRAY[
             'profiles','customers','suppliers','projects','bom_items',
+            'material_prices','quotes',
             'requisitions','purchase_orders','machines','work_orders',
             'work_order_stages','measurement_instruments','shipments'
         ])
@@ -541,6 +610,9 @@ END$$;
 ALTER TABLE public.profiles                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customers               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.suppliers               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.material_prices         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quotes                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quote_items             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_files           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bom_items               ENABLE ROW LEVEL SECURITY;
@@ -582,6 +654,7 @@ BEGIN
     FOR t IN
         SELECT unnest(ARRAY[
             'profiles','customers','suppliers','projects','project_files',
+            'material_prices','quotes','quote_items',
             'bom_items','requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages','time_entries',
             'quality_inspections','ncrs','measurement_instruments',
@@ -606,6 +679,7 @@ BEGIN
     FOR t IN
         SELECT unnest(ARRAY[
             'customers','suppliers','projects','project_files','bom_items',
+            'material_prices','quotes','quote_items',
             'requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages',
             'quality_inspections','ncrs','measurement_instruments',
@@ -617,6 +691,32 @@ BEGIN
             'DROP POLICY IF EXISTS "admin write %I" ON public.%I;
              CREATE POLICY "admin write %I" ON public.%I
              FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());',
+            t, t, t, t
+        );
+    END LOOP;
+END$$;
+
+-- Compras puede escribir el catálogo de precios y cotizaciones
+CREATE OR REPLACE FUNCTION public.is_purchasing()
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND department IN ('Compras','Administrador','Administración / PM')
+    );
+$$;
+
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN SELECT unnest(ARRAY['material_prices','quotes','quote_items'])
+    LOOP
+        EXECUTE format(
+            'DROP POLICY IF EXISTS "purchasing write %I" ON public.%I;
+             CREATE POLICY "purchasing write %I" ON public.%I
+             FOR ALL TO authenticated USING (public.is_purchasing()) WITH CHECK (public.is_purchasing());',
             t, t, t, t
         );
     END LOOP;
