@@ -16,7 +16,17 @@ import {
   MoreHorizontal,
   ArrowUpDown,
   Calendar,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -43,7 +53,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ProjectFormModal } from './ProjectFormModal';
 import { useChat } from '@/contexts/ChatContext';
-import { useProjects, useCreateProject } from '@/lib/api';
+import { useProjects, useCreateProject, useDeleteProject } from '@/lib/api';
 import type { Project, ProjectStatus } from '@/types/database';
 
 const statusVariant: Record<ProjectStatus, 'default' | 'secondary' | 'success' | 'outline' | 'warning'> = {
@@ -67,7 +77,22 @@ export function Projects() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: projects, loading, refetch } = useProjects();
   const { create: createProject } = useCreateProject();
+  const { remove: deleteProject, loading: deleting } = useDeleteProject();
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const data = projects;
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteError(null);
+    try {
+      await deleteProject(deleteTarget.id);
+      await refetch();
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError((err as Error).message);
+    }
+  };
 
   const columns = [
     columnHelper.accessor('id', {
@@ -143,6 +168,14 @@ export function Projects() {
                 Generar master plan
               </DropdownMenuItem>
               <DropdownMenuItem>Editar proyecto</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setDeleteTarget(project)}
+                className="text-[var(--color-app-danger)] focus:text-[var(--color-app-danger)] gap-2"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Eliminar proyecto
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -274,6 +307,61 @@ export function Projects() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateProject}
       />
+
+      {/* Dialog de confirmación de borrado */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={open => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-[var(--color-app-danger)]" />
+              Eliminar proyecto
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción es <strong>irreversible</strong>. Se eliminará todo el contenido del
+              proyecto: BOM, work orders, inspecciones, NCRs, embarques, master plan, juntas y
+              reportes PMO asociados.
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteTarget && (
+            <div className="p-3 rounded-md bg-[var(--color-app-surface-alt)] text-sm">
+              <p className="font-medium">{deleteTarget.name}</p>
+              <p className="text-xs text-[var(--color-app-text-muted)] font-mono mt-0.5">
+                {deleteTarget.id} · {deleteTarget.client_name}
+              </p>
+            </div>
+          )}
+
+          {deleteError && (
+            <div className="p-3 rounded-md bg-[var(--color-app-danger-soft)] text-sm text-[var(--color-app-danger)] flex gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span className="leading-snug">{deleteError}</span>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" />
+              {deleting ? 'Eliminando...' : 'Eliminar definitivamente'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

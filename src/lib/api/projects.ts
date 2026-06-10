@@ -141,3 +141,39 @@ export function useUpdateProjectStatus() {
 
   return { update, ...state };
 }
+
+/**
+ * Elimina un proyecto. Por las FK con ON DELETE CASCADE, se borran también
+ * sus BOMs, work orders, inspecciones, NCRs, archivos, master plan, etc.
+ */
+export function useDeleteProject() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const remove = useCallback(async (projectId: string): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        setState({ loading: false, error: null });
+        return;
+      }
+      const { error, count } = await supabase
+        .from('projects')
+        .delete({ count: 'exact' })
+        .eq('id', projectId);
+      if (error) throw error;
+      if (count === 0) {
+        throw new Error(
+          'No se eliminó el proyecto. Probablemente tu perfil no tiene permisos. ' +
+            'Verifica que profiles.role sea "Administrador" en Supabase.'
+        );
+      }
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const error = err as Error;
+      setState({ loading: false, error });
+      throw error;
+    }
+  }, []);
+
+  return { remove, ...state };
+}
