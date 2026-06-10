@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format, addDays } from 'date-fns';
-import { Plus, X, CalendarRange, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { Plus, X, CalendarRange, Trash2, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAddProjectTask, useUpdateProjectTask, useDeleteProjectTask } from '@/lib/api';
@@ -39,22 +39,27 @@ export function AdHocTaskForm({ projectId, tasks, onChanged }: Props) {
     start: format(new Date(), 'yyyy-MM-dd'),
     duration: 2,
   });
+  const [error, setError] = useState<string | null>(null);
 
   const handleAdd = async () => {
     if (!draft.name.trim()) return;
+    setError(null);
     const start = draft.start;
     const end = format(addDays(new Date(draft.start), Math.max(0, draft.duration - 1)), 'yyyy-MM-dd');
 
-    await add(projectId, {
-      name: draft.name.trim(),
-      department: draft.department || null,
-      start_date: start,
-      end_date: end,
-      scheduled_date: start,
-    });
-
-    setDraft(prev => ({ ...prev, name: '' }));
-    await onChanged?.();
+    try {
+      await add(projectId, {
+        name: draft.name.trim(),
+        department: draft.department || null,
+        start_date: start,
+        end_date: end,
+        scheduled_date: start,
+      });
+      setDraft(prev => ({ ...prev, name: '' }));
+      await onChanged?.();
+    } catch (err) {
+      setError((err as Error).message || 'No se pudo crear la tarea.');
+    }
   };
 
   const handleToggle = async (task: ProjectTask) => {
@@ -72,6 +77,21 @@ export function AdHocTaskForm({ projectId, tasks, onChanged }: Props) {
 
   return (
     <div className="space-y-3">
+      {error && (
+        <div className="flex items-start gap-2 p-3 rounded-md bg-[var(--color-app-danger-soft)] text-sm text-[var(--color-app-danger)]">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="leading-snug flex-1">{error}</div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="opacity-70 hover:opacity-100"
+            aria-label="Cerrar"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Form */}
       <div className="space-y-2 p-3 rounded-md bg-[var(--color-app-surface-alt)]/40">
         <input

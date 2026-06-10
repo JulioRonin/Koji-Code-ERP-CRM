@@ -48,6 +48,7 @@ import { ProjectReport } from '@/components/projects/ProjectReport';
 import { MasterPlanWizard } from '@/components/projects/MasterPlanWizard';
 import { MasterPlanTaskList } from '@/components/projects/MasterPlanTaskList';
 import { AdHocTaskForm } from '@/components/projects/AdHocTaskForm';
+import { MeetingsCard } from '@/components/projects/MeetingsCard';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
 import {
   useProject,
@@ -431,6 +432,9 @@ export function ProjectDetails() {
               </CardContent>
             </Card>
           )}
+
+          {/* Calendario de juntas (si existen) */}
+          <MeetingsCard projectId={project.id} />
 
           {/* Plan de trabajo — si hay master plan, muestra sus activities editables;
               si no, las tareas ad-hoc del proyecto. */}

@@ -406,6 +406,136 @@ export function useCreateMasterPlan() {
   return { create, ...state };
 }
 
+/**
+ * Re-calcula fechas de tareas dependientes a partir de una tarea cambiada.
+ * Forward pass: para cada tarea, su start_date debe ser >= al max end_date de
+ * sus dependencias. Si una tarea se mueve, mantiene su duración original.
+ *
+ * Devuelve la lista nueva (no muta la original).
+ */
+export function cascadeDates(
+  tasks: MasterPlanTask[],
+  changedTaskId: string,
+  newStart: string,
+  newEnd: string
+): MasterPlanTask[] {
+  const byWbs = new Map<string, MasterPlanTask>();
+  const updated: MasterPlanTask[] = tasks.map(t => ({ ...t }));
+  updated.forEach(t => byWbs.set(t.wbs_code, t));
+
+  const changed = updated.find(t => t.id === changedTaskId);
+  if (!changed) return updated;
+  changed.start_date = newStart;
+  changed.end_date = newEnd;
+
+  // Forward pass — itera hasta estabilidad
+  let mutating = true;
+  let safety = 50;
+  while (mutating && safety-- > 0) {
+    mutating = false;
+    for (const task of updated) {
+      if (!task.dependencies || task.dependencies.length === 0) continue;
+      // Max end_date entre dependencias
+      let maxDepEnd: Date | null = null;
+      for (const depWbs of task.dependencies) {
+        const dep = byWbs.get(depWbs);
+        if (!dep) continue;
+        const depEnd = new Date(dep.end_date);
+        if (!maxDepEnd || depEnd > maxDepEnd) maxDepEnd = depEnd;
+      }
+      if (!maxDepEnd) continue;
+
+      const currentStart = new Date(task.start_date);
+      if (maxDepEnd.getTime() > currentStart.getTime()) {
+        // Mueve la tarea conservando su duración
+        const oldStart = new Date(task.start_date);
+        const oldEnd = new Date(task.end_date);
+        const durationMs = oldEnd.getTime() - oldStart.getTime();
+
+        task.start_date = maxDepEnd.toISOString().slice(0, 10);
+        const newEndDate = new Date(maxDepEnd.getTime() + durationMs);
+        task.end_date = newEndDate.toISOString().slice(0, 10);
+        mutating = true;
+      }
+    }
+  }
+
+  return updated;
+}
+
+/**
+ * Persiste cambios de fechas de un set de tareas (después de cascada).
+ * Hace UN solo update batch para minimizar round-trips a Supabase.
+ */
+export function useUpdateMasterPlanTaskDates() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const update = useCallback(
+    async (
+      tasks: MasterPlanTask[],
+      changedTaskId: string,
+      newStart: string,
+      newEnd: string
+    ): Promise<MasterPlanTask[]> => {
+      setState({ loading: true, error: null });
+      try {
+        const recalculated = cascadeDates(tasks, changedTaskId, newStart, newEnd);
+
+        // Detecta cambios reales para no actualizar lo que no cambió
+        const dirty = recalculated.filter(t => {
+          const orig = tasks.find(o => o.id === t.id);
+          return orig && (orig.start_date !== t.start_date || orig.end_date !== t.end_date);
+        });
+
+        const now = new Date().toISOString();
+
+        if (!supabase) {
+          const all = readDemo<MasterPlanTask>(DEMO_TASKS_KEY);
+          dirty.forEach(d => {
+            const idx = all.findIndex(t => t.id === d.id);
+            if (idx >= 0) all[idx] = { ...all[idx], start_date: d.start_date, end_date: d.end_date, updated_at: now };
+          });
+          writeDemo(DEMO_TASKS_KEY, all);
+          setState({ loading: false, error: null });
+          return recalculated;
+        }
+
+        // Persistencia uno por uno (Postgres no soporta UPDATE batch trivial sin UPSERT)
+        for (const d of dirty) {
+          const { error } = await supabase
+            .from('master_plan_tasks')
+            .update({ start_date: d.start_date, end_date: d.end_date, updated_at: now })
+            .eq('id', d.id);
+          if (error) throw error;
+        }
+
+        // Actualiza baseline_end si la última tarea se movió
+        if (dirty.length > 0) {
+          const maxEnd = recalculated.reduce(
+            (max, t) => (t.end_date > max ? t.end_date : max),
+            recalculated[0].end_date
+          );
+          const planId = recalculated[0].master_plan_id;
+          await supabase
+            .from('master_plans')
+            .update({ baseline_end: maxEnd, updated_at: now })
+            .eq('id', planId);
+        }
+
+        setState({ loading: false, error: null });
+        return recalculated;
+      } catch (err) {
+        const e = err as Error;
+        setState({ loading: false, error: e });
+        throw e;
+      }
+    },
+    []
+  );
+
+  return { update, ...state };
+}
+
 export function useUpdateMasterPlanTaskProgress() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
 

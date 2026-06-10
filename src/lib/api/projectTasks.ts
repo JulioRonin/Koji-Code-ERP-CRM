@@ -94,10 +94,32 @@ export function useAddProjectTask() {
           setState({ loading: false, error: null });
           return task;
         }
-        const { data, error } = await supabase.from('project_tasks').insert(task).select('*').single();
-        if (error) throw error;
+        const { data, error } = await supabase
+          .from('project_tasks')
+          .insert(task)
+          .select('*');
+        if (error) {
+          // Mensajes accionables para errores comunes
+          const msg = error.message || '';
+          if (msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('policy')) {
+            throw new Error(
+              'No se pudo crear la tarea. RLS bloqueó la operación — verifica que tu profile.role sea "Administrador" o "Administración / PM" en Supabase.'
+            );
+          }
+          if (msg.toLowerCase().includes('relation') && msg.toLowerCase().includes('not exist')) {
+            throw new Error(
+              'La tabla project_tasks no existe. Re-corre database_schema.sql en el SQL editor de Supabase.'
+            );
+          }
+          throw error;
+        }
+        if (!data || data.length === 0) {
+          throw new Error(
+            'La tarea no se guardó. Verifica que tu profile.role tenga permisos en Supabase.'
+          );
+        }
         setState({ loading: false, error: null });
-        return data as ProjectTask;
+        return data[0] as ProjectTask;
       } catch (err) {
         const e = err as Error;
         setState({ loading: false, error: e });

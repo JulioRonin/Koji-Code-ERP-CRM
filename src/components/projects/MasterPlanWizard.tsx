@@ -12,6 +12,8 @@ import {
   Sparkles,
   Flag,
   Zap,
+  Users,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +31,11 @@ import {
   scheduleTasks,
   projectEndDate,
   useCreateMasterPlan,
+  useCreateMeetings,
+  DEFAULT_MEETING_CONFIGS,
+  generateMeetingDates,
   type MasterPlanTemplate,
+  type MeetingTemplateConfig,
 } from '@/lib/api';
 import type { Project, MasterPlanMethodology, MasterPlanTask } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -45,7 +51,8 @@ const STEPS = [
   { id: 1, label: 'Plantilla',  icon: ClipboardList },
   { id: 2, label: 'Cronograma', icon: CalendarRange },
   { id: 3, label: 'Riesgos',    icon: AlertTriangle },
-  { id: 4, label: 'Revisar',    icon: Check },
+  { id: 4, label: 'Juntas',     icon: Users },
+  { id: 5, label: 'Revisar',    icon: Check },
 ] as const;
 
 const DEPT_COLORS: Record<string, string> = {
@@ -64,8 +71,12 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
   const [riskSummary, setRiskSummary] = useState<string>(MASTER_PLAN_TEMPLATES[0].defaultRiskSummary);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [meetingConfigs, setMeetingConfigs] = useState<MeetingTemplateConfig[]>(
+    DEFAULT_MEETING_CONFIGS.map(c => ({ ...c }))
+  );
 
   const { create } = useCreateMasterPlan();
+  const { create: createMeetings } = useCreateMeetings();
 
   // Cronograma calculado en vivo
   const scheduled = useMemo(() => {
@@ -113,6 +124,35 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
         risk_summary: riskSummary,
         tasks,
       });
+
+      // Generar juntas si hay configuraciones habilitadas
+      const enabledMeetings = meetingConfigs.filter(c => c.enabled);
+      if (enabledMeetings.length > 0) {
+        const baselineStart = parseISO(startDate);
+        const baselineEnd = calculatedEnd;
+        const meetingsToCreate = enabledMeetings.flatMap(config => {
+          const dates = generateMeetingDates(config, baselineStart, baselineEnd);
+          return dates.map((d, idx) => ({
+            project_id: project.id,
+            master_plan_id: plan.id,
+            title:
+              dates.length > 1
+                ? `${config.title} #${idx + 1}`
+                : config.title,
+            meeting_type: config.type,
+            scheduled_at: d.toISOString(),
+            duration_minutes: config.duration_minutes,
+            attendees: config.attendees,
+          }));
+        });
+        try {
+          if (meetingsToCreate.length > 0) {
+            await createMeetings(meetingsToCreate);
+          }
+        } catch (mtgErr) {
+          console.warn('No se pudieron crear las juntas', mtgErr);
+        }
+      }
 
       // Cierra primero, después callback en background — así si onCreated
       // (refetch + agregar nota) tira un error, el plan ya quedó publicado.
@@ -338,8 +378,159 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
             </div>
           )}
 
-          {/* STEP 4 — REVISAR */}
+          {/* STEP 4 — JUNTAS */}
           {step === 4 && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-1">Calendario de juntas</h3>
+                <p className="text-sm text-[var(--color-app-text-muted)]">
+                  Define las reuniones de seguimiento que se calendarizarán automáticamente
+                  entre el inicio y el fin del proyecto. Generan el <em>readiness</em> formal del PMI.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {meetingConfigs.map((config, idx) => {
+                  const previewDates = config.enabled
+                    ? generateMeetingDates(config, parseISO(startDate), calculatedEnd)
+                    : [];
+                  return (
+                    <Card key={config.type} className="p-0">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMeetingConfigs(prev =>
+                                prev.map((c, i) => (i === idx ? { ...c, enabled: !c.enabled } : c))
+                              )
+                            }
+                            className={cn(
+                              'h-5 w-5 rounded border-2 shrink-0 mt-0.5 flex items-center justify-center transition-colors',
+                              config.enabled
+                                ? 'bg-[var(--color-app-primary)] border-[var(--color-app-primary)]'
+                                : 'border-[var(--color-app-border-strong)] bg-white'
+                            )}
+                          >
+                            {config.enabled && <Check className="h-3 w-3 text-white" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="outline">{config.type}</Badge>
+                              <span className="font-medium text-sm">{config.title}</span>
+                            </div>
+                            <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
+                              {config.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        {config.enabled && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-8">
+                            <div>
+                              <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                                Hora
+                              </label>
+                              <Input
+                                type="time"
+                                value={config.time}
+                                onChange={e =>
+                                  setMeetingConfigs(prev =>
+                                    prev.map((c, i) => (i === idx ? { ...c, time: e.target.value } : c))
+                                  )
+                                }
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                                Duración (min)
+                              </label>
+                              <Input
+                                type="number"
+                                min={15}
+                                step={15}
+                                value={config.duration_minutes}
+                                onChange={e =>
+                                  setMeetingConfigs(prev =>
+                                    prev.map((c, i) =>
+                                      i === idx ? { ...c, duration_minutes: Number(e.target.value) || 30 } : c
+                                    )
+                                  )
+                                }
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            {(config.frequency === 'weekly' ||
+                              config.frequency === 'biweekly' ||
+                              config.frequency === 'monthly') && (
+                              <div>
+                                <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                                  Día semana
+                                </label>
+                                <select
+                                  value={config.weekday ?? 1}
+                                  onChange={e =>
+                                    setMeetingConfigs(prev =>
+                                      prev.map((c, i) =>
+                                        i === idx ? { ...c, weekday: Number(e.target.value) } : c
+                                      )
+                                    )
+                                  }
+                                  className="w-full h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs"
+                                >
+                                  <option value={1}>Lunes</option>
+                                  <option value={2}>Martes</option>
+                                  <option value={3}>Miércoles</option>
+                                  <option value={4}>Jueves</option>
+                                  <option value={5}>Viernes</option>
+                                </select>
+                              </div>
+                            )}
+                            <div className="col-span-2 sm:col-span-1">
+                              <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                                Sesiones
+                              </label>
+                              <div className="h-8 px-2 flex items-center text-xs font-medium text-[var(--color-app-text-muted)]">
+                                {previewDates.length}{' '}
+                                {previewDates.length === 1 ? 'junta' : 'juntas'}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {config.enabled && previewDates.length > 0 && (
+                          <div className="pl-8 flex flex-wrap gap-1.5">
+                            {previewDates.slice(0, 6).map((d, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px] font-mono">
+                                {format(d, "d MMM HH:mm", { locale: es })}
+                              </Badge>
+                            ))}
+                            {previewDates.length > 6 && (
+                              <Badge variant="outline" className="text-[10px]">
+                                +{previewDates.length - 6}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              <div className="p-3 bg-[var(--color-app-info-soft)]/50 rounded-md text-xs text-[var(--color-app-text-muted)] flex gap-2">
+                <Clock className="h-4 w-4 shrink-0 mt-0.5 text-[var(--color-app-info)]" />
+                <div>
+                  Las juntas se generan al publicar el master plan. Después podrás marcarlas como
+                  realizadas o canceladas desde el proyecto.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5 — REVISAR */}
+          {step === 5 && (
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold mb-1">Revisar y publicar</h3>
@@ -359,6 +550,19 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
                   <ReviewRow label="Deadline cliente"   value={format(projectDeadline, 'dd MMM yyyy', { locale: es })} />
                   <ReviewRow label="Holgura"            value={`${slackDays} días`}              tone={slackDays >= 0 ? 'success' : 'danger'} />
                   <ReviewRow label="Actividades"        value={`${scheduled.length} (${criticalCount} críticas, ${milestoneCount} hitos)`} />
+                  <ReviewRow
+                    label="Juntas a programar"
+                    value={(() => {
+                      const enabled = meetingConfigs.filter(c => c.enabled);
+                      if (enabled.length === 0) return 'Ninguna';
+                      const total = enabled.reduce(
+                        (acc, c) =>
+                          acc + generateMeetingDates(c, parseISO(startDate), calculatedEnd).length,
+                        0
+                      );
+                      return `${total} sesiones en ${enabled.length} tipos`;
+                    })()}
+                  />
                 </CardContent>
               </Card>
             </div>

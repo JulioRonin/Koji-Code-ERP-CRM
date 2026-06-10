@@ -314,6 +314,24 @@ export interface MasterPlanTask {
   updated_at: string;
 }
 
+export type MeetingType = 'Kick-off' | 'Semanal' | 'Quincenal' | 'Mensual' | 'Hito' | 'Cierre';
+export type MeetingStatus = 'Programada' | 'Realizada' | 'Cancelada';
+
+export interface ProjectMeeting {
+  id: string;
+  project_id: string;
+  master_plan_id: string | null;
+  title: string;
+  meeting_type: MeetingType;
+  scheduled_at: string;
+  duration_minutes: number;
+  attendees: string[];
+  status: MeetingStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ============================================================================
 // TABLA: project_files
 // ============================================================================
@@ -634,6 +652,7 @@ export interface Database {
       project_notes:           { Row: ProjectNote;            Insert: Partial<ProjectNote>;            Update: Partial<ProjectNote> };
       master_plans:            { Row: MasterPlan;             Insert: Partial<MasterPlan>;             Update: Partial<MasterPlan> };
       master_plan_tasks:       { Row: MasterPlanTask;         Insert: Partial<MasterPlanTask>;         Update: Partial<MasterPlanTask> };
+      project_meetings:        { Row: ProjectMeeting;         Insert: Partial<ProjectMeeting>;         Update: Partial<ProjectMeeting> };
       bom_items:               { Row: BomItem;                Insert: Partial<BomItem>;                Update: Partial<BomItem> };
       requisitions:            { Row: Requisition;            Insert: Partial<Requisition>;            Update: Partial<Requisition> };
       purchase_orders:         { Row: PurchaseOrder;          Insert: Partial<PurchaseOrder>;          Update: Partial<PurchaseOrder> };

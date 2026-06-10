@@ -21,6 +21,9 @@ import {
   AlertTriangle,
   ShieldCheck,
   X,
+  MessageSquare,
+  CalendarClock,
+  XCircle,
 } from 'lucide-react';
 import { format, parseISO, isValid, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -32,7 +35,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { GanttChart } from './GanttChart';
-import { useMasterPlan, useMasterPlanTasks, useProjectTasks, useProjectNotes } from '@/lib/api';
+import {
+  useMasterPlan,
+  useMasterPlanTasks,
+  useProjectTasks,
+  useProjectNotes,
+  useProjectMeetings,
+} from '@/lib/api';
+import type { ProjectNote } from '@/types/database';
 import { cn } from '@/lib/utils';
 
 const fmtDate = (s: string | null | undefined) => {
@@ -346,13 +356,13 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
           )}
 
           {/* ───────────────────────────────────────────────────────────────
-              PÁGINA 6 — RIESGOS Y ACTIVIDAD
+              PÁGINA 6 — RIESGOS Y TAREAS ADICIONALES
               ─────────────────────────────────────────────────────────────── */}
           <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm">
             <PageHeader title="Riesgos y observaciones" subtitle="Identificación y seguimiento" />
 
             <div className="space-y-6">
-              {masterPlan?.risk_summary && (
+              {masterPlan?.risk_summary ? (
                 <div className="pmi-keep">
                   <h3 className="text-sm font-semibold text-[#0f172a] mb-2 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-[#b45309]" /> Riesgos identificados
@@ -360,6 +370,13 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
                   <div className="p-4 bg-[#fef3c7]/30 border border-[#fde68a] rounded-md text-sm leading-relaxed whitespace-pre-wrap">
                     {masterPlan.risk_summary}
                   </div>
+                </div>
+              ) : (
+                <div className="pmi-keep">
+                  <h3 className="text-sm font-semibold text-[#0f172a] mb-2">Riesgos identificados</h3>
+                  <p className="text-sm text-[#94a3b8] italic">
+                    Sin riesgos documentados en el Master Plan.
+                  </p>
                 </div>
               )}
 
@@ -388,31 +405,16 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
                   </div>
                 </div>
               )}
-
-              {notes.length > 0 && (
-                <div className="pmi-keep">
-                  <h3 className="text-sm font-semibold text-[#0f172a] mb-2">Actividad reciente</h3>
-                  <div className="border-l-2 border-[#e2e8f0] pl-4 space-y-2 max-h-[280px] overflow-hidden">
-                    {notes.slice(0, 8).map(n => (
-                      <div key={n.id} className="relative text-sm">
-                        <span className="absolute -left-[19px] top-1.5 h-2.5 w-2.5 rounded-full bg-[#0369a1] border-2 border-white" />
-                        <p>
-                          <span className="font-medium">{n.user_name ?? 'Sistema'}</span>{' '}
-                          <span className="text-[#475569]">{n.action}</span>
-                        </p>
-                        <p className="text-xs text-[#94a3b8]">
-                          {format(new Date(n.created_at), 'dd MMM yyyy HH:mm', { locale: es })}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
           {/* ───────────────────────────────────────────────────────────────
-              PÁGINA 7 — FIRMAS Y CIERRE
+              PÁGINA 7 — NOTAS Y HALLAZGOS + JUNTAS
+              ─────────────────────────────────────────────────────────────── */}
+          <NotesAndMeetingsPage projectId={project.id} notes={notes} />
+
+          {/* ───────────────────────────────────────────────────────────────
+              PÁGINA 8 — FIRMAS Y CIERRE
               ─────────────────────────────────────────────────────────────── */}
           <SignaturePage project={project} />
         </div>
@@ -779,6 +781,161 @@ function Signature({ title, name }: { title: string; name: string }) {
       <div className="border-t-2 border-[#cbd5e1] pt-2">
         <p className="text-xs text-[#475569] mb-0.5">{title}</p>
         <p className="text-sm font-semibold text-[#0f172a]">{name}</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// PÁGINA 7 — Notas, hallazgos y juntas
+// ============================================================================
+
+function NotesAndMeetingsPage({
+  projectId,
+  notes,
+}: {
+  projectId: string;
+  notes: ProjectNote[];
+}) {
+  const { data: meetings } = useProjectMeetings(projectId);
+
+  const noteTypeLabel: Record<string, string> = {
+    note: 'Nota del equipo',
+    system: 'Sistema',
+    status_change: 'Cambio de estado',
+    milestone: 'Hito',
+  };
+  const noteTypeColor: Record<string, string> = {
+    note: '#0369a1',
+    system: '#94a3b8',
+    status_change: '#b45309',
+    milestone: '#15803d',
+  };
+
+  const meetingTypeColor: Record<string, string> = {
+    'Kick-off':  '#0369a1',
+    Semanal:     '#0ea5e9',
+    Quincenal:   '#7c3aed',
+    Mensual:     '#15803d',
+    Hito:        '#b45309',
+    Cierre:      '#0d9488',
+  };
+
+  return (
+    <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm">
+      <PageHeader title="Notas y hallazgos" subtitle="Historial documental del proyecto" />
+
+      {/* JUNTAS */}
+      {meetings.length > 0 && (
+        <div className="mb-8 pmi-keep">
+          <h3 className="text-sm font-semibold text-[#0f172a] mb-2 flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-[#0369a1]" /> Calendario de juntas de seguimiento
+          </h3>
+          <div className="border border-[#e2e8f0] rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-[#f8fafc]">
+                <tr className="text-left text-xs text-[#475569]">
+                  <th className="px-3 py-2 font-semibold">Tipo</th>
+                  <th className="px-3 py-2 font-semibold">Junta</th>
+                  <th className="px-3 py-2 font-semibold">Fecha / hora</th>
+                  <th className="px-3 py-2 font-semibold">Asistentes</th>
+                  <th className="px-3 py-2 font-semibold text-center">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {meetings.map(m => {
+                  const date = new Date(m.scheduled_at);
+                  const color = meetingTypeColor[m.meeting_type] ?? '#94a3b8';
+                  return (
+                    <tr key={m.id} className="border-t border-[#e2e8f0]">
+                      <td className="px-3 py-2">
+                        <span
+                          className="inline-flex items-center gap-1.5 text-xs font-medium"
+                          style={{ color }}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                          {m.meeting_type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <p className="font-medium">{m.title}</p>
+                        {m.notes && (
+                          <p className="text-[10px] text-[#475569] mt-0.5 truncate max-w-[280px]">
+                            {m.notes}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {format(date, "dd MMM yyyy", { locale: es })}
+                        <br />
+                        <span className="text-[10px] text-[#94a3b8]">
+                          {format(date, 'HH:mm')} · {m.duration_minutes} min
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-[#475569]">
+                        {m.attendees.length > 0 ? m.attendees.join(', ') : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {m.status === 'Realizada' ? (
+                          <Badge variant="success">Realizada</Badge>
+                        ) : m.status === 'Cancelada' ? (
+                          <Badge variant="outline">Cancelada</Badge>
+                        ) : (
+                          <Badge variant="secondary">Programada</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* NOTAS Y HALLAZGOS */}
+      <div className="pmi-keep">
+        <h3 className="text-sm font-semibold text-[#0f172a] mb-2 flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-[#0369a1]" /> Notas y hallazgos del equipo
+        </h3>
+        {notes.length === 0 ? (
+          <p className="text-sm text-[#94a3b8] italic">
+            Sin notas registradas aún. Las notas agregadas desde el proyecto aparecerán aquí
+            ordenadas cronológicamente.
+          </p>
+        ) : (
+          <div className="border-l-2 border-[#e2e8f0] pl-4 space-y-3">
+            {notes.map(n => {
+              const color = noteTypeColor[n.note_type] ?? '#0369a1';
+              return (
+                <div key={n.id} className="relative">
+                  <span
+                    className="absolute -left-[19px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white"
+                    style={{ backgroundColor: color }}
+                  />
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-semibold text-[#0f172a]">
+                      {n.user_name ?? 'Sistema'}
+                    </span>
+                    <span
+                      className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: `${color}18`,
+                        color,
+                      }}
+                    >
+                      {noteTypeLabel[n.note_type] ?? n.note_type}
+                    </span>
+                    <span className="text-[10px] text-[#94a3b8]">
+                      {format(new Date(n.created_at), "dd MMM yyyy 'a las' HH:mm", { locale: es })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#334155] leading-snug">{n.action}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

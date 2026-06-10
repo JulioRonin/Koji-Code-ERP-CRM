@@ -24,5 +24,6 @@ export * from './quotes';
 export * from './projectTasks';
 export * from './masterPlans';
 export * from './projectsExtras';
+export * from './projectMeetings';
 export * from './automations';
 export * from './chat';
