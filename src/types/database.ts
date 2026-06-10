@@ -240,6 +240,77 @@ export interface Project {
 }
 
 // ============================================================================
+// TABLAS: project_tasks, project_notes, master_plan
+// ============================================================================
+
+export type ProjectTaskStatus = 'pending' | 'in-progress' | 'completed' | 'cancelled';
+
+export interface ProjectTask {
+  id: string;
+  project_id: string;
+  name: string;
+  scheduled_date: string | null;
+  status: ProjectTaskStatus;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ProjectNoteType = 'note' | 'system' | 'status_change' | 'milestone';
+
+export interface ProjectNote {
+  id: string;
+  project_id: string;
+  user_id: string | null;
+  user_name: string | null;
+  action: string;
+  note_type: ProjectNoteType;
+  created_at: string;
+}
+
+export type MasterPlanMethodology = 'PMI-Predictivo' | 'Ágil' | 'Híbrido';
+export type MasterPlanStatus = 'Borrador' | 'Activo' | 'Archivado';
+export type Department = 'Compras' | 'Diseño' | 'Producción' | 'Calidad' | 'Embarque';
+
+export interface MasterPlan {
+  id: string;
+  project_id: string;
+  name: string;
+  version: number;
+  methodology: MasterPlanMethodology;
+  template_used: string | null;
+  baseline_start: string;
+  baseline_end: string;
+  actual_start: string | null;
+  actual_end: string | null;
+  status: MasterPlanStatus;
+  risk_summary: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MasterPlanTask {
+  id: string;
+  master_plan_id: string;
+  wbs_code: string;
+  name: string;
+  department: Department | null;
+  start_date: string;
+  end_date: string;
+  progress: number;
+  is_milestone: boolean;
+  is_critical_path: boolean;
+  dependencies: string[]; // array of wbs_code
+  assigned_to: string | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
 // TABLA: project_files
 // ============================================================================
 
@@ -555,6 +626,10 @@ export interface Database {
       quote_items:             { Row: QuoteItem;              Insert: Partial<QuoteItem>;              Update: Partial<QuoteItem> };
       projects:                { Row: Project;                Insert: Partial<Project>;                Update: Partial<Project> };
       project_files:           { Row: ProjectFile;            Insert: Partial<ProjectFile>;            Update: Partial<ProjectFile> };
+      project_tasks:           { Row: ProjectTask;            Insert: Partial<ProjectTask>;            Update: Partial<ProjectTask> };
+      project_notes:           { Row: ProjectNote;            Insert: Partial<ProjectNote>;            Update: Partial<ProjectNote> };
+      master_plans:            { Row: MasterPlan;             Insert: Partial<MasterPlan>;             Update: Partial<MasterPlan> };
+      master_plan_tasks:       { Row: MasterPlanTask;         Insert: Partial<MasterPlanTask>;         Update: Partial<MasterPlanTask> };
       bom_items:               { Row: BomItem;                Insert: Partial<BomItem>;                Update: Partial<BomItem> };
       requisitions:            { Row: Requisition;            Insert: Partial<Requisition>;            Update: Partial<Requisition> };
       purchase_orders:         { Row: PurchaseOrder;          Insert: Partial<PurchaseOrder>;          Update: Partial<PurchaseOrder> };

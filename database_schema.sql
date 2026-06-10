@@ -164,6 +164,86 @@ CREATE TABLE IF NOT EXISTS public.quote_items (
 CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON public.quote_items(quote_id);
 
 -- ---------------------------------------------------------------------------
+-- 3c. PROJECT TASKS — plan de trabajo simple (WBS ligero)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.project_tasks (
+    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id   TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    scheduled_date DATE,
+    status       TEXT NOT NULL DEFAULT 'pending'
+                 CHECK (status IN ('pending','in-progress','completed','cancelled')),
+    sort_order   INTEGER DEFAULT 0,
+    created_at   TIMESTAMPTZ DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_tasks_project ON public.project_tasks(project_id);
+
+-- Notas y actividad por proyecto
+CREATE TABLE IF NOT EXISTS public.project_notes (
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
+    user_id    UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    user_name  TEXT,
+    action     TEXT NOT NULL,                -- 'creó el proyecto', 'agregó una nota: ...', etc.
+    note_type  TEXT NOT NULL DEFAULT 'note'
+               CHECK (note_type IN ('note','system','status_change','milestone')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_notes_project ON public.project_notes(project_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- 3d. MASTER PLAN — planeación formal PMI
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.master_plans (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id      TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL DEFAULT 'Master Plan v1',
+    version         INTEGER DEFAULT 1,
+    methodology     TEXT DEFAULT 'PMI-Predictivo'
+                    CHECK (methodology IN ('PMI-Predictivo','Ágil','Híbrido')),
+    template_used   TEXT,                       -- 'CNC-Estándar', 'Moldes', 'Herramentales', 'Custom'
+    baseline_start  DATE NOT NULL,
+    baseline_end    DATE NOT NULL,
+    actual_start    DATE,
+    actual_end      DATE,
+    status          TEXT NOT NULL DEFAULT 'Borrador'
+                    CHECK (status IN ('Borrador','Activo','Archivado')),
+    risk_summary    TEXT,
+    notes           TEXT,
+    created_by      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_master_plans_project ON public.master_plans(project_id);
+
+CREATE TABLE IF NOT EXISTS public.master_plan_tasks (
+    id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    master_plan_id    UUID REFERENCES public.master_plans(id) ON DELETE CASCADE,
+    wbs_code          TEXT NOT NULL,               -- "1.1", "2.3"
+    name              TEXT NOT NULL,
+    department        TEXT,                        -- Compras, Diseño, Producción, Calidad, Embarque
+    start_date        DATE NOT NULL,
+    end_date          DATE NOT NULL,
+    progress          INTEGER DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+    is_milestone      BOOLEAN DEFAULT FALSE,
+    is_critical_path  BOOLEAN DEFAULT FALSE,
+    dependencies      JSONB DEFAULT '[]'::jsonb,   -- array de wbs_code que deben terminar antes
+    assigned_to       UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    notes             TEXT,
+    sort_order        INTEGER DEFAULT 0,
+    created_at        TIMESTAMPTZ DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mpt_plan ON public.master_plan_tasks(master_plan_id, sort_order);
+
+-- ---------------------------------------------------------------------------
 -- 4. PROYECTOS
 -- ---------------------------------------------------------------------------
 
@@ -583,6 +663,7 @@ BEGIN
     FOR t IN
         SELECT unnest(ARRAY[
             'profiles','customers','suppliers','projects','bom_items',
+            'project_tasks','project_notes','master_plans','master_plan_tasks',
             'material_prices','quotes',
             'requisitions','purchase_orders','machines','work_orders',
             'work_order_stages','measurement_instruments','shipments'
@@ -613,6 +694,10 @@ ALTER TABLE public.suppliers               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.material_prices         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quotes                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_items             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_tasks           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_notes           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.master_plans            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.master_plan_tasks       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_files           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bom_items               ENABLE ROW LEVEL SECURITY;
@@ -654,6 +739,7 @@ BEGIN
     FOR t IN
         SELECT unnest(ARRAY[
             'profiles','customers','suppliers','projects','project_files',
+            'project_tasks','project_notes','master_plans','master_plan_tasks',
             'material_prices','quotes','quote_items',
             'bom_items','requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages','time_entries',
@@ -679,6 +765,7 @@ BEGIN
     FOR t IN
         SELECT unnest(ARRAY[
             'customers','suppliers','projects','project_files','bom_items',
+            'project_tasks','project_notes','master_plans','master_plan_tasks',
             'material_prices','quotes','quote_items',
             'requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages',
@@ -725,6 +812,11 @@ END$$;
 -- Cualquier autenticado puede mandar mensajes y abrir time entries
 DROP POLICY IF EXISTS "send chat" ON public.chat_messages;
 CREATE POLICY "send chat" ON public.chat_messages
+    FOR INSERT TO authenticated
+    WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+DROP POLICY IF EXISTS "add project notes" ON public.project_notes;
+CREATE POLICY "add project notes" ON public.project_notes
     FOR INSERT TO authenticated
     WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
 

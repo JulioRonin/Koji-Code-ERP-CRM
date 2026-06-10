@@ -137,6 +137,11 @@ export function Projects() {
               <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}`)}>
                 Ver detalles
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => navigate(`/projects/${project.id}?wizard=1`)}
+              >
+                Generar master plan
+              </DropdownMenuItem>
               <DropdownMenuItem>Editar proyecto</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
