@@ -10,7 +10,8 @@ import {
   Clock,
   Share2,
   TrendingUp,
-  ArrowRight,
+  Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -43,7 +44,9 @@ import {
   useCreatePmoReport,
   useMarkReportSent,
   useProjects,
+  useProjectsMasterPlanStatus,
 } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import type { PmoReportType, Project } from '@/types/database';
 import { ProjectReport } from '@/components/projects/ProjectReport';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
@@ -74,10 +77,12 @@ const TYPE_COLORS: Record<PmoReportType, string> = {
 };
 
 export function Pmo() {
+  const navigate = useNavigate();
   const { data: projects } = useProjects();
   const { data: reports, refetch: refetchReports } = usePmoReports();
   const { create: createReport, loading: creating } = useCreatePmoReport();
   const { markSent } = useMarkReportSent();
+  const { data: projectsWithPlan } = useProjectsMasterPlanStatus();
 
   const [showCreate, setShowCreate] = useState(false);
   const [previewProject, setPreviewProject] = useState<Project | null>(null);
@@ -298,6 +303,61 @@ export function Pmo() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Proyectos sin Master Plan — requieren planeación formal */}
+      {(() => {
+        const needsPlan = projects.filter(
+          p =>
+            p.status !== 'Entregado' &&
+            p.status !== 'Cancelado' &&
+            p.status !== 'Cotización' &&
+            !projectsWithPlan.has(p.id)
+        );
+        if (needsPlan.length === 0) return null;
+        return (
+          <Card className="p-0 border-[var(--color-app-warning)]/30 bg-[var(--color-app-warning-soft)]/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-[var(--color-app-warning)]" />
+                Proyectos sin master plan formal
+              </CardTitle>
+              <CardDescription>
+                Estos proyectos están activos pero no tienen un master plan PMI. Genéralo para
+                tener fechas, hitos y ruta crítica formales.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-[var(--color-app-border)]">
+                {needsPlan.map(p => (
+                  <div key={p.id} className="flex items-center gap-3 px-4 md:px-5 py-3">
+                    <div className="h-9 w-9 rounded-full bg-white flex items-center justify-center shrink-0 border border-[var(--color-app-warning)]/30">
+                      <AlertTriangle className="h-4 w-4 text-[var(--color-app-warning)]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm truncate">{p.name}</span>
+                        <span className="text-xs text-[var(--color-app-text-muted)] font-mono hidden sm:inline">
+                          {p.id}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
+                        {p.client_name} · estado {p.status} · entrega{' '}
+                        {format(new Date(p.deadline), 'dd MMM yyyy', { locale: es })}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => navigate(`/projects/${p.id}?wizard=1`)}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Planear
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Cobertura por proyecto — corazón del PMO */}
       <Card className="p-0">

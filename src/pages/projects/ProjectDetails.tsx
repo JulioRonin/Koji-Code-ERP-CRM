@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar,
@@ -13,8 +13,13 @@ import {
   Plus,
   Send,
   ChevronDown,
+  Share2,
+  Sparkles,
+  Loader2,
+  Flag,
+  AlertTriangle,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid, parseISO, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -40,119 +45,197 @@ import {
 import { cn } from '@/lib/utils';
 import { GanttChart } from '@/components/projects/GanttChart';
 import { ProjectReport } from '@/components/projects/ProjectReport';
-import { useClientPortalToken } from '@/lib/api';
-import { Share2 } from 'lucide-react';
+import { MasterPlanWizard } from '@/components/projects/MasterPlanWizard';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
-import type { Project } from '@/types/database';
+import {
+  useProject,
+  useUpdateProjectStatus,
+  useProjectTasks,
+  useAddProjectTask,
+  useUpdateProjectTaskStatus,
+  useProjectNotes,
+  useAddProjectNote,
+  useMasterPlan,
+  useMasterPlanTasks,
+  useBomItems,
+} from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import type { ProjectStatus, MasterPlanTask, ProjectTask } from '@/types/database';
 
-const getMockProject = (id: string) => ({
-  id,
-  name: 'Eje Principal Ensamblaje',
-  client: 'BRP',
-  status: 'En Producción',
-  progress: 75,
-  startDate: '2026-03-01',
-  deadline: '2026-04-15',
-  manager: 'Carlos M.',
-  description:
-    'Fabricación de 500 ejes principales para el nuevo modelo de motor. Requiere maquinado CNC de alta precisión y tratamiento térmico.',
-  tasks: [
-    { id: 1, name: 'Revisión de planos',           status: 'completed',   date: '2026-03-02' },
-    { id: 2, name: 'Compra de material (Acero 4140)', status: 'completed', date: '2026-03-05' },
-    { id: 3, name: 'Programación CAM',             status: 'completed',   date: '2026-03-10' },
-    { id: 4, name: 'Maquinado CNC (Fase 1)',       status: 'in-progress', date: '2026-03-15' },
-    { id: 5, name: 'Tratamiento térmico',          status: 'pending',     date: '2026-03-25' },
-    { id: 6, name: 'Inspección de calidad final',  status: 'pending',     date: '2026-04-05' },
-  ],
-  history: [
-    { id: 1, user: 'Carlos M.', action: 'creó el proyecto',                          date: '2026-03-01T09:00:00Z', type: 'system' },
-    { id: 2, user: 'Ana G.',     action: 'aprobó los planos de diseño',              date: '2026-03-02T14:30:00Z', type: 'system' },
-    { id: 3, user: 'Luis R.',    action: 'generó la orden de compra PO-2026-089',    date: '2026-03-05T11:15:00Z', type: 'system' },
-    { id: 4, user: 'Sistema',    action: 'cambió el estado a "En Producción"',       date: '2026-03-15T08:00:00Z', type: 'system' },
-  ],
-});
+const statusVariant: Record<ProjectStatus, 'default' | 'secondary' | 'success' | 'outline' | 'warning'> = {
+  Cotización:     'warning',
+  Diseño:         'secondary',
+  Compras:        'secondary',
+  'En Producción': 'default',
+  Calidad:        'success',
+  Embarque:       'success',
+  Entregado:      'outline',
+  Cancelado:      'outline',
+};
 
-const GANTT_MOCK_DATA = [
-  { id: 't1', name: 'Procura de Acero 4140',   department: 'Compras' as const,    startDay: 0,  duration: 5,  progress: 100, status: 'completed' as const },
-  { id: 't2', name: 'Diseño CAD/CAM',           department: 'Diseño' as const,     startDay: 2,  duration: 8,  progress: 100, status: 'completed' as const },
-  { id: 't3', name: 'Maquinado CNC Fase 1',    department: 'Producción' as const, startDay: 10, duration: 12, progress: 65,  status: 'in-progress' as const },
-  { id: 't4', name: 'Tratamiento Térmico',     department: 'Producción' as const, startDay: 22, duration: 4,  progress: 0,   status: 'pending' as const },
-  { id: 't5', name: 'Inspección No Destructiva', department: 'Calidad' as const,  startDay: 26, duration: 3,  progress: 0,   status: 'pending' as const },
-  { id: 't6', name: 'Empaque y Logística',      department: 'Producción' as const, startDay: 29, duration: 2,  progress: 0,   status: 'pending' as const },
-];
+const taskBadge: Record<ProjectTask['status'], 'success' | 'default' | 'secondary' | 'outline'> = {
+  completed: 'success',
+  'in-progress': 'default',
+  pending: 'secondary',
+  cancelled: 'outline',
+};
 
-const statusVariant: Record<string, 'default' | 'secondary' | 'success' | 'outline' | 'warning'> = {
-  'Cotización':     'warning',
-  'Diseño':         'secondary',
-  'En Producción':  'default',
-  'Calidad':        'success',
-  'Entregado':      'outline',
+const DEPT_COLORS: Record<string, string> = {
+  Compras:    '#7c3aed',
+  Diseño:     '#0ea5e9',
+  Producción: '#0369a1',
+  Calidad:    '#15803d',
+  Embarque:   '#0d9488',
 };
 
 export function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
 
-  const initialProject = getMockProject(id || 'IMC-2026-042');
-  const [status, setStatus] = useState(initialProject.status);
-  const [history, setHistory] = useState(initialProject.history);
+  const { data: project, loading: loadingProject, refetch: refetchProject } = useProject(id);
+  const { update: updateStatus } = useUpdateProjectStatus();
+  const { data: bomItems } = useBomItems(id);
+
+  const { data: tasks, refetch: refetchTasks } = useProjectTasks(id);
+  const { add: addTask } = useAddProjectTask();
+  const { update: updateTaskStatus } = useUpdateProjectTaskStatus();
+
+  const { data: notes, refetch: refetchNotes } = useProjectNotes(id);
+  const { add: addNote } = useAddProjectNote();
+
+  const { data: masterPlan, refetch: refetchMasterPlan } = useMasterPlan(id);
+  const { data: masterPlanTasks } = useMasterPlanTasks(masterPlan?.id);
+
   const [newNote, setNewNote] = useState('');
+  const [newTaskName, setNewTaskName] = useState('');
   const [isMasterPlanOpen, setIsMasterPlanOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isWizardOpen, setIsWizardOpen] = useState(searchParams.get('wizard') === '1');
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
-  const { data: portalToken } = useClientPortalToken(initialProject.id);
+  // Limpia el query string una vez consumido
+  React.useEffect(() => {
+    if (searchParams.get('wizard') === '1' && isWizardOpen) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('wizard');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Shape mínimo compatible con ShareClientLinkModal
-  const projectForShare = {
-    id: initialProject.id,
-    name: initialProject.name,
-    client_name: initialProject.client,
-  } as Project;
+  // ── Cálculos derivados ──────────────────────────────────────────────────
+  const completedTasks = useMemo(() => tasks.filter(t => t.status === 'completed').length, [tasks]);
 
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
+  const ganttTasks = useMemo(() => {
+    if (!masterPlan || masterPlanTasks.length === 0) return [];
+    const planStart = parseISO(masterPlan.baseline_start);
+    return masterPlanTasks.map(t => {
+      const start = parseISO(t.start_date);
+      const end = parseISO(t.end_date);
+      const startDay = Math.max(0, differenceInDays(start, planStart));
+      const duration = Math.max(1, differenceInDays(end, start));
+      let status: 'pending' | 'in-progress' | 'completed' = 'pending';
+      if (t.progress >= 100) status = 'completed';
+      else if (t.progress > 0) status = 'in-progress';
+      return {
+        id: t.id,
+        name: t.name,
+        department: (t.department ?? 'Producción') as 'Compras' | 'Diseño' | 'Producción' | 'Calidad',
+        startDay,
+        duration,
+        progress: t.progress,
+        status,
+      };
+    });
+  }, [masterPlan, masterPlanTasks]);
 
-    const noteEntry = {
-      id: history.length + 1,
-      user: 'Usuario actual',
+  // ── Handlers ────────────────────────────────────────────────────────────
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !id) return;
+    await addNote({
+      project_id: id,
+      user_id: user?.id ?? null,
+      user_name: user?.name ?? 'Usuario',
       action: `agregó una nota: "${newNote}"`,
-      date: new Date().toISOString(),
-      type: 'note',
-    };
-
-    setHistory([noteEntry, ...history]);
+      note_type: 'note',
+    });
     setNewNote('');
+    await refetchNotes();
   };
 
-  const handleStatusChange = (newStatus: string) => {
-    setStatus(newStatus);
-    const statusEntry = {
-      id: history.length + 1,
-      user: 'Usuario actual',
+  const handleStatusChange = async (newStatus: ProjectStatus) => {
+    if (!id) return;
+    await updateStatus(id, newStatus);
+    await addNote({
+      project_id: id,
+      user_id: user?.id ?? null,
+      user_name: user?.name ?? 'Usuario',
       action: `cambió el estado a "${newStatus}"`,
-      date: new Date().toISOString(),
-      type: 'system',
-    };
-    setHistory([statusEntry, ...history]);
+      note_type: 'status_change',
+    });
+    await Promise.all([refetchProject(), refetchNotes()]);
   };
+
+  const handleAddTask = async () => {
+    if (!newTaskName.trim() || !id) return;
+    setIsAddingTask(true);
+    try {
+      await addTask(id, newTaskName);
+      setNewTaskName('');
+      await refetchTasks();
+    } finally {
+      setIsAddingTask(false);
+    }
+  };
+
+  const handleToggleTask = async (task: ProjectTask) => {
+    const next: ProjectTask['status'] =
+      task.status === 'completed' ? 'pending' : task.status === 'pending' ? 'in-progress' : 'completed';
+    await updateTaskStatus(task.id, next);
+    await refetchTasks();
+  };
+
+  // ── Render guards ──────────────────────────────────────────────────────
+  if (loadingProject) {
+    return (
+      <div className="flex items-center justify-center py-20 text-sm text-[var(--color-app-text-muted)]">
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando proyecto...
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-sm text-[var(--color-app-text-muted)]">
+          No se encontró el proyecto <code className="font-mono">{id}</code>.
+        </p>
+        <Button variant="outline" className="mt-4" onClick={() => navigate('/projects')}>
+          ← Volver a proyectos
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 md:space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Button variant="outline" size="icon" onClick={() => navigate('/projects')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-[var(--color-app-text)]">{initialProject.name}</h1>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg md:text-xl font-semibold truncate">{project.name}</h1>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent">
-                    <Badge variant={statusVariant[status] ?? 'default'} className="cursor-pointer">
-                      {status}
+                    <Badge variant={statusVariant[project.status] ?? 'default'} className="cursor-pointer">
+                      {project.status}
                       <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
                     </Badge>
                   </Button>
@@ -160,7 +243,7 @@ export function ProjectDetails() {
                 <DropdownMenuContent align="start">
                   <DropdownMenuLabel>Cambiar estado</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {Object.keys(statusVariant).map(s => (
+                  {(Object.keys(statusVariant) as ProjectStatus[]).map(s => (
                     <DropdownMenuItem key={s} onClick={() => handleStatusChange(s)}>
                       {s}
                     </DropdownMenuItem>
@@ -169,24 +252,30 @@ export function ProjectDetails() {
               </DropdownMenu>
             </div>
             <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
-              <span className="font-mono">{initialProject.id}</span> · Cliente: {initialProject.client}
+              <span className="font-mono">{project.id}</span> · Cliente: {project.client_name}
             </p>
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsMasterPlanOpen(true)}>
-            <BarChart3 className="h-4 w-4 mr-1.5" /> Master plan
-          </Button>
-          <Button onClick={() => setIsReportOpen(true)}>
-            <Plus className="h-4 w-4 mr-1.5" /> Generar reporte
+        <div className="flex gap-2 flex-wrap">
+          {masterPlan ? (
+            <Button variant="outline" onClick={() => setIsMasterPlanOpen(true)}>
+              <BarChart3 className="h-4 w-4 mr-1.5" /> Master plan
+            </Button>
+          ) : (
+            <Button onClick={() => setIsWizardOpen(true)}>
+              <Sparkles className="h-4 w-4 mr-1.5" /> Generar master plan
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => setIsReportOpen(true)}>
+            <Plus className="h-4 w-4 mr-1.5" /> Reporte
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6">
         {/* Left: overview & tasks */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-5 md:space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -195,108 +284,182 @@ export function ProjectDetails() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5" /> Manager
-                  </p>
-                  <p className="text-sm font-medium mt-1">{initialProject.manager}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" /> Inicio
-                  </p>
-                  <p className="text-sm font-medium mt-1">28 feb 2026</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" /> Entrega
-                  </p>
-                  <p className="text-sm font-medium mt-1">14 abr 2026</p>
-                </div>
+                <SummaryItem icon={User} label="Manager" value={project.manager_id ?? '—'} />
+                <SummaryItem
+                  icon={Calendar}
+                  label="Inicio"
+                  value={isValid(parseISO(project.start_date)) ? format(parseISO(project.start_date), 'dd MMM yyyy', { locale: es }) : '—'}
+                />
+                <SummaryItem
+                  icon={Clock}
+                  label="Entrega"
+                  value={isValid(parseISO(project.deadline)) ? format(parseISO(project.deadline), 'dd MMM yyyy', { locale: es }) : '—'}
+                />
+                <SummaryItem icon={Flag} label="Partes BOM" value={String(bomItems.length)} />
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-[var(--color-app-text-muted)]">Progreso general</span>
-                  <span className="font-medium">{initialProject.progress}%</span>
+                  <span className="font-medium">{project.progress}%</span>
                 </div>
-                <Progress value={initialProject.progress} className="h-2" />
+                <Progress value={project.progress} className="h-2" />
               </div>
 
-              <div className="p-4 rounded-md bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)]">
-                <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5 mb-1.5">
-                  <FileText className="h-3.5 w-3.5" /> Descripción
-                </p>
-                <p className="text-sm leading-relaxed">{initialProject.description}</p>
-              </div>
+              {project.description && (
+                <div className="p-4 rounded-md bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)]">
+                  <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5 mb-1.5">
+                    <FileText className="h-3.5 w-3.5" /> Descripción
+                  </p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{project.description}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          {/* Master Plan summary */}
+          {masterPlan ? (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-[var(--color-app-primary)]" /> Master Plan{' '}
+                    <Badge variant="success" className="ml-1">{masterPlan.status}</Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    {masterPlan.template_used} · {masterPlan.methodology} · v{masterPlan.version}
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setIsMasterPlanOpen(true)}>
+                  Ver Gantt
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <MasterPlanSummary tasks={masterPlanTasks} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-[var(--color-app-primary-soft)] flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-[var(--color-app-primary)]" />
+                </div>
+                <div>
+                  <p className="font-medium">Este proyecto aún no tiene Master Plan</p>
+                  <p className="text-sm text-[var(--color-app-text-muted)] mt-1 max-w-md">
+                    Genera un plan formal PMI con fechas, Gantt, hitos y ruta crítica para presentarlo al cliente.
+                  </p>
+                </div>
+                <Button onClick={() => setIsWizardOpen(true)}>
+                  <Sparkles className="h-4 w-4 mr-1.5" /> Generar master plan
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tareas manuales */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Plan de trabajo
                 </CardTitle>
-                <CardDescription>Tareas y fases del proyecto</CardDescription>
+                <CardDescription>
+                  {completedTasks} de {tasks.length} tareas completadas
+                </CardDescription>
               </div>
-              <Button variant="outline" size="sm">Añadir tarea</Button>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {initialProject.tasks.map(task => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between p-3 rounded-md border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      {task.status === 'completed' ? (
-                        <CheckCircle2 className="h-5 w-5 text-[var(--color-app-success)]" />
-                      ) : task.status === 'in-progress' ? (
-                        <div className="h-5 w-5 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin" />
-                      ) : (
-                        <Circle className="h-5 w-5 text-[var(--color-app-text-subtle)]" />
-                      )}
-                      <div>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  value={newTaskName}
+                  onChange={e => setNewTaskName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+                  placeholder="Añadir tarea rápida..."
+                  className="flex-1 h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                />
+                <Button onClick={handleAddTask} disabled={!newTaskName.trim() || isAddingTask} size="sm">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" /> Añadir
+                </Button>
+              </div>
+
+              {tasks.length === 0 ? (
+                <p className="text-sm text-[var(--color-app-text-muted)] text-center py-6">
+                  Sin tareas aún. Añade la primera arriba.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {tasks.map(task => (
+                    <button
+                      key={task.id}
+                      onClick={() => handleToggleTask(task)}
+                      className="w-full flex items-center justify-between p-3 rounded-md border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]/30 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {task.status === 'completed' ? (
+                          <CheckCircle2 className="h-5 w-5 text-[var(--color-app-success)] shrink-0" />
+                        ) : task.status === 'in-progress' ? (
+                          <div className="h-5 w-5 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin shrink-0" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-[var(--color-app-text-subtle)] shrink-0" />
+                        )}
                         <p
                           className={cn(
-                            'text-sm font-medium',
-                            task.status === 'completed' ? 'text-[var(--color-app-text-muted)] line-through' : 'text-[var(--color-app-text)]'
+                            'text-sm font-medium truncate',
+                            task.status === 'completed' && 'text-[var(--color-app-text-muted)] line-through'
                           )}
                         >
                           {task.name}
                         </p>
-                        <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
-                          Programado: {format(new Date(task.date), 'dd MMM yyyy', { locale: es })}
-                        </p>
                       </div>
-                    </div>
-                    <Badge
-                      variant={
-                        task.status === 'completed' ? 'success' : task.status === 'in-progress' ? 'default' : 'secondary'
-                      }
-                    >
-                      {task.status === 'completed'
-                        ? 'Completado'
-                        : task.status === 'in-progress'
-                        ? 'En proceso'
-                        : 'Pendiente'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
+                      <Badge variant={taskBadge[task.status]}>
+                        {task.status === 'completed'
+                          ? 'Completado'
+                          : task.status === 'in-progress'
+                          ? 'En proceso'
+                          : task.status === 'cancelled'
+                          ? 'Cancelado'
+                          : 'Pendiente'}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
         {/* Right: activity & docs */}
-        <div className="space-y-6">
+        <div className="space-y-5 md:space-y-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Share2 className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Portal del cliente
+              </CardTitle>
+              <CardDescription>
+                {project.client_portal_token
+                  ? 'Enlace activo · compartir vía QR, correo o WhatsApp.'
+                  : 'Genera un enlace seguro de solo lectura para tu cliente.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={() => setIsShareOpen(true)}
+                className="w-full"
+                variant={project.client_portal_token ? 'outline' : 'default'}
+              >
+                <Share2 className="h-4 w-4 mr-1.5" />
+                {project.client_portal_token ? 'Compartir con el cliente' : 'Generar enlace'}
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Actividad y notas
               </CardTitle>
-              <CardDescription>Historial de cambios</CardDescription>
+              <CardDescription>Historial real del proyecto</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -310,89 +473,58 @@ export function ProjectDetails() {
                 </Button>
               </div>
 
-              <div className="relative border-l border-[var(--color-app-border)] ml-2 space-y-4 pt-2">
-                {history.map(item => (
-                  <div key={item.id} className="relative pl-5">
-                    <span
-                      className={cn(
-                        'absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white',
-                        item.type === 'note' ? 'bg-[var(--color-app-info)]' : 'bg-[var(--color-app-primary)]'
-                      )}
-                    />
-                    <p className="text-sm leading-snug">
-                      <span className="font-medium">{item.user}</span>{' '}
-                      <span className="text-[var(--color-app-text-muted)]">{item.action}</span>
-                    </p>
-                    <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
-                      {format(new Date(item.date), "dd MMM yyyy, HH:mm", { locale: es })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <Share2 className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Portal del cliente
-              </CardTitle>
-              <CardDescription>
-                {portalToken
-                  ? 'Enlace activo · QR, correo y WhatsApp disponibles.'
-                  : 'Genera un enlace seguro de solo lectura para tu cliente.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => setIsShareOpen(true)} className="w-full" variant={portalToken ? 'outline' : 'default'}>
-                <Share2 className="h-4 w-4 mr-1.5" />
-                {portalToken ? 'Compartir con el cliente' : 'Generar enlace'}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Documentos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {[
-                { name: 'Planos_V2.pdf', size: '2.4 MB', when: 'hace 2 días' },
-                { name: 'Cotización.pdf', size: '1.1 MB', when: 'hace 1 semana' },
-              ].map(doc => (
-                <div
-                  key={doc.name}
-                  className="flex items-center gap-3 p-2.5 rounded-md hover:bg-[var(--color-app-surface-alt)] cursor-pointer transition-colors"
-                >
-                  <div className="p-2 bg-[var(--color-app-primary-soft)] rounded-md">
-                    <FileText className="h-4 w-4 text-[var(--color-app-primary)]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{doc.name}</p>
-                    <p className="text-xs text-[var(--color-app-text-muted)]">
-                      {doc.size} · {doc.when}
-                    </p>
-                  </div>
+              {notes.length === 0 ? (
+                <p className="text-sm text-[var(--color-app-text-muted)] text-center py-4">
+                  Sin actividad registrada aún.
+                </p>
+              ) : (
+                <div className="relative border-l border-[var(--color-app-border)] ml-2 space-y-4 pt-2">
+                  {notes.map(item => (
+                    <div key={item.id} className="relative pl-5">
+                      <span
+                        className={cn(
+                          'absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white',
+                          item.note_type === 'note' && 'bg-[var(--color-app-info)]',
+                          item.note_type === 'status_change' && 'bg-[var(--color-app-warning)]',
+                          item.note_type === 'milestone' && 'bg-[var(--color-app-success)]',
+                          item.note_type === 'system' && 'bg-[var(--color-app-primary)]'
+                        )}
+                      />
+                      <p className="text-sm leading-snug">
+                        <span className="font-medium">{item.user_name ?? 'Sistema'}</span>{' '}
+                        <span className="text-[var(--color-app-text-muted)]">{item.action}</span>
+                      </p>
+                      <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
+                        {format(new Date(item.created_at), "dd MMM yyyy, HH:mm", { locale: es })}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Master plan dialog */}
+      {/* Master Plan dialog (Gantt completo) */}
       <Dialog open={isMasterPlanOpen} onOpenChange={setIsMasterPlanOpen}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>Master plan · Gantt</DialogTitle>
+            <DialogTitle>Master Plan · Gantt</DialogTitle>
             <DialogDescription>
-              Cronograma integrado · {initialProject.id}
+              {masterPlan
+                ? `${masterPlan.template_used} · ${masterPlan.methodology} · ${project.id}`
+                : 'Sin plan generado'}
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-auto">
-            <GanttChart startDate={initialProject.startDate} tasks={GANTT_MOCK_DATA} />
+            {ganttTasks.length > 0 ? (
+              <GanttChart startDate={masterPlan?.baseline_start ?? project.start_date} tasks={ganttTasks} />
+            ) : (
+              <p className="text-sm text-[var(--color-app-text-muted)] text-center py-8">
+                Aún no hay actividades en el Master Plan.
+              </p>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -400,15 +532,155 @@ export function ProjectDetails() {
       <ProjectReport
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
-        project={{ ...initialProject, status }}
-        ganttTasks={GANTT_MOCK_DATA}
+        project={{
+          id: project.id,
+          name: project.name,
+          client: project.client_name,
+          status: project.status,
+          progress: project.progress,
+          startDate: project.start_date,
+          deadline: project.deadline,
+          manager: project.manager_id ?? '—',
+          description: project.description ?? '',
+          tasks: [],
+        }}
+        ganttTasks={ganttTasks}
       />
 
       <ShareClientLinkModal
-        project={projectForShare}
+        project={project}
         open={isShareOpen}
         onClose={() => setIsShareOpen(false)}
       />
+
+      <MasterPlanWizard
+        project={project}
+        open={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onCreated={async () => {
+          await Promise.all([refetchMasterPlan(), refetchNotes()]);
+          await addNote({
+            project_id: project.id,
+            user_id: user?.id ?? null,
+            user_name: user?.name ?? 'Usuario',
+            action: 'generó el Master Plan del proyecto',
+            note_type: 'milestone',
+          });
+          await refetchNotes();
+        }}
+      />
+    </div>
+  );
+}
+
+function SummaryItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </p>
+      <p className="text-sm font-medium mt-1 truncate">{value}</p>
+    </div>
+  );
+}
+
+function MasterPlanSummary({ tasks }: { tasks: MasterPlanTask[] }) {
+  if (tasks.length === 0) {
+    return <p className="text-sm text-[var(--color-app-text-muted)]">Sin actividades.</p>;
+  }
+
+  const milestones = tasks.filter(t => t.is_milestone);
+  const critical = tasks.filter(t => t.is_critical_path);
+  const avgProgress = Math.round(tasks.reduce((acc, t) => acc + t.progress, 0) / tasks.length);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <Stat label="Actividades" value={String(tasks.length)} />
+        <Stat label="Críticas" value={String(critical.length)} tone="danger" />
+        <Stat label="Hitos" value={String(milestones.length)} />
+      </div>
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-[var(--color-app-text-muted)]">Avance del plan</span>
+          <span className="font-medium">{avgProgress}%</span>
+        </div>
+        <Progress value={avgProgress} className="h-2" />
+      </div>
+
+      {milestones.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-[var(--color-app-text-muted)] uppercase mb-2">Próximos hitos</p>
+          <div className="space-y-1.5">
+            {milestones.slice(0, 4).map(m => {
+              const date = parseISO(m.end_date);
+              const daysLeft = differenceInDays(date, new Date());
+              return (
+                <div key={m.id} className="flex items-center gap-2 text-sm">
+                  <Flag
+                    className={cn(
+                      'h-3.5 w-3.5 shrink-0',
+                      m.progress >= 100 ? 'text-[var(--color-app-success)]' : 'text-[var(--color-app-warning)]'
+                    )}
+                  />
+                  <span className="font-mono text-xs text-[var(--color-app-text-muted)]">{m.wbs_code}</span>
+                  <span className="truncate flex-1">{m.name}</span>
+                  <span
+                    className={cn(
+                      'text-xs shrink-0',
+                      daysLeft < 0
+                        ? 'text-[var(--color-app-danger)]'
+                        : daysLeft <= 7
+                        ? 'text-[var(--color-app-warning)]'
+                        : 'text-[var(--color-app-text-muted)]'
+                    )}
+                  >
+                    {m.progress >= 100
+                      ? format(date, 'dd MMM', { locale: es })
+                      : daysLeft >= 0
+                      ? `${daysLeft}d`
+                      : `${-daysLeft}d atraso`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {critical.length > 0 && (
+        <div className="p-3 bg-[var(--color-app-danger-soft)]/40 rounded-md text-xs text-[var(--color-app-text-muted)] flex gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--color-app-danger)]" />
+          <div>
+            <strong className="text-[var(--color-app-danger)]">Ruta crítica:</strong> cualquier retraso en{' '}
+            {critical.length} actividad{critical.length === 1 ? '' : 'es'} impacta directamente la fecha de entrega.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: 'danger' }) {
+  return (
+    <div className="p-3 rounded-md border border-[var(--color-app-border)]">
+      <p className="text-xs text-[var(--color-app-text-muted)]">{label}</p>
+      <p
+        className={cn(
+          'text-lg font-semibold mt-0.5 tabular-nums',
+          tone === 'danger' && 'text-[var(--color-app-danger)]'
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }
