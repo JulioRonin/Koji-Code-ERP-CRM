@@ -109,7 +109,7 @@ export function ProjectDetails() {
   const { add: addNote } = useAddProjectNote();
 
   const { data: masterPlan, refetch: refetchMasterPlan } = useMasterPlan(id);
-  const { data: masterPlanTasks } = useMasterPlanTasks(masterPlan?.id);
+  const { data: masterPlanTasks, refetch: refetchMasterPlanTasks } = useMasterPlanTasks(masterPlan?.id);
 
   const [newNote, setNewNote] = useState('');
   const [newTaskName, setNewTaskName] = useState('');
@@ -454,8 +454,13 @@ export function ProjectDetails() {
                 <MasterPlanTaskList
                   tasks={masterPlanTasks}
                   onUpdated={async () => {
-                    // Refresca el proyecto para reflejar el nuevo % global
-                    await Promise.all([refetchProject(), refetchMasterPlan()]);
+                    // Refresca tareas (fechas / avance), el plan (baseline_end)
+                    // y el proyecto (% global recalculado).
+                    await Promise.all([
+                      refetchMasterPlanTasks(),
+                      refetchMasterPlan(),
+                      refetchProject(),
+                    ]);
                   }}
                 />
               </CardContent>
