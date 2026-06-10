@@ -168,18 +168,28 @@ CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON public.quote_items(quote_id)
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.project_tasks (
-    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    project_id   TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
-    name         TEXT NOT NULL,
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id     TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
+    name           TEXT NOT NULL,
     scheduled_date DATE,
-    status       TEXT NOT NULL DEFAULT 'pending'
-                 CHECK (status IN ('pending','in-progress','completed','cancelled')),
-    sort_order   INTEGER DEFAULT 0,
-    created_at   TIMESTAMPTZ DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ DEFAULT NOW()
+    start_date     DATE,
+    end_date       DATE,
+    department     TEXT,                          -- Compras, Diseño, Producción, Calidad, Embarque
+    progress       INTEGER DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+    status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending','in-progress','completed','cancelled')),
+    sort_order     INTEGER DEFAULT 0,
+    created_at     TIMESTAMPTZ DEFAULT NOW(),
+    updated_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_project_tasks_project ON public.project_tasks(project_id);
+
+-- Para ampliar tablas ya creadas, los siguientes ALTER son idempotentes:
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS start_date DATE;
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS end_date   DATE;
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS department TEXT;
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS progress   INTEGER DEFAULT 0;
 
 -- Notas y actividad por proyecto
 CREATE TABLE IF NOT EXISTS public.project_notes (

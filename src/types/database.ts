@@ -250,6 +250,10 @@ export interface ProjectTask {
   project_id: string;
   name: string;
   scheduled_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  department: Department | string | null;
+  progress: number;
   status: ProjectTaskStatus;
   sort_order: number;
   created_at: string;

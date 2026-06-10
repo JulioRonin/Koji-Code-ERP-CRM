@@ -54,19 +54,34 @@ export function useProjectTasks(projectId: string | undefined): AsyncState<Proje
   );
 }
 
+interface AddTaskInput {
+  name: string;
+  scheduled_date?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  department?: string | null;
+}
+
 export function useAddProjectTask() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
 
   const add = useCallback(
-    async (projectId: string, name: string, scheduledDate?: string | null): Promise<ProjectTask> => {
+    async (projectId: string, input: AddTaskInput | string): Promise<ProjectTask> => {
       setState({ loading: true, error: null });
       try {
         const now = new Date().toISOString();
+        const payload: AddTaskInput =
+          typeof input === 'string' ? { name: input } : input;
+
         const task: ProjectTask = {
           id: newId('task'),
           project_id: projectId,
-          name,
-          scheduled_date: scheduledDate ?? null,
+          name: payload.name,
+          scheduled_date: payload.scheduled_date ?? null,
+          start_date: payload.start_date ?? null,
+          end_date: payload.end_date ?? null,
+          department: payload.department ?? null,
+          progress: 0,
           status: 'pending',
           sort_order: Date.now(),
           created_at: now,
@@ -95,6 +110,73 @@ export function useAddProjectTask() {
   return { add, ...state };
 }
 
+export function useUpdateProjectTask() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const update = useCallback(
+    async (taskId: string, patch: Partial<ProjectTask>): Promise<void> => {
+      setState({ loading: true, error: null });
+      try {
+        const now = new Date().toISOString();
+        if (!supabase) {
+          const all = readDemo<ProjectTask>(DEMO_TASKS_KEY);
+          const idx = all.findIndex(t => t.id === taskId);
+          if (idx >= 0) {
+            all[idx] = { ...all[idx], ...patch, updated_at: now };
+            writeDemo(DEMO_TASKS_KEY, all);
+          }
+          setState({ loading: false, error: null });
+          return;
+        }
+        const { data, error } = await supabase
+          .from('project_tasks')
+          .update({ ...patch, updated_at: now })
+          .eq('id', taskId)
+          .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('No se actualizó la tarea. Verifica permisos en profiles.role.');
+        }
+        setState({ loading: false, error: null });
+      } catch (err) {
+        const e = err as Error;
+        setState({ loading: false, error: e });
+        throw e;
+      }
+    },
+    []
+  );
+
+  return { update, ...state };
+}
+
+export function useDeleteProjectTask() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const remove = useCallback(async (taskId: string): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        writeDemo(
+          DEMO_TASKS_KEY,
+          readDemo<ProjectTask>(DEMO_TASKS_KEY).filter(t => t.id !== taskId)
+        );
+        setState({ loading: false, error: null });
+        return;
+      }
+      const { error } = await supabase.from('project_tasks').delete().eq('id', taskId);
+      if (error) throw error;
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const e = err as Error;
+      setState({ loading: false, error: e });
+      throw e;
+    }
+  }, []);
+
+  return { remove, ...state };
+}
+
 export function useUpdateProjectTaskStatus() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
 
@@ -102,21 +184,28 @@ export function useUpdateProjectTaskStatus() {
     setState({ loading: true, error: null });
     try {
       const now = new Date().toISOString();
+      const progress =
+        status === 'completed' ? 100 : status === 'in-progress' ? 50 : status === 'cancelled' ? 0 : 0;
+
       if (!supabase) {
         const all = readDemo<ProjectTask>(DEMO_TASKS_KEY);
         const idx = all.findIndex(t => t.id === taskId);
         if (idx >= 0) {
-          all[idx] = { ...all[idx], status, updated_at: now };
+          all[idx] = { ...all[idx], status, progress, updated_at: now };
           writeDemo(DEMO_TASKS_KEY, all);
         }
         setState({ loading: false, error: null });
         return;
       }
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('project_tasks')
-        .update({ status, updated_at: now })
-        .eq('id', taskId);
+        .update({ status, progress, updated_at: now })
+        .eq('id', taskId)
+        .select('id');
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('No se actualizó la tarea. Verifica permisos en profiles.role.');
+      }
       setState({ loading: false, error: null });
     } catch (err) {
       const e = err as Error;
