@@ -30,8 +30,11 @@ import {
 } from '@/components/ui/table';
 import { ROLES } from '@/data/crmData';
 import { cn } from '@/lib/utils';
-import { useProfiles } from '@/lib/api';
+import { useProfiles, useUpdateProfile } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Profile } from '@/types/database';
+
+const ADMIN_ROLES = ['Administrador', 'Administración / PM'];
 
 function initialsFor(name: string): string {
   return name
@@ -50,11 +53,25 @@ const tabs = [
 type Tab = (typeof tabs)[number]['id'];
 
 export function Personnel() {
+  const { user } = useAuth();
+  const isAdmin = !!user && ADMIN_ROLES.includes(user.role);
   const [activeTab, setActiveTab] = useState<Tab>('directory');
   const [selectedStaff, setSelectedStaff] = useState<Profile | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: staff } = useProfiles();
+  const { data: staff, refetch: refetchStaff } = useProfiles();
+  const { update: updateProfile, loading: savingProfile } = useUpdateProfile();
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<{
+    full_name: string;
+    email: string;
+    role: string;
+    department: string;
+    phone: string;
+    bio: string;
+    salary: number;
+    status: string;
+  } | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
   const [newStaff, setNewStaff] = useState({
     name: '',
     role: ROLES[1].name,
@@ -71,6 +88,57 @@ export function Personnel() {
       s.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.department.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const openEdit = (member: Profile) => {
+    setEditError(null);
+    setEditDraft({
+      full_name: member.full_name,
+      email: member.email,
+      role: member.role,
+      department: member.department,
+      phone: member.phone ?? '',
+      bio: member.bio ?? '',
+      salary: member.salary ?? 0,
+      status: member.status,
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editDraft || !selectedStaff) return;
+    setEditError(null);
+    try {
+      await updateProfile(selectedStaff.id, {
+        full_name: editDraft.full_name,
+        email: editDraft.email,
+        role: editDraft.role,
+        department: editDraft.department,
+        phone: editDraft.phone || null,
+        bio: editDraft.bio || null,
+        salary: editDraft.salary,
+        status: editDraft.status,
+      });
+      await refetchStaff();
+      setSelectedStaff(prev =>
+        prev
+          ? {
+              ...prev,
+              full_name: editDraft.full_name,
+              email: editDraft.email,
+              role: editDraft.role,
+              department: editDraft.department,
+              phone: editDraft.phone || null,
+              bio: editDraft.bio || null,
+              salary: editDraft.salary,
+              status: editDraft.status,
+            }
+          : prev
+      );
+      setEditDraft(null);
+    } catch (err) {
+      setEditError((err as Error).message);
+    }
+  };
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,9 +165,11 @@ export function Personnel() {
             Talento, roles y nómina.
           </p>
         </div>
-        <Button onClick={() => setIsRegisterModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-1.5" /> Registrar personal
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setIsRegisterModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-1.5" /> Registrar personal
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -200,7 +270,15 @@ export function Personnel() {
                   </div>
                   <Progress value={selectedStaff.metadata.efficiency ?? 90} className="h-1.5" />
                 </div>
-                <Button variant="outline" className="w-full">Editar información</Button>
+                {isAdmin ? (
+                  <Button variant="outline" className="w-full" onClick={() => openEdit(selectedStaff)}>
+                    Editar información
+                  </Button>
+                ) : (
+                  <p className="text-xs text-[var(--color-app-text-muted)] text-center">
+                    Sólo administradores pueden editar la información del personal.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -392,6 +470,146 @@ export function Personnel() {
                 </TableBody>
               </Table>
             </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit modal (sólo administradores) */}
+      {editDraft && selectedStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-2xl p-0">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-[var(--color-app-border)]">
+              <div>
+                <CardTitle>Editar información del personal</CardTitle>
+                <CardDescription>
+                  {selectedStaff.full_name} · acción exclusiva de administradores.
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setEditDraft(null);
+                  setEditError(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <form onSubmit={handleSaveEdit}>
+              <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Nombre completo</label>
+                    <Input
+                      required
+                      value={editDraft.full_name}
+                      onChange={e => setEditDraft({ ...editDraft, full_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Correo electrónico</label>
+                    <Input
+                      required
+                      type="email"
+                      value={editDraft.email}
+                      onChange={e => setEditDraft({ ...editDraft, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Teléfono</label>
+                    <Input
+                      value={editDraft.phone}
+                      onChange={e => setEditDraft({ ...editDraft, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Departamento</label>
+                    <select
+                      value={editDraft.department}
+                      onChange={e => setEditDraft({ ...editDraft, department: e.target.value })}
+                      className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+                    >
+                      <option value="Diseño e Ingeniería">Diseño e Ingeniería</option>
+                      <option value="Producción">Producción</option>
+                      <option value="Calidad / Metrología">Calidad / Metrología</option>
+                      <option value="Administración">Administración</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Rol asignado</label>
+                    <select
+                      value={editDraft.role}
+                      onChange={e => setEditDraft({ ...editDraft, role: e.target.value })}
+                      className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+                    >
+                      {ROLES.map(r => (
+                        <option key={r.id} value={r.name}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Estatus</label>
+                    <select
+                      value={editDraft.status}
+                      onChange={e => setEditDraft({ ...editDraft, status: e.target.value })}
+                      className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+                    >
+                      <option value="Activo">Activo</option>
+                      <option value="Inactivo">Inactivo</option>
+                      <option value="Vacaciones">Vacaciones</option>
+                      <option value="Incapacidad">Incapacidad</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Sueldo base (MXN)</label>
+                    <Input
+                      type="number"
+                      value={editDraft.salary}
+                      onChange={e => setEditDraft({ ...editDraft, salary: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Biografía profesional</label>
+                    <textarea
+                      rows={3}
+                      value={editDraft.bio}
+                      onChange={e => setEditDraft({ ...editDraft, bio: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+
+              {editError && (
+                <div className="mx-6 mb-4 p-3 rounded-md bg-[var(--color-app-danger-soft)] text-sm text-[var(--color-app-danger)]">
+                  {editError}
+                </div>
+              )}
+
+              <div className="p-6 pt-0 flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditDraft(null);
+                    setEditError(null);
+                  }}
+                  className="flex-1"
+                  disabled={savingProfile}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" className="flex-1" disabled={savingProfile}>
+                  {savingProfile ? 'Guardando...' : 'Guardar cambios'}
+                </Button>
+              </div>
+            </form>
           </Card>
         </div>
       )}

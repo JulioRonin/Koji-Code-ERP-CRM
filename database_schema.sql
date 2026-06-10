@@ -817,6 +817,22 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Admins pueden actualizar perfiles del personal (sólo UPDATE; INSERT lo hace
+-- el trigger handle_new_user al registrar un auth.user). Sin política dedicada
+-- la actualización fallaba en silencio para los Administradores.
+DROP POLICY IF EXISTS "admin update profiles" ON public.profiles;
+CREATE POLICY "admin update profiles" ON public.profiles
+    FOR UPDATE TO authenticated
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
+
+-- Cada usuario puede actualizar su propio perfil (datos personales).
+DROP POLICY IF EXISTS "self update profile" ON public.profiles;
+CREATE POLICY "self update profile" ON public.profiles
+    FOR UPDATE TO authenticated
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
+
 -- Compras puede escribir el catálogo de precios y cotizaciones
 CREATE OR REPLACE FUNCTION public.is_purchasing()
 RETURNS BOOLEAN
