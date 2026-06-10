@@ -46,6 +46,7 @@ import { cn } from '@/lib/utils';
 import { GanttChart } from '@/components/projects/GanttChart';
 import { ProjectReport } from '@/components/projects/ProjectReport';
 import { MasterPlanWizard } from '@/components/projects/MasterPlanWizard';
+import { MasterPlanTaskList } from '@/components/projects/MasterPlanTaskList';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
 import {
   useProject,
@@ -357,76 +358,163 @@ export function ProjectDetails() {
             </Card>
           )}
 
-          {/* Tareas manuales */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
+          {/* Plan de trabajo — si hay master plan, muestra sus activities editables;
+              si no, las tareas ad-hoc del proyecto. */}
+          {masterPlan && masterPlanTasks.length > 0 ? (
+            <Card>
+              <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Plan de trabajo
                 </CardTitle>
                 <CardDescription>
-                  {completedTasks} de {tasks.length} tareas completadas
+                  {masterPlanTasks.filter(t => t.progress >= 100).length} de{' '}
+                  {masterPlanTasks.length} actividades completadas · click en cualquier actividad
+                  para actualizar su avance
                 </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <input
-                  value={newTaskName}
-                  onChange={e => setNewTaskName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAddTask()}
-                  placeholder="Añadir tarea rápida..."
-                  className="flex-1 h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+              </CardHeader>
+              <CardContent>
+                <MasterPlanTaskList
+                  tasks={masterPlanTasks}
+                  onUpdated={async () => {
+                    // Refresca el proyecto para reflejar el nuevo % global
+                    await Promise.all([refetchProject(), refetchMasterPlan()]);
+                  }}
                 />
-                <Button onClick={handleAddTask} disabled={!newTaskName.trim() || isAddingTask} size="sm">
-                  <Plus className="h-3.5 w-3.5 mr-1.5" /> Añadir
-                </Button>
-              </div>
-
-              {tasks.length === 0 ? (
-                <p className="text-sm text-[var(--color-app-text-muted)] text-center py-6">
-                  Sin tareas aún. Añade la primera arriba.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {tasks.map(task => (
-                    <button
-                      key={task.id}
-                      onClick={() => handleToggleTask(task)}
-                      className="w-full flex items-center justify-between p-3 rounded-md border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]/30 transition-colors text-left"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {task.status === 'completed' ? (
-                          <CheckCircle2 className="h-5 w-5 text-[var(--color-app-success)] shrink-0" />
-                        ) : task.status === 'in-progress' ? (
-                          <div className="h-5 w-5 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin shrink-0" />
-                        ) : (
-                          <Circle className="h-5 w-5 text-[var(--color-app-text-subtle)] shrink-0" />
-                        )}
-                        <p
-                          className={cn(
-                            'text-sm font-medium truncate',
-                            task.status === 'completed' && 'text-[var(--color-app-text-muted)] line-through'
-                          )}
-                        >
-                          {task.name}
-                        </p>
-                      </div>
-                      <Badge variant={taskBadge[task.status]}>
-                        {task.status === 'completed'
-                          ? 'Completado'
-                          : task.status === 'in-progress'
-                          ? 'En proceso'
-                          : task.status === 'cancelled'
-                          ? 'Cancelado'
-                          : 'Pendiente'}
-                      </Badge>
-                    </button>
-                  ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Plan de trabajo
+                  </CardTitle>
+                  <CardDescription>
+                    {completedTasks} de {tasks.length} tareas completadas
+                  </CardDescription>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    value={newTaskName}
+                    onChange={e => setNewTaskName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+                    placeholder="Añadir tarea rápida..."
+                    className="flex-1 h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                  />
+                  <Button onClick={handleAddTask} disabled={!newTaskName.trim() || isAddingTask} size="sm">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Añadir
+                  </Button>
+                </div>
+
+                {tasks.length === 0 ? (
+                  <p className="text-sm text-[var(--color-app-text-muted)] text-center py-6">
+                    Sin tareas aún. Genera un master plan o añade tareas rápidas arriba.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {tasks.map(task => (
+                      <button
+                        key={task.id}
+                        onClick={() => handleToggleTask(task)}
+                        className="w-full flex items-center justify-between p-3 rounded-md border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]/30 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {task.status === 'completed' ? (
+                            <CheckCircle2 className="h-5 w-5 text-[var(--color-app-success)] shrink-0" />
+                          ) : task.status === 'in-progress' ? (
+                            <div className="h-5 w-5 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin shrink-0" />
+                          ) : (
+                            <Circle className="h-5 w-5 text-[var(--color-app-text-subtle)] shrink-0" />
+                          )}
+                          <p
+                            className={cn(
+                              'text-sm font-medium truncate',
+                              task.status === 'completed' && 'text-[var(--color-app-text-muted)] line-through'
+                            )}
+                          >
+                            {task.name}
+                          </p>
+                        </div>
+                        <Badge variant={taskBadge[task.status]}>
+                          {task.status === 'completed'
+                            ? 'Completado'
+                            : task.status === 'in-progress'
+                            ? 'En proceso'
+                            : task.status === 'cancelled'
+                            ? 'Cancelado'
+                            : 'Pendiente'}
+                        </Badge>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tareas adicionales (cuando ya hay master plan) — colapsables */}
+          {masterPlan && (
+            <details className="rounded-xl border border-[var(--color-app-border)] bg-white">
+              <summary className="cursor-pointer p-4 text-sm font-medium flex items-center justify-between hover:bg-[var(--color-app-surface-alt)]/40 rounded-xl">
+                <span className="flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+                  Tareas adicionales · {tasks.length}
+                </span>
+                <span className="text-xs text-[var(--color-app-text-muted)]">
+                  Anota pendientes ad-hoc fuera del plan
+                </span>
+              </summary>
+              <div className="p-4 pt-0 space-y-3 border-t border-[var(--color-app-border)]">
+                <div className="flex gap-2">
+                  <input
+                    value={newTaskName}
+                    onChange={e => setNewTaskName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+                    placeholder="Añadir tarea ad-hoc..."
+                    className="flex-1 h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                  />
+                  <Button onClick={handleAddTask} disabled={!newTaskName.trim() || isAddingTask} size="sm">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Añadir
+                  </Button>
+                </div>
+                {tasks.length === 0 ? (
+                  <p className="text-xs text-[var(--color-app-text-muted)] text-center py-3">
+                    Sin tareas ad-hoc.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {tasks.map(task => (
+                      <button
+                        key={task.id}
+                        onClick={() => handleToggleTask(task)}
+                        className="w-full flex items-center justify-between p-2.5 rounded-md border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]/30 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {task.status === 'completed' ? (
+                            <CheckCircle2 className="h-4 w-4 text-[var(--color-app-success)] shrink-0" />
+                          ) : task.status === 'in-progress' ? (
+                            <div className="h-4 w-4 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin shrink-0" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-[var(--color-app-text-subtle)] shrink-0" />
+                          )}
+                          <p
+                            className={cn(
+                              'text-sm truncate',
+                              task.status === 'completed' && 'text-[var(--color-app-text-muted)] line-through'
+                            )}
+                          >
+                            {task.name}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
         </div>
 
         {/* Right: activity & docs */}

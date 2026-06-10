@@ -413,22 +413,78 @@ export function useUpdateMasterPlanTaskProgress() {
     setState({ loading: true, error: null });
     try {
       const now = new Date().toISOString();
-      const clamped = Math.max(0, Math.min(100, progress));
+      const clamped = Math.max(0, Math.min(100, Math.round(progress)));
+
       if (!supabase) {
-        const all = readDemo<MasterPlanTask>(DEMO_TASKS_KEY);
-        const idx = all.findIndex(t => t.id === taskId);
-        if (idx >= 0) {
-          all[idx] = { ...all[idx], progress: clamped, updated_at: now };
-          writeDemo(DEMO_TASKS_KEY, all);
+        // Actualiza la tarea
+        const allTasks = readDemo<MasterPlanTask>(DEMO_TASKS_KEY);
+        const idx = allTasks.findIndex(t => t.id === taskId);
+        if (idx < 0) {
+          setState({ loading: false, error: null });
+          return;
+        }
+        const task = allTasks[idx];
+        allTasks[idx] = { ...task, progress: clamped, updated_at: now };
+        writeDemo(DEMO_TASKS_KEY, allTasks);
+
+        // Recalcula avance del proyecto basado en el promedio del plan activo
+        const planTasks = allTasks.filter(t => t.master_plan_id === task.master_plan_id);
+        const avg = Math.round(planTasks.reduce((acc, t) => acc + t.progress, 0) / planTasks.length);
+
+        const plans = readDemo<MasterPlan>(DEMO_PLANS_KEY);
+        const plan = plans.find(p => p.id === task.master_plan_id);
+        if (plan) {
+          // Persiste el avance al project en localStorage de demo
+          try {
+            const projRaw = localStorage.getItem('koji_demo_projects_progress');
+            const map: Record<string, number> = projRaw ? JSON.parse(projRaw) : {};
+            map[plan.project_id] = avg;
+            localStorage.setItem('koji_demo_projects_progress', JSON.stringify(map));
+          } catch {
+            /* ignore */
+          }
         }
         setState({ loading: false, error: null });
         return;
       }
-      const { error } = await supabase
+
+      // ── Supabase ─────────────────────────────────────────────
+      // 1) Update task
+      const { data: taskRow, error: updErr } = await supabase
         .from('master_plan_tasks')
         .update({ progress: clamped, updated_at: now })
-        .eq('id', taskId);
-      if (error) throw error;
+        .eq('id', taskId)
+        .select('master_plan_id')
+        .single();
+      if (updErr) throw updErr;
+
+      const planId = (taskRow as { master_plan_id: string }).master_plan_id;
+
+      // 2) Promedio del plan
+      const { data: allTasks, error: listErr } = await supabase
+        .from('master_plan_tasks')
+        .select('progress')
+        .eq('master_plan_id', planId);
+      if (listErr) throw listErr;
+      const rows = (allTasks ?? []) as { progress: number }[];
+      const avg = rows.length > 0
+        ? Math.round(rows.reduce((acc, t) => acc + (t.progress || 0), 0) / rows.length)
+        : 0;
+
+      // 3) Proyecto al que pertenece este plan
+      const { data: planRow, error: planErr } = await supabase
+        .from('master_plans')
+        .select('project_id')
+        .eq('id', planId)
+        .single();
+      if (planErr) throw planErr;
+
+      // 4) Persiste avance al proyecto
+      await supabase
+        .from('projects')
+        .update({ progress: avg, updated_at: now })
+        .eq('id', (planRow as { project_id: string }).project_id);
+
       setState({ loading: false, error: null });
     } catch (err) {
       const e = err as Error;
