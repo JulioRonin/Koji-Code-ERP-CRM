@@ -63,6 +63,7 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [riskSummary, setRiskSummary] = useState<string>(MASTER_PLAN_TEMPLATES[0].defaultRiskSummary);
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { create } = useCreateMasterPlan();
 
@@ -85,6 +86,7 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
 
   const handleSubmit = async () => {
     setCreating(true);
+    setError(null);
     try {
       const tasks: Omit<MasterPlanTask, 'id' | 'master_plan_id' | 'created_at' | 'updated_at'>[] = scheduled.map(
         (t, i) => ({
@@ -112,10 +114,28 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
         tasks,
       });
 
-      onCreated?.(plan.id);
+      // Cierra primero, después callback en background — así si onCreated
+      // (refetch + agregar nota) tira un error, el plan ya quedó publicado.
       onClose();
-      // Reset
       setStep(1);
+      try {
+        await onCreated?.(plan.id);
+      } catch (cbErr) {
+        console.warn('onCreated callback failed (master plan ya fue publicado)', cbErr);
+      }
+    } catch (err) {
+      const e = err as Error & { message?: string; code?: string; details?: string };
+      console.error('Master Plan publish failed', e);
+      let msg = e.message || 'No se pudo publicar el master plan.';
+      // Pista útil cuando las tablas no existen aún
+      if (msg.includes('master_plans') || msg.toLowerCase().includes('relation') || msg.toLowerCase().includes('not exist')) {
+        msg =
+          'Las tablas master_plans / master_plan_tasks no existen en la base de datos. ' +
+          'Re-corre database_schema.sql en el SQL editor de Supabase y vuelve a intentar.';
+      } else if (msg.includes('row-level security') || msg.includes('policy')) {
+        msg = 'No tienes permisos para crear el master plan (RLS). Verifica que tu profile.department sea Administrador o Administración / PM.';
+      }
+      setError(msg);
     } finally {
       setCreating(false);
     }
@@ -344,6 +364,16 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
             </div>
           )}
         </div>
+
+        {/* Error inline */}
+        {error && (
+          <div className="px-6 pb-3 shrink-0">
+            <div className="flex gap-2 p-3 rounded-md bg-[var(--color-app-danger-soft)] text-sm text-[var(--color-app-danger)]">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="leading-snug">{error}</div>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[var(--color-app-border)] flex items-center justify-between shrink-0">

@@ -558,15 +558,20 @@ export function ProjectDetails() {
         open={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
         onCreated={async () => {
-          await Promise.all([refetchMasterPlan(), refetchNotes()]);
-          await addNote({
-            project_id: project.id,
-            user_id: user?.id ?? null,
-            user_name: user?.name ?? 'Usuario',
-            action: 'generó el Master Plan del proyecto',
-            note_type: 'milestone',
-          });
-          await refetchNotes();
+          try {
+            await refetchMasterPlan();
+            await addNote({
+              project_id: project.id,
+              user_id: user?.id ?? null,
+              user_name: user?.name ?? 'Usuario',
+              action: 'generó el Master Plan del proyecto',
+              note_type: 'milestone',
+            });
+            await refetchNotes();
+          } catch (err) {
+            // No bloquea la publicación del plan
+            console.warn('Post-publish actions failed', err);
+          }
         }}
       />
     </div>
