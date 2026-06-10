@@ -132,15 +132,15 @@ export function ShareClientLinkModal({ project, open, onClose }: ShareClientLink
           <div className="space-y-4">
             {/* QR */}
             {qrDataUrl && (
-              <div className="flex items-center gap-4 p-4 bg-[var(--color-app-surface-alt)] rounded-md">
-                <div className="bg-white p-2 rounded-md border border-[var(--color-app-border)] shrink-0">
-                  <img src={qrDataUrl} alt="QR del portal" className="w-24 h-24" />
+              <div className="flex flex-col sm:flex-row items-start gap-4 p-4 bg-[var(--color-app-surface-alt)] rounded-md">
+                <div className="bg-white p-2 rounded-md border border-[var(--color-app-border)] shrink-0 self-center sm:self-start">
+                  <img src={qrDataUrl} alt="QR del portal" className="w-24 h-24 block" />
                 </div>
-                <div className="flex-1 min-w-0 space-y-1">
-                  <Badge variant="success" className="mb-1">Enlace activo</Badge>
-                  <p className="text-xs text-[var(--color-app-text-muted)]">
-                    El cliente escanea el QR o abre el link para ver el avance en
-                    tiempo real.
+                <div className="flex-1 min-w-0 space-y-2">
+                  <Badge variant="success">Enlace activo</Badge>
+                  <p className="text-xs text-[var(--color-app-text-muted)] leading-relaxed">
+                    El cliente escanea el QR o abre el link para ver el avance del proyecto en tiempo real.
+                    Solo lectura · sin necesidad de cuenta.
                   </p>
                 </div>
               </div>

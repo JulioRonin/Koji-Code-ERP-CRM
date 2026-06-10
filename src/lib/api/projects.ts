@@ -118,11 +118,19 @@ export function useUpdateProjectStatus() {
         setState({ loading: false, error: null });
         return;
       }
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('projects')
         .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', projectId);
+        .eq('id', projectId)
+        .select('id');
       if (error) throw error;
+      // RLS-silent: si la política bloquea, no hay error pero data es []
+      if (!data || data.length === 0) {
+        throw new Error(
+          'No se actualizó ningún registro. Probablemente tu perfil no tiene permisos. ' +
+            'Verifica que profiles.role sea "Administrador" o "Administración / PM" en Supabase.'
+        );
+      }
       setState({ loading: false, error: null });
     } catch (err) {
       const error = err as Error;

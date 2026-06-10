@@ -168,18 +168,28 @@ CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON public.quote_items(quote_id)
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.project_tasks (
-    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    project_id   TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
-    name         TEXT NOT NULL,
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id     TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
+    name           TEXT NOT NULL,
     scheduled_date DATE,
-    status       TEXT NOT NULL DEFAULT 'pending'
-                 CHECK (status IN ('pending','in-progress','completed','cancelled')),
-    sort_order   INTEGER DEFAULT 0,
-    created_at   TIMESTAMPTZ DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ DEFAULT NOW()
+    start_date     DATE,
+    end_date       DATE,
+    department     TEXT,                          -- Compras, Diseño, Producción, Calidad, Embarque
+    progress       INTEGER DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+    status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending','in-progress','completed','cancelled')),
+    sort_order     INTEGER DEFAULT 0,
+    created_at     TIMESTAMPTZ DEFAULT NOW(),
+    updated_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_project_tasks_project ON public.project_tasks(project_id);
+
+-- Para ampliar tablas ya creadas, los siguientes ALTER son idempotentes:
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS start_date DATE;
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS end_date   DATE;
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS department TEXT;
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS progress   INTEGER DEFAULT 0;
 
 -- Notas y actividad por proyecto
 CREATE TABLE IF NOT EXISTS public.project_notes (
@@ -242,6 +252,29 @@ CREATE TABLE IF NOT EXISTS public.master_plan_tasks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mpt_plan ON public.master_plan_tasks(master_plan_id, sort_order);
+
+-- ---------------------------------------------------------------------------
+-- 3e. JUNTAS DEL PROYECTO — calendario de seguimiento (readiness PMI)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.project_meetings (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id       TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
+    master_plan_id   UUID REFERENCES public.master_plans(id) ON DELETE SET NULL,
+    title            TEXT NOT NULL,
+    meeting_type     TEXT NOT NULL DEFAULT 'Semanal'
+                     CHECK (meeting_type IN ('Kick-off','Semanal','Quincenal','Mensual','Hito','Cierre')),
+    scheduled_at     TIMESTAMPTZ NOT NULL,
+    duration_minutes INTEGER DEFAULT 30,
+    attendees        JSONB DEFAULT '[]'::jsonb,    -- array de departamentos / participantes
+    status           TEXT NOT NULL DEFAULT 'Programada'
+                     CHECK (status IN ('Programada','Realizada','Cancelada')),
+    notes            TEXT,
+    created_at       TIMESTAMPTZ DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_meetings_project ON public.project_meetings(project_id, scheduled_at);
 
 -- ---------------------------------------------------------------------------
 -- 4. PROYECTOS
@@ -698,6 +731,7 @@ ALTER TABLE public.project_tasks           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_notes           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.master_plans            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.master_plan_tasks       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_meetings        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_files           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bom_items               ENABLE ROW LEVEL SECURITY;
@@ -740,7 +774,7 @@ BEGIN
         SELECT unnest(ARRAY[
             'profiles','customers','suppliers','projects','project_files',
             'project_tasks','project_notes','master_plans','master_plan_tasks',
-            'material_prices','quotes','quote_items',
+            'project_meetings','material_prices','quotes','quote_items',
             'bom_items','requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages','time_entries',
             'quality_inspections','ncrs','measurement_instruments',
@@ -766,7 +800,7 @@ BEGIN
         SELECT unnest(ARRAY[
             'customers','suppliers','projects','project_files','bom_items',
             'project_tasks','project_notes','master_plans','master_plan_tasks',
-            'material_prices','quotes','quote_items',
+            'project_meetings','material_prices','quotes','quote_items',
             'requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages',
             'quality_inspections','ncrs','measurement_instruments',

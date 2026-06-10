@@ -22,10 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { PROJECTS, INITIAL_BOMS } from '@/components/purchasing/BOMManager';
 import { cn } from '@/lib/utils';
 import { useChat } from '@/contexts/ChatContext';
-import { useInspections, useNcrs, useInstruments } from '@/lib/api';
+import { useInspections, useNcrs, useInstruments, useProjects, useBomItems } from '@/lib/api';
 
 type QualityStatus = 'PENDIENTE' | 'EN REVISIÓN' | 'APROBADO' | 'RECHAZADO (NCR)';
 
@@ -55,15 +54,23 @@ type Tab = (typeof tabs)[number]['id'];
 export function Quality() {
   const { sendSystemMessage } = useChat();
   const [activeTab, setActiveTab] = useState<Tab>('project_control');
-  const [selectedProjectId, setSelectedProjectId] = useState(PROJECTS[0].id);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [partStatuses, setPartStatuses] = useState<Record<string, QualityStatus>>({});
 
+  const { data: projects } = useProjects();
+  const { data: bomItems } = useBomItems(selectedProjectId || undefined);
   const { data: inspections } = useInspections();
   const { data: ncrs } = useNcrs();
   const { data: instruments } = useInstruments();
 
-  const projectBOM = INITIAL_BOMS.find(b => b.projectId === selectedProjectId);
-  const parts = projectBOM ? projectBOM.items : [];
+  // Auto-selecciona el primer proyecto cuando llegan
+  React.useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId]);
+
+  const parts = bomItems;
 
   const handleStatusChange = (partId: string, status: QualityStatus) => {
     setPartStatuses(prev => ({ ...prev, [partId]: status }));
@@ -72,7 +79,7 @@ export function Quality() {
       const part = parts.find(p => p.id === partId);
       sendSystemMessage(
         '5',
-        `⚠️ Alerta de calidad: La pieza [${part?.partNumber}] (${part?.description}) del proyecto ${selectedProjectId} ha sido RECHAZADA. Se requiere apertura de NCR.`,
+        `⚠️ Alerta de calidad: La pieza [${part?.part_number}] (${part?.description}) del proyecto ${selectedProjectId} ha sido RECHAZADA. Se requiere apertura de NCR.`,
         'QUALITY'
       );
     }
@@ -161,7 +168,8 @@ export function Quality() {
                 onChange={e => setSelectedProjectId(e.target.value)}
                 className="block w-full md:w-80 h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
               >
-                {PROJECTS.map(p => (
+                {projects.length === 0 && <option value="">No hay proyectos</option>}
+                {projects.map(p => (
                   <option key={p.id} value={p.id}>
                     {p.id} — {p.name}
                   </option>
@@ -196,7 +204,7 @@ export function Quality() {
                   const currentStatus = partStatuses[part.id] || 'PENDIENTE';
                   return (
                     <TableRow key={part.id}>
-                      <TableCell className="font-mono text-xs">{part.partNumber}</TableCell>
+                      <TableCell className="font-mono text-xs">{part.part_number}</TableCell>
                       <TableCell>{part.description}</TableCell>
                       <TableCell className="text-[var(--color-app-text-muted)]">Staff de piso</TableCell>
                       <TableCell>

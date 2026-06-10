@@ -47,6 +47,8 @@ import { GanttChart } from '@/components/projects/GanttChart';
 import { ProjectReport } from '@/components/projects/ProjectReport';
 import { MasterPlanWizard } from '@/components/projects/MasterPlanWizard';
 import { MasterPlanTaskList } from '@/components/projects/MasterPlanTaskList';
+import { AdHocTaskForm } from '@/components/projects/AdHocTaskForm';
+import { MeetingsCard } from '@/components/projects/MeetingsCard';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
 import {
   useProject,
@@ -116,6 +118,7 @@ export function ProjectDetails() {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(searchParams.get('wizard') === '1');
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   // Limpia el query string una vez consumido
   React.useEffect(() => {
@@ -131,9 +134,19 @@ export function ProjectDetails() {
   const completedTasks = useMemo(() => tasks.filter(t => t.status === 'completed').length, [tasks]);
 
   const ganttTasks = useMemo(() => {
-    if (!masterPlan || masterPlanTasks.length === 0) return [];
-    const planStart = parseISO(masterPlan.baseline_start);
-    return masterPlanTasks.map(t => {
+    if (!masterPlan && tasks.filter(t => t.start_date && t.end_date).length === 0) return [];
+
+    const planStart = masterPlan
+      ? parseISO(masterPlan.baseline_start)
+      : (() => {
+          const dated = tasks
+            .filter(t => t.start_date)
+            .map(t => parseISO(t.start_date!))
+            .sort((a, b) => a.getTime() - b.getTime());
+          return dated[0] ?? parseISO(project?.start_date ?? new Date().toISOString());
+        })();
+
+    const fromPlan = masterPlanTasks.map(t => {
       const start = parseISO(t.start_date);
       const end = parseISO(t.end_date);
       const startDay = Math.max(0, differenceInDays(start, planStart));
@@ -151,7 +164,30 @@ export function ProjectDetails() {
         status,
       };
     });
-  }, [masterPlan, masterPlanTasks]);
+
+    const fromTasks = tasks
+      .filter(t => t.start_date && t.end_date)
+      .map(t => {
+        const start = parseISO(t.start_date!);
+        const end = parseISO(t.end_date!);
+        const startDay = Math.max(0, differenceInDays(start, planStart));
+        const duration = Math.max(1, differenceInDays(end, start));
+        let status: 'pending' | 'in-progress' | 'completed' = 'pending';
+        if (t.status === 'completed' || t.progress >= 100) status = 'completed';
+        else if (t.status === 'in-progress' || t.progress > 0) status = 'in-progress';
+        return {
+          id: t.id,
+          name: `★ ${t.name}`, // marca visual de tarea ad-hoc
+          department: ((t.department as string) ?? 'Producción') as 'Compras' | 'Diseño' | 'Producción' | 'Calidad',
+          startDay,
+          duration,
+          progress: t.progress,
+          status,
+        };
+      });
+
+    return [...fromPlan, ...fromTasks];
+  }, [masterPlan, masterPlanTasks, tasks, project?.start_date]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleAddNote = async () => {
@@ -169,15 +205,27 @@ export function ProjectDetails() {
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     if (!id) return;
-    await updateStatus(id, newStatus);
-    await addNote({
-      project_id: id,
-      user_id: user?.id ?? null,
-      user_name: user?.name ?? 'Usuario',
-      action: `cambió el estado a "${newStatus}"`,
-      note_type: 'status_change',
-    });
-    await Promise.all([refetchProject(), refetchNotes()]);
+    setFeedback(null);
+    try {
+      await updateStatus(id, newStatus);
+      // Solo registramos la nota si el update sí pasó
+      try {
+        await addNote({
+          project_id: id,
+          user_id: user?.id ?? null,
+          user_name: user?.name ?? 'Usuario',
+          action: `cambió el estado a "${newStatus}"`,
+          note_type: 'status_change',
+        });
+      } catch {
+        /* ignore note failure */
+      }
+      await Promise.all([refetchProject(), refetchNotes()]);
+      setFeedback({ tone: 'success', text: `Estado actualizado a "${newStatus}".` });
+      setTimeout(() => setFeedback(null), 3000);
+    } catch (err) {
+      setFeedback({ tone: 'error', text: (err as Error).message });
+    }
   };
 
   const handleAddTask = async () => {
@@ -274,6 +322,33 @@ export function ProjectDetails() {
         </div>
       </div>
 
+      {/* Feedback banner */}
+      {feedback && (
+        <div
+          className={cn(
+            'flex items-start gap-2 p-3 rounded-md text-sm',
+            feedback.tone === 'success'
+              ? 'bg-[var(--color-app-success-soft)] text-[var(--color-app-success)]'
+              : 'bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)]'
+          )}
+        >
+          {feedback.tone === 'success' ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          )}
+          <div className="leading-snug flex-1">{feedback.text}</div>
+          <button
+            type="button"
+            onClick={() => setFeedback(null)}
+            className="opacity-70 hover:opacity-100"
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6">
         {/* Left: overview & tasks */}
         <div className="lg:col-span-2 space-y-5 md:space-y-6">
@@ -358,6 +433,9 @@ export function ProjectDetails() {
             </Card>
           )}
 
+          {/* Calendario de juntas (si existen) */}
+          <MeetingsCard projectId={project.id} />
+
           {/* Plan de trabajo — si hay master plan, muestra sus activities editables;
               si no, las tareas ad-hoc del proyecto. */}
           {masterPlan && masterPlanTasks.length > 0 ? (
@@ -384,134 +462,48 @@ export function ProjectDetails() {
             </Card>
           ) : (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Plan de trabajo
-                  </CardTitle>
-                  <CardDescription>
-                    {completedTasks} de {tasks.length} tareas completadas
-                  </CardDescription>
-                </div>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Plan de trabajo
+                </CardTitle>
+                <CardDescription>
+                  Sin Master Plan formal aún. Mientras tanto, registra tareas con fechas y se
+                  verán en el Gantt y el reporte.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex gap-2">
-                  <input
-                    value={newTaskName}
-                    onChange={e => setNewTaskName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddTask()}
-                    placeholder="Añadir tarea rápida..."
-                    className="flex-1 h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
-                  />
-                  <Button onClick={handleAddTask} disabled={!newTaskName.trim() || isAddingTask} size="sm">
-                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Añadir
-                  </Button>
-                </div>
-
-                {tasks.length === 0 ? (
-                  <p className="text-sm text-[var(--color-app-text-muted)] text-center py-6">
-                    Sin tareas aún. Genera un master plan o añade tareas rápidas arriba.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {tasks.map(task => (
-                      <button
-                        key={task.id}
-                        onClick={() => handleToggleTask(task)}
-                        className="w-full flex items-center justify-between p-3 rounded-md border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]/30 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          {task.status === 'completed' ? (
-                            <CheckCircle2 className="h-5 w-5 text-[var(--color-app-success)] shrink-0" />
-                          ) : task.status === 'in-progress' ? (
-                            <div className="h-5 w-5 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin shrink-0" />
-                          ) : (
-                            <Circle className="h-5 w-5 text-[var(--color-app-text-subtle)] shrink-0" />
-                          )}
-                          <p
-                            className={cn(
-                              'text-sm font-medium truncate',
-                              task.status === 'completed' && 'text-[var(--color-app-text-muted)] line-through'
-                            )}
-                          >
-                            {task.name}
-                          </p>
-                        </div>
-                        <Badge variant={taskBadge[task.status]}>
-                          {task.status === 'completed'
-                            ? 'Completado'
-                            : task.status === 'in-progress'
-                            ? 'En proceso'
-                            : task.status === 'cancelled'
-                            ? 'Cancelado'
-                            : 'Pendiente'}
-                        </Badge>
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <CardContent>
+                <AdHocTaskForm
+                  projectId={project.id}
+                  tasks={tasks}
+                  onChanged={async () => {
+                    await refetchTasks();
+                  }}
+                />
               </CardContent>
             </Card>
           )}
 
-          {/* Tareas adicionales (cuando ya hay master plan) — colapsables */}
+          {/* Tareas adicionales — con fechas, duración y departamento;
+              aparecen en el Gantt y el reporte */}
           {masterPlan && (
-            <details className="rounded-xl border border-[var(--color-app-border)] bg-white">
+            <details className="rounded-xl border border-[var(--color-app-border)] bg-white" open={tasks.length > 0}>
               <summary className="cursor-pointer p-4 text-sm font-medium flex items-center justify-between hover:bg-[var(--color-app-surface-alt)]/40 rounded-xl">
                 <span className="flex items-center gap-2">
                   <Plus className="h-4 w-4 text-[var(--color-app-text-muted)]" />
                   Tareas adicionales · {tasks.length}
                 </span>
-                <span className="text-xs text-[var(--color-app-text-muted)]">
-                  Anota pendientes ad-hoc fuera del plan
+                <span className="text-xs text-[var(--color-app-text-muted)] hidden sm:inline">
+                  Aparecen en el Gantt y reporte
                 </span>
               </summary>
-              <div className="p-4 pt-0 space-y-3 border-t border-[var(--color-app-border)]">
-                <div className="flex gap-2">
-                  <input
-                    value={newTaskName}
-                    onChange={e => setNewTaskName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddTask()}
-                    placeholder="Añadir tarea ad-hoc..."
-                    className="flex-1 h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
-                  />
-                  <Button onClick={handleAddTask} disabled={!newTaskName.trim() || isAddingTask} size="sm">
-                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Añadir
-                  </Button>
-                </div>
-                {tasks.length === 0 ? (
-                  <p className="text-xs text-[var(--color-app-text-muted)] text-center py-3">
-                    Sin tareas ad-hoc.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {tasks.map(task => (
-                      <button
-                        key={task.id}
-                        onClick={() => handleToggleTask(task)}
-                        className="w-full flex items-center justify-between p-2.5 rounded-md border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]/30 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {task.status === 'completed' ? (
-                            <CheckCircle2 className="h-4 w-4 text-[var(--color-app-success)] shrink-0" />
-                          ) : task.status === 'in-progress' ? (
-                            <div className="h-4 w-4 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin shrink-0" />
-                          ) : (
-                            <Circle className="h-4 w-4 text-[var(--color-app-text-subtle)] shrink-0" />
-                          )}
-                          <p
-                            className={cn(
-                              'text-sm truncate',
-                              task.status === 'completed' && 'text-[var(--color-app-text-muted)] line-through'
-                            )}
-                          >
-                            {task.name}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="p-4 pt-0 border-t border-[var(--color-app-border)]">
+                <AdHocTaskForm
+                  projectId={project.id}
+                  tasks={tasks}
+                  onChanged={async () => {
+                    await refetchTasks();
+                  }}
+                />
               </div>
             </details>
           )}
@@ -596,8 +588,8 @@ export function ProjectDetails() {
 
       {/* Master Plan dialog (Gantt completo) */}
       <Dialog open={isMasterPlanOpen} onOpenChange={setIsMasterPlanOpen}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
             <DialogTitle>Master Plan · Gantt</DialogTitle>
             <DialogDescription>
               {masterPlan
@@ -605,7 +597,7 @@ export function ProjectDetails() {
                 : 'Sin plan generado'}
             </DialogDescription>
           </DialogHeader>
-          <div className="overflow-auto">
+          <div className="flex-1 overflow-auto px-6 pb-6">
             {ganttTasks.length > 0 ? (
               <GanttChart startDate={masterPlan?.baseline_start ?? project.start_date} tasks={ganttTasks} />
             ) : (

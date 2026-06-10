@@ -5,12 +5,13 @@ import {
   Flag,
   ChevronDown,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useUpdateMasterPlanTaskProgress } from '@/lib/api';
+import { useUpdateMasterPlanTaskProgress, useUpdateMasterPlanTaskDates } from '@/lib/api';
 import type { MasterPlanTask } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -37,22 +38,61 @@ interface Props {
 export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { update } = useUpdateMasterPlanTaskProgress();
+  const { update: updateDates, loading: savingDates } = useUpdateMasterPlanTaskDates();
 
   // Optimistic UI: progreso local mientras llega la respuesta
   const [localProgress, setLocalProgress] = useState<Record<string, number>>({});
+  const [editingDates, setEditingDates] = useState<Record<string, { start: string; end: string }>>({});
 
   const getProgress = (t: MasterPlanTask) => localProgress[t.id] ?? t.progress;
+
+  const handleSaveDates = async (task: MasterPlanTask) => {
+    const draft = editingDates[task.id];
+    if (!draft) return;
+    if (!draft.start || !draft.end) return;
+    if (new Date(draft.end) < new Date(draft.start)) {
+      setError('La fecha de fin debe ser igual o posterior a la de inicio.');
+      return;
+    }
+    if (draft.start === task.start_date && draft.end === task.end_date) {
+      // No hay cambio real
+      setEditingDates(prev => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+      return;
+    }
+    setSavingId(task.id);
+    setError(null);
+    try {
+      await updateDates(tasks, task.id, draft.start, draft.end);
+      await onUpdated?.();
+      setEditingDates(prev => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+    } catch (err) {
+      setError((err as Error).message || 'No se pudieron guardar las fechas.');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   const handleSet = async (task: MasterPlanTask, value: number) => {
     const clamped = Math.max(0, Math.min(100, value));
     setLocalProgress(prev => ({ ...prev, [task.id]: clamped }));
     setSavingId(task.id);
+    setError(null);
     try {
       await update(task.id, clamped);
       await onUpdated?.();
     } catch (err) {
       console.error('No se pudo actualizar el avance', err);
+      setError((err as Error).message || 'No se pudo guardar el avance.');
       // Revierte el optimistic
       setLocalProgress(prev => {
         const next = { ...prev };
@@ -74,6 +114,15 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
 
   return (
     <div className="space-y-1.5">
+      {error && (
+        <div className="flex items-start gap-2 p-3 rounded-md bg-[var(--color-app-danger-soft)] text-sm text-[var(--color-app-danger)]">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="leading-snug flex-1">{error}</div>
+          <button onClick={() => setError(null)} className="opacity-70 hover:opacity-100">
+            ×
+          </button>
+        </div>
+      )}
       {tasks.map(task => {
         const progress = getProgress(task);
         const isExpanded = expandedId === task.id;
@@ -227,33 +276,95 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
                   ))}
                 </div>
 
-                {/* Meta */}
-                <div className="grid grid-cols-2 gap-2 text-xs text-[var(--color-app-text-muted)] pt-1">
-                  <div>
-                    <span className="block text-[10px] uppercase">Inicio</span>
-                    <span className="text-[var(--color-app-text)] font-medium">
-                      {format(parseISO(task.start_date), 'dd MMM yyyy', { locale: es })}
+                {/* Fechas editables con cascada */}
+                <div className="pt-1 border-t border-[var(--color-app-border)] pt-3 space-y-2">
+                  <p className="text-[10px] uppercase text-[var(--color-app-text-muted)] flex items-center justify-between">
+                    Fechas
+                    <span className="text-[var(--color-app-text-subtle)] normal-case font-normal">
+                      Cambiar mueve las dependientes en automático
                     </span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] uppercase">Fin</span>
-                    <span className="text-[var(--color-app-text)] font-medium">
-                      {format(parseISO(task.end_date), 'dd MMM yyyy', { locale: es })}
-                    </span>
-                  </div>
-                  {task.dependencies && task.dependencies.length > 0 && (
-                    <div className="col-span-2">
-                      <span className="block text-[10px] uppercase mb-1">Depende de</span>
-                      <div className="flex flex-wrap gap-1">
-                        {task.dependencies.map(d => (
-                          <Badge key={d} variant="outline" className="font-mono text-[10px]">
-                            {d}
-                          </Badge>
-                        ))}
-                      </div>
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                        Inicio
+                      </label>
+                      <input
+                        type="date"
+                        value={(editingDates[task.id]?.start ?? task.start_date).slice(0, 10)}
+                        onChange={e =>
+                          setEditingDates(prev => ({
+                            ...prev,
+                            [task.id]: {
+                              start: e.target.value,
+                              end: prev[task.id]?.end ?? task.end_date,
+                            },
+                          }))
+                        }
+                        className="w-full h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                      />
                     </div>
-                  )}
+                    <div>
+                      <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-0.5">
+                        Fin
+                      </label>
+                      <input
+                        type="date"
+                        value={(editingDates[task.id]?.end ?? task.end_date).slice(0, 10)}
+                        onChange={e =>
+                          setEditingDates(prev => ({
+                            ...prev,
+                            [task.id]: {
+                              start: prev[task.id]?.start ?? task.start_date,
+                              end: e.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                      />
+                    </div>
+                  </div>
+                  {editingDates[task.id] &&
+                    (editingDates[task.id].start !== task.start_date ||
+                      editingDates[task.id].end !== task.end_date) && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSaveDates(task)}
+                          disabled={savingDates}
+                          className="h-7 px-2.5 rounded-md text-xs font-medium bg-[var(--color-app-primary)] text-white hover:bg-[var(--color-app-primary-hover)] disabled:opacity-50"
+                        >
+                          {savingDates ? 'Guardando…' : 'Guardar y propagar'}
+                        </button>
+                        <button
+                          onClick={() =>
+                            setEditingDates(prev => {
+                              const next = { ...prev };
+                              delete next[task.id];
+                              return next;
+                            })
+                          }
+                          className="h-7 px-2.5 rounded-md text-xs font-medium border border-[var(--color-app-border)] hover:bg-[var(--color-app-surface-alt)]"
+                        >
+                          Descartar
+                        </button>
+                      </div>
+                    )}
                 </div>
+
+                {task.dependencies && task.dependencies.length > 0 && (
+                  <div className="pt-1">
+                    <span className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
+                      Depende de
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {task.dependencies.map(d => (
+                        <Badge key={d} variant="outline" className="font-mono text-[10px]">
+                          {d}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
