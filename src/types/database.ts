@@ -147,6 +147,74 @@ export interface Supplier {
 }
 
 // ============================================================================
+// TABLAS: cotizaciones
+// ============================================================================
+
+export type QuoteStatus =
+  | 'Borrador'
+  | 'Enviada'
+  | 'Aprobada'
+  | 'Rechazada'
+  | 'Convertida'
+  | 'Expirada';
+
+export interface MaterialPrice {
+  id: string;
+  material: string;
+  description: string | null;
+  uom: string;
+  unit_price: number;
+  currency: string;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  valid_until: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Quote {
+  id: string;
+  customer_id: string | null;
+  client_name: string;
+  project_name: string;
+  status: QuoteStatus;
+  currency: string;
+  margin_pct: number;
+  tax_pct: number;
+  machine_rate_per_hour: number;
+  valid_until: string | null;
+  notes: string | null;
+  subtotal: number;
+  total: number;
+  converted_project_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteItem {
+  id: string;
+  quote_id: string;
+  part_number: string;
+  description: string | null;
+  quantity: number;
+  material_price_id: string | null;
+  material_name: string | null;
+  material_qty: number;
+  material_unit_cost: number;
+  machining_hours: number;
+  machine_rate: number;
+  extra_cost: number;
+  margin_pct: number | null;
+  drawing_file: string | null;
+  unit_price: number;
+  line_total: number;
+  sort_order: number;
+  created_at: string;
+}
+
+// ============================================================================
 // TABLA: projects
 // ============================================================================
 
@@ -482,6 +550,9 @@ export interface Database {
       profiles:                { Row: Profile;                Insert: Partial<Profile>;                Update: Partial<Profile> };
       customers:               { Row: Customer;               Insert: Partial<Customer>;               Update: Partial<Customer> };
       suppliers:               { Row: Supplier;               Insert: Partial<Supplier>;               Update: Partial<Supplier> };
+      material_prices:         { Row: MaterialPrice;          Insert: Partial<MaterialPrice>;          Update: Partial<MaterialPrice> };
+      quotes:                  { Row: Quote;                  Insert: Partial<Quote>;                  Update: Partial<Quote> };
+      quote_items:             { Row: QuoteItem;              Insert: Partial<QuoteItem>;              Update: Partial<QuoteItem> };
       projects:                { Row: Project;                Insert: Partial<Project>;                Update: Partial<Project> };
       project_files:           { Row: ProjectFile;            Insert: Partial<ProjectFile>;            Update: Partial<ProjectFile> };
       bom_items:               { Row: BomItem;                Insert: Partial<BomItem>;                Update: Partial<BomItem> };

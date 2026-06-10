@@ -14,6 +14,7 @@ import {
   HardHat,
   Truck,
   FileBarChart,
+  Calculator,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { name: 'Dashboard',  path: '/',            icon: LayoutDashboard,  departments: ['ALL'] },
+  { name: 'Cotizaciones', path: '/quotes',    icon: Calculator,       departments: ['Administrador', 'Administración / PM', 'Compras'] },
   { name: 'Proyectos',  path: '/projects',    icon: FolderKanban,     departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción', 'Diseño'] },
   { name: 'Diseño',     path: '/design',      icon: Ruler,            departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción', 'Diseño'] },
   { name: 'Compras',    path: '/purchasing',  icon: ShoppingCart,     departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción'] },

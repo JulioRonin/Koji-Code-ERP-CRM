@@ -20,5 +20,6 @@ export * from './workOrderStages';
 export * from './shipments';
 export * from './clientPortal';
 export * from './pmo';
+export * from './quotes';
 export * from './automations';
 export * from './chat';
