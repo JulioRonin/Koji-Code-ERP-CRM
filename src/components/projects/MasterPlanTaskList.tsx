@@ -5,6 +5,7 @@ import {
   Flag,
   ChevronDown,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -37,6 +38,7 @@ interface Props {
 export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { update } = useUpdateMasterPlanTaskProgress();
 
   // Optimistic UI: progreso local mientras llega la respuesta
@@ -48,11 +50,13 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
     const clamped = Math.max(0, Math.min(100, value));
     setLocalProgress(prev => ({ ...prev, [task.id]: clamped }));
     setSavingId(task.id);
+    setError(null);
     try {
       await update(task.id, clamped);
       await onUpdated?.();
     } catch (err) {
       console.error('No se pudo actualizar el avance', err);
+      setError((err as Error).message || 'No se pudo guardar el avance.');
       // Revierte el optimistic
       setLocalProgress(prev => {
         const next = { ...prev };
@@ -74,6 +78,15 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
 
   return (
     <div className="space-y-1.5">
+      {error && (
+        <div className="flex items-start gap-2 p-3 rounded-md bg-[var(--color-app-danger-soft)] text-sm text-[var(--color-app-danger)]">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="leading-snug flex-1">{error}</div>
+          <button onClick={() => setError(null)} className="opacity-70 hover:opacity-100">
+            ×
+          </button>
+        </div>
+      )}
       {tasks.map(task => {
         const progress = getProgress(task);
         const isExpanded = expandedId === task.id;

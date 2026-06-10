@@ -116,6 +116,7 @@ export function ProjectDetails() {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(searchParams.get('wizard') === '1');
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   // Limpia el query string una vez consumido
   React.useEffect(() => {
@@ -169,15 +170,27 @@ export function ProjectDetails() {
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     if (!id) return;
-    await updateStatus(id, newStatus);
-    await addNote({
-      project_id: id,
-      user_id: user?.id ?? null,
-      user_name: user?.name ?? 'Usuario',
-      action: `cambió el estado a "${newStatus}"`,
-      note_type: 'status_change',
-    });
-    await Promise.all([refetchProject(), refetchNotes()]);
+    setFeedback(null);
+    try {
+      await updateStatus(id, newStatus);
+      // Solo registramos la nota si el update sí pasó
+      try {
+        await addNote({
+          project_id: id,
+          user_id: user?.id ?? null,
+          user_name: user?.name ?? 'Usuario',
+          action: `cambió el estado a "${newStatus}"`,
+          note_type: 'status_change',
+        });
+      } catch {
+        /* ignore note failure */
+      }
+      await Promise.all([refetchProject(), refetchNotes()]);
+      setFeedback({ tone: 'success', text: `Estado actualizado a "${newStatus}".` });
+      setTimeout(() => setFeedback(null), 3000);
+    } catch (err) {
+      setFeedback({ tone: 'error', text: (err as Error).message });
+    }
   };
 
   const handleAddTask = async () => {
@@ -273,6 +286,33 @@ export function ProjectDetails() {
           </Button>
         </div>
       </div>
+
+      {/* Feedback banner */}
+      {feedback && (
+        <div
+          className={cn(
+            'flex items-start gap-2 p-3 rounded-md text-sm',
+            feedback.tone === 'success'
+              ? 'bg-[var(--color-app-success-soft)] text-[var(--color-app-success)]'
+              : 'bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)]'
+          )}
+        >
+          {feedback.tone === 'success' ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          )}
+          <div className="leading-snug flex-1">{feedback.text}</div>
+          <button
+            type="button"
+            onClick={() => setFeedback(null)}
+            className="opacity-70 hover:opacity-100"
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6">
         {/* Left: overview & tasks */}

@@ -449,16 +449,19 @@ export function useUpdateMasterPlanTaskProgress() {
       }
 
       // ── Supabase ─────────────────────────────────────────────
-      // 1) Update task
-      const { data: taskRow, error: updErr } = await supabase
+      // 1) Update task — detectamos RLS silenciosa pidiendo el row de vuelta
+      const { data: updatedRows, error: updErr } = await supabase
         .from('master_plan_tasks')
         .update({ progress: clamped, updated_at: now })
         .eq('id', taskId)
-        .select('master_plan_id')
-        .single();
+        .select('master_plan_id');
       if (updErr) throw updErr;
-
-      const planId = (taskRow as { master_plan_id: string }).master_plan_id;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error(
+          'No se pudo guardar el avance. Verifica que tu perfil tenga rol Administrador / PM en profiles.role.'
+        );
+      }
+      const planId = (updatedRows[0] as { master_plan_id: string }).master_plan_id;
 
       // 2) Promedio del plan
       const { data: allTasks, error: listErr } = await supabase

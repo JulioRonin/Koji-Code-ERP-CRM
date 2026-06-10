@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Clock, Target, Box } from 'lucide-react';
-import { PROJECTS, INITIAL_BOMS } from '@/components/purchasing/BOMManager';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
+import { useProjects, useBomItems } from '@/lib/api';
 
 export function ProductionStatusHeader() {
-  const [selectedProjectId, setSelectedProjectId] = useState(PROJECTS[0].id);
-  const bom = INITIAL_BOMS.find(b => b.projectId === selectedProjectId);
+  const { data: projects } = useProjects();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const { data: bomItems } = useBomItems(selectedProjectId || undefined);
 
-  const totalParts = bom ? bom.items.length : 0;
-  const assignedParts = Math.floor(totalParts * 0.8);
-  const finishedParts = Math.floor(totalParts * 0.3);
+  // Selecciona el primer proyecto cuando llegan
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      // Prefiere proyectos en producción
+      const inProd = projects.find(p => p.status === 'En Producción') ?? projects[0];
+      setSelectedProjectId(inProd.id);
+    }
+  }, [projects, selectedProjectId]);
+
+  const totalParts = bomItems.length;
+  const assignedParts = bomItems.filter(b => b.manufacturing_status !== 'PENDIENTE').length;
+  const finishedParts = bomItems.filter(b => b.manufacturing_status === 'TERMINADO').length;
   const progress = totalParts > 0 ? (finishedParts / totalParts) * 100 : 0;
 
   return (
@@ -28,7 +38,8 @@ export function ProductionStatusHeader() {
               onChange={e => setSelectedProjectId(e.target.value)}
               className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm text-[var(--color-app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)] transition-colors"
             >
-              {PROJECTS.map(p => (
+              {projects.length === 0 && <option value="">No hay proyectos</option>}
+              {projects.map(p => (
                 <option key={p.id} value={p.id}>
                   {p.id} — {p.name}
                 </option>
@@ -38,9 +49,9 @@ export function ProductionStatusHeader() {
 
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 w-full">
-            <Kpi icon={Box}        label="Total piezas" value={totalParts}    suffix="items" />
-            <Kpi icon={Clock}      label="Asignadas"    value={assignedParts} suffix="WIP" />
-            <Kpi icon={CheckCircle2} label="Terminadas"  value={finishedParts} suffix="listo" tone="success" />
+            <Kpi icon={Box}          label="Total piezas" value={totalParts}    suffix="items" />
+            <Kpi icon={Clock}        label="Asignadas"    value={assignedParts} suffix="WIP" />
+            <Kpi icon={CheckCircle2} label="Terminadas"   value={finishedParts} suffix="listo" tone="success" />
             <div className="space-y-2 rounded-md bg-[var(--color-app-surface-alt)] p-3 border border-[var(--color-app-border)]">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-[var(--color-app-text-muted)]">Progreso global</span>

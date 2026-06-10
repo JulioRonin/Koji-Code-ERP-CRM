@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { format, parseISO, isValid } from 'date-fns';
+import { es } from 'date-fns/locale';
 import {
   FolderSearch,
   ChevronRight,
@@ -21,19 +23,36 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { PROJECTS, INITIAL_BOMS } from '@/components/purchasing/BOMManager';
-import { useProfiles } from '@/lib/api';
+import { useProfiles, useProjects, useBomItems } from '@/lib/api';
+import type { BomItem } from '@/types/database';
+
+const fmtDate = (s: string | null | undefined) => {
+  if (!s) return '—';
+  try {
+    const d = parseISO(s);
+    return isValid(d) ? format(d, 'dd MMM yyyy', { locale: es }) : '—';
+  } catch {
+    return '—';
+  }
+};
 
 export function ProductionProjectView() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
-  const [selectedPart, setSelectedPart] = useState<any>(null);
+  const [selectedPart, setSelectedPart] = useState<BomItem | null>(null);
   const { data: technicians } = useProfiles('Técnico');
+  const { data: projects } = useProjects();
+  const { data: parts } = useBomItems(selectedProjectId ?? undefined);
 
-  const selectedProject = PROJECTS.find(p => p.id === selectedProjectId);
-  const projectBOM = INITIAL_BOMS.find(b => b.projectId === selectedProjectId);
-  const parts = projectBOM ? projectBOM.items : [];
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+
+  const filteredParts = parts.filter(p =>
+    searchTerm.trim()
+      ? p.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+      : true
+  );
 
   if (!selectedProjectId) {
     return (
@@ -41,32 +60,40 @@ export function ProductionProjectView() {
         <h2 className="text-base font-medium flex items-center gap-2 text-[var(--color-app-text)]">
           <FolderSearch className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Selección de proyecto
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {PROJECTS.map(project => (
-            <Card
-              key={project.id}
-              className="p-0 hover:border-[var(--color-app-primary)]/40 hover:shadow-md transition-all cursor-pointer"
-              onClick={() => setSelectedProjectId(project.id)}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <Badge variant="outline" className="font-mono text-xs">{project.id}</Badge>
-                  <ChevronRight className="h-4 w-4 text-[var(--color-app-text-subtle)]" />
-                </div>
-                <CardTitle className="text-base mt-2">{project.name}</CardTitle>
-                <CardDescription>Cliente: {project.client}</CardDescription>
-              </CardHeader>
-              <CardContent className="pb-5">
-                <div className="flex justify-between items-center text-xs text-[var(--color-app-text-muted)]">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" /> {project.deadline}
-                  </span>
-                  <span className="text-[var(--color-app-primary)]">Ver lista →</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {projects.length === 0 ? (
+          <Card>
+            <div className="py-12 text-center text-sm text-[var(--color-app-text-muted)]">
+              No hay proyectos creados. Crea uno en el módulo Proyectos para empezar.
+            </div>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map(project => (
+              <Card
+                key={project.id}
+                className="p-0 hover:border-[var(--color-app-primary)]/40 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => setSelectedProjectId(project.id)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <Badge variant="outline" className="font-mono text-xs">{project.id}</Badge>
+                    <ChevronRight className="h-4 w-4 text-[var(--color-app-text-subtle)]" />
+                  </div>
+                  <CardTitle className="text-base mt-2">{project.name}</CardTitle>
+                  <CardDescription>Cliente: {project.client_name}</CardDescription>
+                </CardHeader>
+                <CardContent className="pb-5">
+                  <div className="flex justify-between items-center text-xs text-[var(--color-app-text-muted)]">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" /> {fmtDate(project.deadline)}
+                    </span>
+                    <span className="text-[var(--color-app-primary)]">Ver lista →</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -98,67 +125,85 @@ export function ProductionProjectView() {
 
       <Card className="p-0">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID parte</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Cantidad</TableHead>
-                <TableHead className="text-center">Referencias</TableHead>
-                <TableHead>Estatus compra</TableHead>
-                <TableHead>Plan producción</TableHead>
-                <TableHead className="text-right">Acción</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {parts.map(item => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-mono text-xs">{item.partNumber}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{item.description}</span>
-                      <span className="text-xs text-[var(--color-app-text-muted)]">{item.category}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-[var(--color-app-text-muted)] tabular-nums">
-                    {item.quantity} {item.uom}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-center gap-2">
-                      <span title="Modelo 3D (STEP)" className="p-1.5 rounded-md bg-[var(--color-app-surface-alt)] hover:bg-[var(--color-app-primary-soft)] transition-colors cursor-pointer">
-                        <FileOutput className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" />
-                      </span>
-                      <span title="Plano 2D (PDF)" className="p-1.5 rounded-md bg-[var(--color-app-surface-alt)] hover:bg-[var(--color-app-primary-soft)] transition-colors cursor-pointer">
-                        <FileCode2 className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" />
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="success">En stock</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">Sin asignar</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setSelectedPart(item);
-                        setIsPlanningModalOpen(true);
-                      }}
-                    >
-                      Asignar plan
-                    </Button>
-                  </TableCell>
+          {filteredParts.length === 0 ? (
+            <div className="py-12 text-center text-sm text-[var(--color-app-text-muted)]">
+              Sin partes en el BOM de este proyecto. Cárgalas desde Compras → BOM / Listas.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID parte</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead>Cantidad</TableHead>
+                  <TableHead className="text-center">Referencias</TableHead>
+                  <TableHead>Estatus compra</TableHead>
+                  <TableHead>Plan producción</TableHead>
+                  <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredParts.map(item => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-mono text-xs">{item.part_number}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{item.description}</span>
+                        <span className="text-xs text-[var(--color-app-text-muted)]">{item.category}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[var(--color-app-text-muted)] tabular-nums">
+                      {item.quantity} {item.uom}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-center gap-2">
+                        <span title="Modelo 3D (STEP)" className="p-1.5 rounded-md bg-[var(--color-app-surface-alt)] hover:bg-[var(--color-app-primary-soft)] transition-colors cursor-pointer">
+                          <FileOutput className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" />
+                        </span>
+                        <span title="Plano 2D (PDF)" className="p-1.5 rounded-md bg-[var(--color-app-surface-alt)] hover:bg-[var(--color-app-primary-soft)] transition-colors cursor-pointer">
+                          <FileCode2 className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" />
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          item.bom_status === 'Recibido' || item.bom_status === 'Stock'
+                            ? 'success'
+                            : item.bom_status === 'Solicitado' || item.bom_status === 'Tránsito'
+                            ? 'warning'
+                            : 'secondary'
+                        }
+                      >
+                        {item.bom_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={item.manufacturing_status === 'PENDIENTE' ? 'secondary' : 'default'}>
+                        {item.manufacturing_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPart(item);
+                          setIsPlanningModalOpen(true);
+                        }}
+                      >
+                        Asignar plan
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
       {/* Planning Modal */}
-      {isPlanningModalOpen && (
+      {isPlanningModalOpen && selectedPart && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <Card className="w-full max-w-lg p-0">
             <CardHeader>
@@ -168,7 +213,7 @@ export function ProductionProjectView() {
                     <PenTool className="h-4 w-4" /> Generar plan de producción
                   </CardTitle>
                   <CardDescription className="font-mono text-xs mt-1">
-                    {selectedPart?.partNumber} · {selectedPart?.description}
+                    {selectedPart.part_number} · {selectedPart.description}
                   </CardDescription>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setIsPlanningModalOpen(false)}>✕</Button>

@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { PROJECTS, INITIAL_BOMS } from '@/components/purchasing/BOMManager';
+import { useProjects, useBomItems } from '@/lib/api';
+import { format, parseISO, isValid } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 const PART_IMAGES: Record<string, string> = {
@@ -24,15 +26,31 @@ const PART_IMAGES: Record<string, string> = {
 };
 
 export function DesignChecklist() {
-  const [selectedProjectId, setSelectedProjectId] = useState(PROJECTS[0].id);
+  const { data: projects } = useProjects();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  const selectedProject = PROJECTS.find(p => p.id === selectedProjectId);
-  const projectBOM = INITIAL_BOMS.find(b => b.projectId === selectedProjectId);
-  const parts = projectBOM ? projectBOM.items : [];
+  React.useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId]);
+
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const { data: parts } = useBomItems(selectedProjectId || undefined);
+  const deadlineStr = selectedProject?.deadline
+    ? (() => {
+        try {
+          const d = parseISO(selectedProject.deadline);
+          return isValid(d) ? format(d, 'dd MMM yyyy', { locale: es }) : 'N/A';
+        } catch {
+          return 'N/A';
+        }
+      })()
+    : 'N/A';
 
   const toggleItem = (id: string) => {
     setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
@@ -48,7 +66,7 @@ export function DesignChecklist() {
 
   const filteredParts = parts.filter(
     p =>
-      p.partNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -67,7 +85,8 @@ export function DesignChecklist() {
                     onChange={e => setSelectedProjectId(e.target.value)}
                     className="block w-full md:w-72 h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)] no-print"
                   >
-                    {PROJECTS.map(p => (
+                    {projects.length === 0 && <option value="">No hay proyectos</option>}
+                    {projects.map(p => (
                       <option key={p.id} value={p.id}>{p.id} — {p.name}</option>
                     ))}
                   </select>
@@ -78,14 +97,14 @@ export function DesignChecklist() {
                     <User className="h-4 w-4 text-[var(--color-app-text-muted)]" />
                     <div>
                       <p className="text-xs text-[var(--color-app-text-muted)]">Cliente</p>
-                      <p className="text-sm font-medium">{selectedProject?.client || 'N/A'}</p>
+                      <p className="text-sm font-medium">{selectedProject?.client_name || 'N/A'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-[var(--color-app-text-muted)]" />
                     <div>
                       <p className="text-xs text-[var(--color-app-text-muted)]">Fecha de entrega</p>
-                      <p className="text-sm font-medium">{selectedProject?.deadline || 'N/A'}</p>
+                      <p className="text-sm font-medium">{deadlineStr}</p>
                     </div>
                   </div>
                 </div>
@@ -124,7 +143,7 @@ export function DesignChecklist() {
                 <div className="relative h-44 bg-[var(--color-app-surface-alt)] overflow-hidden group">
                   <img
                     src={PART_IMAGES[item.id] || '/technical_drawing_part_1_1774986202285.png'}
-                    alt={item.partNumber}
+                    alt={item.part_number}
                     className="w-full h-full object-cover"
                   />
                   <button
@@ -140,7 +159,7 @@ export function DesignChecklist() {
                 <div className="p-4 space-y-3">
                   <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-mono font-medium truncate">{item.partNumber}</p>
+                      <p className="text-sm font-mono font-medium truncate">{item.part_number}</p>
                       <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5 leading-snug">
                         {item.description}
                       </p>

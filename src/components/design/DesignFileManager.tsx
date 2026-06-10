@@ -22,16 +22,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { PROJECTS, INITIAL_BOMS } from '@/components/purchasing/BOMManager';
+import { useProjects, useBomItems } from '@/lib/api';
 
 export function DesignFileManager() {
-  const [selectedProjectId, setSelectedProjectId] = useState(PROJECTS[0].id);
+  const { data: projects } = useProjects();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const { data: parts } = useBomItems(selectedProjectId || undefined);
   const [isUploading, setIsUploading] = useState(false);
   const [mappedFiles, setMappedFiles] = useState<Record<string, { drawing?: string; model?: string }>>({});
   const [searchTerm, setSearchTerm] = useState('');
 
-  const projectBOM = INITIAL_BOMS.find(b => b.projectId === selectedProjectId);
-  const parts = projectBOM ? projectBOM.items : [];
+  React.useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId]);
 
   const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -42,7 +47,7 @@ export function DesignFileManager() {
       const newMappings = { ...mappedFiles };
       Array.from(files).forEach(file => {
         const fileName = file.name;
-        const matchedPart = parts.find(p => fileName.toLowerCase().includes(p.partNumber.toLowerCase()));
+        const matchedPart = parts.find(p => fileName.toLowerCase().includes(p.part_number.toLowerCase()));
         if (matchedPart) {
           const lower = fileName.toLowerCase();
           const is3D = lower.endsWith('.step') || lower.endsWith('.stp') || lower.endsWith('.igs');
@@ -60,7 +65,7 @@ export function DesignFileManager() {
 
   const filteredParts = parts.filter(
     p =>
-      p.partNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -75,7 +80,8 @@ export function DesignFileManager() {
             onChange={e => setSelectedProjectId(e.target.value)}
             className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
           >
-            {PROJECTS.map(p => (
+            {projects.length === 0 && <option value="">No hay proyectos</option>}
+            {projects.map(p => (
               <option key={p.id} value={p.id}>
                 {p.id} — {p.name}
               </option>
@@ -142,7 +148,7 @@ export function DesignFileManager() {
             {filteredParts.length > 0 ? (
               filteredParts.map(part => (
                 <TableRow key={part.id}>
-                  <TableCell className="font-mono text-xs">{part.partNumber}</TableCell>
+                  <TableCell className="font-mono text-xs">{part.part_number}</TableCell>
                   <TableCell className="text-[var(--color-app-text-muted)]">{part.description}</TableCell>
                   <TableCell className="text-center">
                     {mappedFiles[part.id]?.drawing ? (
