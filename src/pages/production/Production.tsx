@@ -25,7 +25,7 @@ import {
 import { ProductionStatusHeader } from '@/components/production/ProductionStatusHeader';
 import { ProductionProjectView } from '@/components/production/ProductionProjectView';
 import { cn } from '@/lib/utils';
-import { useMachines, useWorkOrders } from '@/lib/api';
+import { useMachines, useWorkOrders, useBomItems, useProjects } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 
 const machineLeftColor: Record<string, string> = {
@@ -52,6 +52,18 @@ type Tab = (typeof tabs)[number]['id'];
 export function Production() {
   const [activeTab, setActiveTab] = useState<Tab>('floor');
   const [searchTerm, setSearchTerm] = useState('');
+  // Estado de proyecto y BOM compartido entre header y vista de planificación,
+  // para que el scoreboard se actualice cuando se marca una pieza como terminada.
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const { data: projects } = useProjects();
+  const { data: bomItems, refetch: refetchBom } = useBomItems(selectedProjectId || undefined);
+
+  React.useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      const inProd = projects.find(p => p.status === 'En Producción') ?? projects[0];
+      setSelectedProjectId(inProd.id);
+    }
+  }, [projects, selectedProjectId]);
   const { data: machines } = useMachines();
   const { data: workOrders } = useWorkOrders();
   const navigate = useNavigate();
@@ -71,7 +83,12 @@ export function Production() {
         </Button>
       </div>
 
-      <ProductionStatusHeader />
+      <ProductionStatusHeader
+        projects={projects}
+        bomItems={bomItems}
+        selectedProjectId={selectedProjectId}
+        onSelectProject={setSelectedProjectId}
+      />
 
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit">
@@ -208,7 +225,15 @@ export function Production() {
         </>
       )}
 
-      {activeTab === 'planning' && <ProductionProjectView />}
+      {activeTab === 'planning' && (
+        <ProductionProjectView
+          projects={projects}
+          bomItems={bomItems}
+          selectedProjectId={selectedProjectId}
+          onSelectProject={setSelectedProjectId}
+          onChanged={refetchBom}
+        />
+      )}
 
       {activeTab === 'status' && (
         <Card>

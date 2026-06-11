@@ -31,7 +31,15 @@ import {
   useUpdateManufacturingStatus,
 } from '@/lib/api';
 import type { BomItem, ManufacturingStatus } from '@/types/database';
-import { CheckCircle2, Circle } from 'lucide-react';
+import { CheckCircle2, Circle, ChevronDown, Loader2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 async function openStorageFile(path: string | null) {
   if (!path) return;
@@ -49,23 +57,58 @@ const fmtDate = (s: string | null | undefined) => {
   }
 };
 
-export function ProductionProjectView() {
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+const MFG_STATUSES: ManufacturingStatus[] = [
+  'PENDIENTE',
+  'EN PROCESO',
+  'CALIDAD',
+  'TERMINADO',
+  'RECHAZADO',
+];
+
+interface Props {
+  /** Si se pasan, la vista usa los datos del padre (Production page) y
+   *  delega la selección/refetch hacia arriba. Si no, mantiene su propio
+   *  estado interno para que el componente siga siendo usable suelto. */
+  projects?: import('@/types/database').Project[];
+  bomItems?: BomItem[];
+  selectedProjectId?: string;
+  onSelectProject?: (id: string) => void;
+  onChanged?: () => Promise<void> | void;
+}
+
+export function ProductionProjectView(props: Props = {}) {
+  // Estado controlado vs interno
+  const controlled = props.selectedProjectId !== undefined;
+  const [internalProjectId, setInternalProjectId] = useState<string | null>(null);
+  const effectiveProjectId = controlled ? props.selectedProjectId ?? null : internalProjectId;
+  const setSelectedProjectId = (id: string | null) => {
+    if (controlled) {
+      props.onSelectProject?.(id ?? '');
+    } else {
+      setInternalProjectId(id);
+    }
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<BomItem | null>(null);
   const { data: technicians } = useProfiles('Técnico');
-  const { data: projects } = useProjects();
-  const { data: parts, refetch: refetchParts } = useBomItems(selectedProjectId ?? undefined);
+  const internalProjects = useProjects().data;
+  const projectsList = props.projects ?? internalProjects;
+  const internalBom = useBomItems(effectiveProjectId ?? undefined);
+  const parts = props.bomItems ?? internalBom.data;
+  const refetchParts = async () => {
+    if (props.onChanged) await props.onChanged();
+    else await internalBom.refetch();
+  };
   const { update: updateMfg, loading: updatingMfg } = useUpdateManufacturingStatus();
   const [busyToggleId, setBusyToggleId] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
-  const toggleFinished = async (item: BomItem) => {
+  const setStatus = async (item: BomItem, next: ManufacturingStatus) => {
+    if (next === item.manufacturing_status) return;
     setBusyToggleId(item.id);
     setToggleError(null);
-    const next: ManufacturingStatus =
-      item.manufacturing_status === 'TERMINADO' ? 'EN PROCESO' : 'TERMINADO';
     try {
       await updateMfg(item.id, next);
       await refetchParts();
@@ -76,7 +119,7 @@ export function ProductionProjectView() {
     }
   };
 
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const selectedProject = projectsList.find(p => p.id === effectiveProjectId);
 
   // Sólo las piezas marcadas para fabricar entran al plan de producción. Los
   // consumibles, hardware y demás insumos viven en el módulo de Compras
@@ -89,13 +132,13 @@ export function ProductionProjectView() {
       : true
   );
 
-  if (!selectedProjectId) {
+  if (!effectiveProjectId) {
     return (
       <div className="space-y-4">
         <h2 className="text-base font-medium flex items-center gap-2 text-[var(--color-app-text)]">
           <FolderSearch className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Selección de proyecto
         </h2>
-        {projects.length === 0 ? (
+        {projectsList.length === 0 ? (
           <Card>
             <div className="py-12 text-center text-sm text-[var(--color-app-text-muted)]">
               No hay proyectos creados. Crea uno en el módulo Proyectos para empezar.
@@ -103,7 +146,7 @@ export function ProductionProjectView() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map(project => (
+            {projectsList.map(project => (
               <Card
                 key={project.id}
                 className="p-0 hover:border-[var(--color-app-primary)]/40 hover:shadow-md transition-all cursor-pointer"
@@ -257,34 +300,11 @@ export function ProductionProjectView() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <button
-                        type="button"
-                        onClick={() => toggleFinished(item)}
-                        disabled={busyToggleId === item.id || updatingMfg}
-                        title={
-                          item.manufacturing_status === 'TERMINADO'
-                            ? 'Marcado como TERMINADO — clic para revertir a EN PROCESO'
-                            : 'Marcar pieza como TERMINADA'
-                        }
-                        className="inline-flex items-center gap-1.5 group disabled:opacity-50"
-                      >
-                        {item.manufacturing_status === 'TERMINADO' ? (
-                          <CheckCircle2 className="h-4 w-4 text-[var(--color-app-success)]" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-[var(--color-app-text-subtle)] group-hover:text-[var(--color-app-primary)]" />
-                        )}
-                        <Badge
-                          variant={
-                            item.manufacturing_status === 'TERMINADO'
-                              ? 'success'
-                              : item.manufacturing_status === 'PENDIENTE'
-                              ? 'secondary'
-                              : 'default'
-                          }
-                        >
-                          {item.manufacturing_status}
-                        </Badge>
-                      </button>
+                      <StatusDropdown
+                        item={item}
+                        busy={busyToggleId === item.id || updatingMfg}
+                        onChange={s => setStatus(item, s)}
+                      />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -377,5 +397,62 @@ export function ProductionProjectView() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Status dropdown ──────────────────────────────────────────────────
+
+const STATUS_VARIANT: Record<ManufacturingStatus, 'secondary' | 'default' | 'success' | 'warning' | 'destructive'> = {
+  PENDIENTE: 'secondary',
+  'EN PROCESO': 'default',
+  CALIDAD: 'warning',
+  TERMINADO: 'success',
+  RECHAZADO: 'destructive',
+};
+
+function StatusDropdown({
+  item,
+  busy,
+  onChange,
+}: {
+  item: BomItem;
+  busy: boolean;
+  onChange: (s: ManufacturingStatus) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild disabled={busy}>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 group disabled:opacity-50"
+          disabled={busy}
+        >
+          {busy ? (
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--color-app-primary)]" />
+          ) : item.manufacturing_status === 'TERMINADO' ? (
+            <CheckCircle2 className="h-4 w-4 text-[var(--color-app-success)]" />
+          ) : (
+            <Circle className="h-4 w-4 text-[var(--color-app-text-subtle)] group-hover:text-[var(--color-app-primary)]" />
+          )}
+          <Badge variant={STATUS_VARIANT[item.manufacturing_status]} className="cursor-pointer">
+            {item.manufacturing_status}
+            <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
+          </Badge>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Cambiar estatus</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {MFG_STATUSES.map(s => (
+          <DropdownMenuItem
+            key={s}
+            onClick={() => onChange(s)}
+            className={item.manufacturing_status === s ? 'font-semibold' : ''}
+          >
+            {s}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
