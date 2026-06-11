@@ -201,5 +201,6 @@ export const ROLES = [
   { id: 'R-2', name: 'Diseñador', description: 'Gestión de modelos CAD y checklists de manufactura.' },
   { id: 'R-3', name: 'Producción', description: 'Operación de maquinaria y reporte de avance.' },
   { id: 'R-4', name: 'Compras', description: 'Gestión de proveedores e inventarios.' },
-  { id: 'R-5', name: 'Calidad', description: 'Inspección de piezas y reportes de no conformidad.' }
+  { id: 'R-5', name: 'Calidad', description: 'Inspección de piezas y reportes de no conformidad.' },
+  { id: 'R-6', name: 'Técnico', description: 'Operador de planta — reporta tiempos y avance de piezas.' },
 ];
