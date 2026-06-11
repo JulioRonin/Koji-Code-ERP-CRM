@@ -69,11 +69,17 @@ export function useUpdateManufacturingStatus() {
         setState({ loading: false, error: null });
         return;
       }
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('bom_items')
         .update({ manufacturing_status: status, updated_at: new Date().toISOString() })
-        .eq('id', itemId);
+        .eq('id', itemId)
+        .select('id');
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(
+          'No se actualizó el estatus. Verifica que tu profiles.role sea "Administrador" en Supabase.'
+        );
+      }
       setState({ loading: false, error: null });
     } catch (err) {
       const error = err as Error;

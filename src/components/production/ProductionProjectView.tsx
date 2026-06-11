@@ -23,8 +23,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useProfiles, useProjects, useBomItems, getFileDownloadUrl } from '@/lib/api';
-import type { BomItem } from '@/types/database';
+import {
+  useProfiles,
+  useProjects,
+  useBomItems,
+  getFileDownloadUrl,
+  useUpdateManufacturingStatus,
+} from '@/lib/api';
+import type { BomItem, ManufacturingStatus } from '@/types/database';
+import { CheckCircle2, Circle } from 'lucide-react';
 
 async function openStorageFile(path: string | null) {
   if (!path) return;
@@ -49,7 +56,25 @@ export function ProductionProjectView() {
   const [selectedPart, setSelectedPart] = useState<BomItem | null>(null);
   const { data: technicians } = useProfiles('Técnico');
   const { data: projects } = useProjects();
-  const { data: parts } = useBomItems(selectedProjectId ?? undefined);
+  const { data: parts, refetch: refetchParts } = useBomItems(selectedProjectId ?? undefined);
+  const { update: updateMfg, loading: updatingMfg } = useUpdateManufacturingStatus();
+  const [busyToggleId, setBusyToggleId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+
+  const toggleFinished = async (item: BomItem) => {
+    setBusyToggleId(item.id);
+    setToggleError(null);
+    const next: ManufacturingStatus =
+      item.manufacturing_status === 'TERMINADO' ? 'EN PROCESO' : 'TERMINADO';
+    try {
+      await updateMfg(item.id, next);
+      await refetchParts();
+    } catch (err) {
+      setToggleError((err as Error).message || 'No se pudo actualizar.');
+    } finally {
+      setBusyToggleId(null);
+    }
+  };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -118,7 +143,9 @@ export function ProductionProjectView() {
           <div>
             <h2 className="text-base font-semibold">{selectedProject?.name}</h2>
             <p className="text-xs text-[var(--color-app-text-muted)] font-mono">
-              {selectedProject?.id} · BOM de producción
+              {selectedProject?.id} · {productionParts.length} piezas ·{' '}
+              {productionParts.filter(p => p.manufacturing_status === 'TERMINADO').length}{' '}
+              terminadas
             </p>
           </div>
         </div>
@@ -132,6 +159,15 @@ export function ProductionProjectView() {
           />
         </div>
       </div>
+
+      {toggleError && (
+        <div className="p-3 rounded-md bg-[var(--color-app-danger-soft)] text-sm text-[var(--color-app-danger)] flex items-center justify-between">
+          <span>{toggleError}</span>
+          <button onClick={() => setToggleError(null)} className="text-xs">
+            ×
+          </button>
+        </div>
+      )}
 
       <Card className="p-0">
         <CardContent className="p-0">
@@ -221,9 +257,34 @@ export function ProductionProjectView() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={item.manufacturing_status === 'PENDIENTE' ? 'secondary' : 'default'}>
-                        {item.manufacturing_status}
-                      </Badge>
+                      <button
+                        type="button"
+                        onClick={() => toggleFinished(item)}
+                        disabled={busyToggleId === item.id || updatingMfg}
+                        title={
+                          item.manufacturing_status === 'TERMINADO'
+                            ? 'Marcado como TERMINADO — clic para revertir a EN PROCESO'
+                            : 'Marcar pieza como TERMINADA'
+                        }
+                        className="inline-flex items-center gap-1.5 group disabled:opacity-50"
+                      >
+                        {item.manufacturing_status === 'TERMINADO' ? (
+                          <CheckCircle2 className="h-4 w-4 text-[var(--color-app-success)]" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-[var(--color-app-text-subtle)] group-hover:text-[var(--color-app-primary)]" />
+                        )}
+                        <Badge
+                          variant={
+                            item.manufacturing_status === 'TERMINADO'
+                              ? 'success'
+                              : item.manufacturing_status === 'PENDIENTE'
+                              ? 'secondary'
+                              : 'default'
+                          }
+                        >
+                          {item.manufacturing_status}
+                        </Badge>
+                      </button>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
