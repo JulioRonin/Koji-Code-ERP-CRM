@@ -24,13 +24,21 @@ import {
   useBomItems,
   useAttachDrawings,
   useDetachDrawing,
+  useAssignDrawingManually,
   getFileDownloadUrl,
 } from '@/lib/api';
+import type { AttachDrawingsResult } from '@/lib/api/projectFiles';
 import type { BomItem } from '@/types/database';
 
-interface MatchResult {
-  matched: { partNumber: string; itemId: string; fileName: string }[];
-  unmatched: string[];
+interface PendingFile {
+  /** Identificador estable para React keys (filename + size + lastMod). */
+  key: string;
+  file: File;
+  suggestions: { itemId: string; partNumber: string; score: number }[];
+  /** Item destino elegido por el usuario (id), inicialmente la mejor sugerencia. */
+  assignedItemId: string;
+  /** 'drawing' o 'model' — para subirlo al campo correcto. */
+  kind: 'drawing' | 'model';
 }
 
 /**
@@ -50,11 +58,15 @@ export function DesignFileManager() {
   const { data: parts, refetch: refetchParts } = useBomItems(selectedProjectId || undefined);
   const { attach, loading: attaching } = useAttachDrawings();
   const { detach } = useDetachDrawing();
+  const { assign: assignOne, loading: assigning } = useAssignDrawingManually();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [productionOnly, setProductionOnly] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [lastResult, setLastResult] = useState<MatchResult | null>(null);
+  const [lastResult, setLastResult] = useState<AttachDrawingsResult | null>(null);
+  /** Cola de archivos sin match — el usuario los asigna a mano desde el panel. */
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [pendingFilter, setPendingFilter] = useState('');
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const modelInputRef = useRef<HTMLInputElement>(null);
@@ -114,9 +126,25 @@ export function DesignFileManager() {
       await refetchParts();
       const ok = result.matched.length;
       const fail = result.unmatched.length;
+
+      // Mete los archivos sin match al panel de asignación manual.
+      // Conservamos los File objects en memoria (no se subieron todavía).
+      if (fail > 0) {
+        setPendingFiles(prev => [
+          ...prev,
+          ...result.unmatched.map(u => ({
+            key: `${u.file.name}-${u.file.size}-${u.file.lastModified}`,
+            file: u.file,
+            suggestions: u.suggestions,
+            assignedItemId: u.suggestions[0]?.itemId ?? '',
+            kind,
+          })),
+        ]);
+      }
+
       if (ok > 0 && fail === 0) flash(`${ok} archivo(s) asociado(s) correctamente.`);
-      else if (ok > 0 && fail > 0) flash(`${ok} asociado(s) · ${fail} sin match.`, 'error');
-      else flash('Ningún archivo coincidió con un número de parte.', 'error');
+      else if (ok > 0 && fail > 0) flash(`${ok} asociado(s) · ${fail} sin match — asígnalos abajo.`, 'error');
+      else flash(`${fail} archivo(s) sin match — asígnalos manualmente abajo.`, 'error');
     } catch (err) {
       flash((err as Error).message || 'No se pudo procesar la carga.', 'error');
     } finally {
@@ -124,6 +152,33 @@ export function DesignFileManager() {
       if (modelInputRef.current) modelInputRef.current.value = '';
     }
   };
+
+  const handleAssignManual = async (pending: PendingFile) => {
+    if (!pending.assignedItemId || !selectedProjectId) return;
+    const partNumber = parts.find(p => p.id === pending.assignedItemId)?.part_number;
+    if (!partNumber) {
+      flash('No se encontró el part number destino.', 'error');
+      return;
+    }
+    try {
+      await assignOne(pending.file, pending.assignedItemId, partNumber, selectedProjectId, pending.kind);
+      await refetchParts();
+      setPendingFiles(prev => prev.filter(p => p.key !== pending.key));
+      flash(`${pending.file.name} → ${partNumber}`);
+    } catch (err) {
+      flash((err as Error).message || 'No se pudo asignar.', 'error');
+    }
+  };
+
+  const removePending = (key: string) => {
+    setPendingFiles(prev => prev.filter(p => p.key !== key));
+  };
+
+  const filteredPending = useMemo(() => {
+    if (!pendingFilter.trim()) return pendingFiles;
+    const q = pendingFilter.toLowerCase();
+    return pendingFiles.filter(p => p.file.name.toLowerCase().includes(q));
+  }, [pendingFiles, pendingFilter]);
 
   const openFile = async (storagePath: string) => {
     const url = await getFileDownloadUrl(storagePath);
@@ -243,11 +298,13 @@ export function DesignFileManager() {
         </div>
       )}
 
-      {/* Resultado de la última carga */}
-      {lastResult && (lastResult.matched.length > 0 || lastResult.unmatched.length > 0) && (
-        <Card className="p-4 space-y-3">
+      {/* Auto-matched (último batch) */}
+      {lastResult && lastResult.matched.length > 0 && (
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Resultado del match</p>
+            <p className="text-sm font-medium text-[var(--color-app-success)]">
+              ✓ Asociados automáticamente ({lastResult.matched.length})
+            </p>
             <button
               onClick={() => setLastResult(null)}
               className="text-xs text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]"
@@ -255,43 +312,80 @@ export function DesignFileManager() {
               Cerrar
             </button>
           </div>
-          {lastResult.matched.length > 0 && (
-            <div>
-              <p className="text-xs text-[var(--color-app-success)] mb-1.5">
-                ✓ Asociados ({lastResult.matched.length})
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-xs">
-                {lastResult.matched.map(m => (
-                  <div
-                    key={m.fileName}
-                    className="p-2 rounded bg-[var(--color-app-success-soft)] flex items-center gap-2"
-                  >
-                    <Badge variant="success" className="font-mono">
-                      {m.partNumber}
-                    </Badge>
-                    <span className="truncate text-[var(--color-app-text-muted)]">
-                      {m.fileName}
-                    </span>
-                  </div>
-                ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-xs">
+            {lastResult.matched.map(m => (
+              <div
+                key={m.fileName}
+                className="p-2 rounded bg-[var(--color-app-success-soft)] flex items-center gap-2"
+              >
+                <Badge variant="success" className="font-mono">
+                  {m.partNumber}
+                </Badge>
+                <span className="truncate text-[var(--color-app-text-muted)]">{m.fileName}</span>
               </div>
-            </div>
-          )}
-          {lastResult.unmatched.length > 0 && (
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Panel de asignación manual — archivos sin match */}
+      {pendingFiles.length > 0 && (
+        <Card className="p-0 border-[var(--color-app-warning)]/40">
+          <div className="p-4 border-b border-[var(--color-app-border)] bg-[var(--color-app-warning-soft)]/40 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
-              <p className="text-xs text-[var(--color-app-warning)] mb-1.5">
-                ⚠ Sin match ({lastResult.unmatched.length}) — renómbralos para que contengan el
-                número de parte.
+              <p className="text-sm font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-[var(--color-app-warning)]" />
+                Asignar manualmente · {pendingFiles.length} archivos sin match
               </p>
-              <div className="flex flex-wrap gap-1.5 text-xs">
-                {lastResult.unmatched.map(f => (
-                  <Badge key={f} variant="warning" className="font-mono">
-                    {f}
-                  </Badge>
-                ))}
-              </div>
+              <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
+                Cada PDF se quedó sin part_number similar. Elige el item del BOM al que corresponde
+                (te sugerimos los 5 más parecidos) y dale <strong>Asignar</strong>. Los archivos
+                viven en tu navegador hasta que los asignes o quites.
+              </p>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <div className="relative w-48">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
+                <Input
+                  placeholder="Filtrar archivos…"
+                  value={pendingFilter}
+                  onChange={e => setPendingFilter(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPendingFiles([])}
+                className="text-[var(--color-app-danger)]"
+              >
+                Limpiar lista
+              </Button>
+            </div>
+          </div>
+
+          <div className="max-h-[28rem] overflow-y-auto divide-y divide-[var(--color-app-border)]">
+            {filteredPending.map(pending => (
+              <PendingFileRow
+                key={pending.key}
+                pending={pending}
+                allParts={parts}
+                busy={assigning}
+                onChangeAssignment={itemId =>
+                  setPendingFiles(prev =>
+                    prev.map(p => (p.key === pending.key ? { ...p, assignedItemId: itemId } : p))
+                  )
+                }
+                onAssign={() => handleAssignManual(pending)}
+                onRemove={() => removePending(pending.key)}
+              />
+            ))}
+            {filteredPending.length === 0 && (
+              <div className="py-8 text-center text-sm text-[var(--color-app-text-muted)]">
+                No hay archivos pendientes que coincidan con ese filtro.
+              </div>
+            )}
+          </div>
         </Card>
       )}
 
@@ -442,6 +536,133 @@ export function DesignFileManager() {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+interface PendingRowProps {
+  pending: PendingFile;
+  allParts: BomItem[];
+  busy: boolean;
+  onChangeAssignment: (itemId: string) => void;
+  onAssign: () => void;
+  onRemove: () => void;
+}
+
+/**
+ * Fila de asignación manual para un archivo sin match. Muestra el filename,
+ * un dropdown con las 5 mejores sugerencias por similitud, fallback a "buscar
+ * en todo el BOM" con un datalist + input, y botón Asignar.
+ */
+function PendingFileRow({ pending, allParts, busy, onChangeAssignment, onAssign, onRemove }: PendingRowProps) {
+  const [showAll, setShowAll] = useState(false);
+  const [customSearch, setCustomSearch] = useState('');
+
+  // Texto a mostrar para la asignación actual
+  const currentPart = allParts.find(p => p.id === pending.assignedItemId);
+
+  // Cuando el usuario tipea en el modo "buscar en todo el BOM", filtramos
+  // dinámicamente. Tope a 30 para no congelar el render con BOMs gigantes.
+  const customMatches = useMemo(() => {
+    if (!showAll || !customSearch.trim()) return [];
+    const q = customSearch.toLowerCase();
+    return allParts
+      .filter(
+        p =>
+          p.part_number.toLowerCase().includes(q) ||
+          (p.description ?? '').toLowerCase().includes(q)
+      )
+      .slice(0, 30);
+  }, [showAll, customSearch, allParts]);
+
+  return (
+    <div className="p-3 grid grid-cols-12 gap-3 items-center hover:bg-[var(--color-app-surface-alt)]/30">
+      <div className="col-span-12 md:col-span-4 flex items-center gap-2 min-w-0">
+        <FileText className="h-4 w-4 text-[var(--color-app-text-muted)] shrink-0" />
+        <span className="text-xs font-mono truncate" title={pending.file.name}>
+          {pending.file.name}
+        </span>
+        <Badge variant="outline" className="text-[10px] shrink-0">
+          {pending.kind === 'drawing' ? '2D' : '3D'}
+        </Badge>
+      </div>
+
+      <div className="col-span-12 md:col-span-6 space-y-1.5">
+        {!showAll ? (
+          <select
+            value={pending.assignedItemId}
+            onChange={e => onChangeAssignment(e.target.value)}
+            className="w-full h-8 px-2 rounded border border-[var(--color-app-border-strong)] bg-white text-xs"
+          >
+            {pending.suggestions.length === 0 && (
+              <option value="">Sin sugerencias — busca en todo el BOM</option>
+            )}
+            {pending.suggestions.map(s => {
+              const part = allParts.find(p => p.id === s.itemId);
+              const pct = Math.round(s.score * 100);
+              return (
+                <option key={s.itemId} value={s.itemId}>
+                  {s.partNumber} {part?.description ? `· ${part.description}` : ''} {pct > 0 ? `(${pct}%)` : ''}
+                </option>
+              );
+            })}
+          </select>
+        ) : (
+          <div className="space-y-1.5">
+            <Input
+              placeholder="Buscar número de parte o descripción…"
+              value={customSearch}
+              onChange={e => setCustomSearch(e.target.value)}
+              className="h-8 text-xs"
+            />
+            {customMatches.length > 0 && (
+              <select
+                value={pending.assignedItemId}
+                onChange={e => onChangeAssignment(e.target.value)}
+                className="w-full h-8 px-2 rounded border border-[var(--color-app-border-strong)] bg-white text-xs"
+              >
+                <option value="">Elige…</option>
+                {customMatches.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.part_number} · {p.description ?? ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {currentPart && (
+              <p className="text-[10px] text-[var(--color-app-text-muted)]">
+                Seleccionado: <strong className="font-mono">{currentPart.part_number}</strong>
+              </p>
+            )}
+          </div>
+        )}
+        <button
+          onClick={() => setShowAll(v => !v)}
+          className="text-[10px] text-[var(--color-app-primary)] hover:underline"
+        >
+          {showAll ? 'Volver a sugerencias' : 'Buscar en todo el BOM…'}
+        </button>
+      </div>
+
+      <div className="col-span-12 md:col-span-2 flex justify-end gap-1.5">
+        <Button
+          size="sm"
+          onClick={onAssign}
+          disabled={!pending.assignedItemId || busy}
+          className="h-8"
+        >
+          Asignar
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          className="h-8 w-8 text-[var(--color-app-danger)]"
+          title="Descartar archivo"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }

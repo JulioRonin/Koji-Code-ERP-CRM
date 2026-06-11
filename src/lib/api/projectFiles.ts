@@ -122,9 +122,11 @@ export async function getFileDownloadUrl(storagePath: string): Promise<string | 
   return data.signedUrl;
 }
 
-interface AttachDrawingsResult {
+export interface AttachDrawingsResult {
   matched: { partNumber: string; itemId: string; fileName: string }[];
-  unmatched: string[];
+  /** Archivos sin match exacto. Vienen con sugerencias por similitud para
+   *  que la UI pueda ofrecer asignación manual. */
+  unmatched: { file: File; suggestions: { itemId: string; partNumber: string; score: number }[] }[];
 }
 
 interface AttachDrawingsInput {
@@ -136,13 +138,68 @@ interface AttachDrawingsInput {
   bomItems: { id: string; part_number: string }[];
 }
 
+/** Normaliza una cadena: minúsculas y sólo alfanuméricos. Así
+ *  "IBA-02-04_001.PDF" y "iba0204001" se ven iguales. */
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Score 0–1 de similitud entre filename y part_number. 1 si el part es
+ *  substring del filename, si no la longitud del prefijo común sobre la
+ *  longitud del part_number. */
+function similarity(fileBase: string, partNumber: string): number {
+  const a = normalize(fileBase);
+  const b = normalize(partNumber);
+  if (b.length === 0) return 0;
+  if (a.includes(b)) return 1;
+  let prefix = 0;
+  while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
+  return prefix / b.length;
+}
+
 /**
- * Sube archivos a Storage y hace match por nombre contra los part numbers
- * del BOM del proyecto. Si el filename contiene el part_number (case-insensitive)
- * guarda el storage_path en bom_items.drawing_url (o model_url).
+ * Sube un binario a Storage y persiste la referencia en bom_items.
+ * Compartido entre el matcher automático y la asignación manual.
+ */
+async function uploadOne(
+  file: File,
+  itemId: string,
+  partNumber: string,
+  projectId: string,
+  kind: 'drawing' | 'model'
+): Promise<void> {
+  const folder = kind === 'drawing' ? 'drawings' : 'models';
+  const storagePath = `${projectId}/${folder}/${partNumber}-${file.name}`;
+  if (!supabase) return;
+
+  const { error: upErr } = await supabase.storage
+    .from(BUCKET)
+    .upload(storagePath, file, { upsert: true });
+  if (upErr) throw upErr;
+
+  const column = kind === 'drawing' ? 'drawing_url' : 'model_url';
+  const { data, error } = await supabase
+    .from('bom_items')
+    .update({ [column]: storagePath, updated_at: new Date().toISOString() })
+    .eq('id', itemId)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error(
+      'No se pudo guardar la referencia al plano. Verifica que tu profiles.role sea ' +
+        '"Administrador" en Supabase.'
+    );
+  }
+}
+
+/**
+ * Sube archivos a Storage y hace match contra los part numbers del BOM.
+ * El match ignora mayúsculas y separadores (-, _, espacios) — así
+ * "IBA_02_04_001.pdf" empareja "IBA-02-04-001".
  *
- * Devuelve dos listas: los items emparejados y los archivos que no pudieron
- * asociarse a ningún número de parte.
+ * Los archivos sin match perfecto se devuelven con un top-5 de candidatos
+ * sugeridos por similitud para que la UI los muestre en un panel y el
+ * usuario asigne manualmente.
  */
 export function useAttachDrawings() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
@@ -150,44 +207,31 @@ export function useAttachDrawings() {
   const attach = useCallback(async (input: AttachDrawingsInput): Promise<AttachDrawingsResult> => {
     setState({ loading: true, error: null });
     const matched: AttachDrawingsResult['matched'] = [];
-    const unmatched: string[] = [];
+    const unmatched: AttachDrawingsResult['unmatched'] = [];
     try {
-      // Orden: matchea primero los part_number más largos para evitar que
-      // "MS-A-4140-01" matchee también "MS-A-4140" si existieran ambos.
-      const sortedItems = [...input.bomItems].sort(
-        (a, b) => b.part_number.length - a.part_number.length
-      );
+      const normItems = input.bomItems.map(it => ({ ...it, _norm: normalize(it.part_number) }));
+      // Match primero contra los part_numbers más largos / específicos
+      normItems.sort((a, b) => b._norm.length - a._norm.length);
 
       for (const file of input.files) {
-        const fname = file.name.toLowerCase();
-        const hit = sortedItems.find(it => fname.includes(it.part_number.toLowerCase()));
+        const fileBase = file.name.replace(/\.[^.]+$/, '');
+        const normFile = normalize(file.name);
+        const hit = normItems.find(it => it._norm.length > 0 && normFile.includes(it._norm));
+
         if (!hit) {
-          unmatched.push(file.name);
+          const ranked = input.bomItems
+            .map(it => ({
+              itemId: it.id,
+              partNumber: it.part_number,
+              score: similarity(fileBase, it.part_number),
+            }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5);
+          unmatched.push({ file, suggestions: ranked });
           continue;
         }
-        const folder = input.kind === 'drawing' ? 'drawings' : 'models';
-        const storagePath = `${input.projectId}/${folder}/${hit.part_number}-${file.name}`;
 
-        if (supabase) {
-          const { error: upErr } = await supabase.storage
-            .from(BUCKET)
-            .upload(storagePath, file, { upsert: true });
-          if (upErr) throw upErr;
-
-          const column = input.kind === 'drawing' ? 'drawing_url' : 'model_url';
-          const { data, error } = await supabase
-            .from('bom_items')
-            .update({ [column]: storagePath, updated_at: new Date().toISOString() })
-            .eq('id', hit.id)
-            .select('id');
-          if (error) throw error;
-          if (!data || data.length === 0) {
-            throw new Error(
-              'No se pudo guardar la referencia al plano. Verifica que tu profiles.role sea ' +
-                '"Administrador" en Supabase.'
-            );
-          }
-        }
+        await uploadOne(file, hit.id, hit.part_number, input.projectId, input.kind);
         matched.push({ partNumber: hit.part_number, itemId: hit.id, fileName: file.name });
       }
       setState({ loading: false, error: null });
@@ -200,6 +244,37 @@ export function useAttachDrawings() {
   }, []);
 
   return { attach, ...state };
+}
+
+/**
+ * Sube un archivo individual y lo asocia con un BOM item específico
+ * (usado por el panel de asignación manual).
+ */
+export function useAssignDrawingManually() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const assign = useCallback(
+    async (
+      file: File,
+      itemId: string,
+      partNumber: string,
+      projectId: string,
+      kind: 'drawing' | 'model'
+    ): Promise<void> => {
+      setState({ loading: true, error: null });
+      try {
+        await uploadOne(file, itemId, partNumber, projectId, kind);
+        setState({ loading: false, error: null });
+      } catch (err) {
+        const error = err as Error;
+        setState({ loading: false, error });
+        throw error;
+      }
+    },
+    []
+  );
+
+  return { assign, ...state };
 }
 
 /**
