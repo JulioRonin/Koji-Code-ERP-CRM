@@ -20,6 +20,7 @@ import {
   useBomItems,
   getFileDownloadUrl,
   usePdfFirstPageThumbnail,
+  useBatchPdfThumbnails,
 } from '@/lib/api';
 import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -109,17 +110,31 @@ export function DesignChecklist() {
   const pages = useMemo(() => chunkPages(filteredParts, ITEMS_PER_PAGE), [filteredParts]);
   const imageUrls = useSignedUrls(filteredParts.map(p => p.image_url));
 
+  // Items que dependen del PDF para tener thumbnail (no tienen image_url).
+  const pdfPaths = useMemo(
+    () => filteredParts.filter(p => !p.image_url && p.drawing_url).map(p => p.drawing_url!),
+    [filteredParts]
+  );
+  const { urls: pdfThumbUrls, progress: pdfBatchProgress, prime: primePdfThumbs } =
+    useBatchPdfThumbnails(pdfPaths);
+
   const toggleItem = (id: string) => {
     setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true);
-    // Da tiempo a que los PDFs se rendericen como thumbnail antes de imprimir.
-    setTimeout(() => {
+    try {
+      // Renderiza TODOS los PDFs como thumbnails antes de disparar print.
+      // Sin esto, los cards salen con "Sin imagen" porque pdfjs aún no
+      // termina (procesa cientos de PDFs no es instantáneo).
+      await primePdfThumbs();
+      // Da un tick más para que React aplique los src de las imágenes.
+      await new Promise(r => setTimeout(r, 200));
       window.print();
+    } finally {
       setIsExporting(false);
-    }, 600);
+    }
   };
 
   const withImageCount = filteredParts.filter(p => p.image_url || p.drawing_url).length;
@@ -287,8 +302,17 @@ export function DesignChecklist() {
             <div className="flex flex-col gap-2 w-full md:w-auto">
               <Button onClick={handleExport} disabled={isExporting}>
                 <Printer className={cn('h-4 w-4 mr-1.5', isExporting && 'animate-pulse')} />
-                {isExporting ? 'Procesando…' : `Generar PDF · ${pages.length} hoja(s)`}
+                {isExporting
+                  ? pdfBatchProgress.total > 0
+                    ? `Renderizando PDFs ${pdfBatchProgress.done}/${pdfBatchProgress.total}…`
+                    : 'Procesando…'
+                  : `Generar PDF · ${pages.length} hoja(s)`}
               </Button>
+              {pdfPaths.length > 0 && (
+                <p className="text-[10px] text-[var(--color-app-text-muted)] leading-tight">
+                  Se renderizarán {pdfPaths.length} planos como vista previa al imprimir.
+                </p>
+              )}
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
                 <Input
@@ -336,6 +360,7 @@ export function DesignChecklist() {
               key={item.id}
               item={item}
               imageUrl={item.image_url ? imageUrls[item.image_url] : undefined}
+              pdfThumbUrl={item.drawing_url ? pdfThumbUrls[item.drawing_url] : undefined}
               checked={!!checkedItems[item.id]}
               onToggle={() => toggleItem(item.id)}
               onZoom={url => setZoomImage(url)}
@@ -370,6 +395,7 @@ export function DesignChecklist() {
                 key={item.id}
                 item={item}
                 imageUrl={item.image_url ? imageUrls[item.image_url] : undefined}
+                pdfThumbUrl={item.drawing_url ? pdfThumbUrls[item.drawing_url] : undefined}
               />
             ))}
           </div>
@@ -412,15 +438,19 @@ function Meta({ icon: Icon, label, value }: { icon: React.ComponentType<{ classN
 interface ScreenCardProps {
   item: BomItem;
   imageUrl?: string;
+  pdfThumbUrl?: string;
   checked: boolean;
   onToggle: () => void;
   onZoom: (url: string) => void;
 }
 
-function ChecklistCardScreen({ item, imageUrl, checked, onToggle, onZoom }: ScreenCardProps) {
-  // Si no hay imagen pero hay PDF, renderiza la primera página como thumbnail.
-  const pdfThumb = usePdfFirstPageThumbnail(!imageUrl ? item.drawing_url : null);
-  const effectiveUrl = imageUrl ?? pdfThumb ?? undefined;
+function ChecklistCardScreen({ item, imageUrl, pdfThumbUrl, checked, onToggle, onZoom }: ScreenCardProps) {
+  // Si no hay imagen ni thumb del padre, renderiza la primera página del PDF
+  // bajo demanda (cae de useBatchPdfThumbnails al cache compartido).
+  const fallback = usePdfFirstPageThumbnail(
+    !imageUrl && !pdfThumbUrl ? item.drawing_url : null
+  );
+  const effectiveUrl = imageUrl ?? pdfThumbUrl ?? fallback ?? undefined;
 
   return (
     <Card className={cn('p-0 overflow-hidden transition-all', checked && 'opacity-70')}>
@@ -439,7 +469,7 @@ function ChecklistCardScreen({ item, imageUrl, checked, onToggle, onZoom }: Scre
               >
                 <Maximize2 className="h-3.5 w-3.5" />
               </button>
-              {!imageUrl && pdfThumb && (
+              {!imageUrl && (pdfThumbUrl || fallback) && (
                 <Badge variant="outline" className="absolute top-2 left-2 text-[10px] bg-white/90">
                   Desde PDF
                 </Badge>
@@ -499,12 +529,13 @@ function ChecklistCardScreen({ item, imageUrl, checked, onToggle, onZoom }: Scre
 interface PrintCardProps {
   item: BomItem;
   imageUrl?: string;
+  pdfThumbUrl?: string;
 }
 
-function ChecklistCardPrint({ item, imageUrl }: PrintCardProps) {
-  // Mismo fallback que la vista pantalla: PDF → thumbnail si no hay imagen.
-  const pdfThumb = usePdfFirstPageThumbnail(!imageUrl ? item.drawing_url : null);
-  const effective = imageUrl ?? pdfThumb;
+function ChecklistCardPrint({ item, imageUrl, pdfThumbUrl }: PrintCardProps) {
+  // El padre ya precargó todos los PDFs vía useBatchPdfThumbnails antes
+  // de llamar a window.print(); aquí sólo consumimos el resultado.
+  const effective = imageUrl ?? pdfThumbUrl;
   return (
     <div className="print-card">
       <div className="print-card-image">
