@@ -23,8 +23,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useProfiles, useProjects, useBomItems } from '@/lib/api';
+import { useProfiles, useProjects, useBomItems, getFileDownloadUrl } from '@/lib/api';
 import type { BomItem } from '@/types/database';
+
+async function openStorageFile(path: string | null) {
+  if (!path) return;
+  const url = await getFileDownloadUrl(path);
+  if (url) window.open(url, '_blank', 'noopener');
+}
 
 const fmtDate = (s: string | null | undefined) => {
   if (!s) return '—';
@@ -161,12 +167,44 @@ export function ProductionProjectView() {
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-center gap-2">
-                        <span title="Modelo 3D (STEP)" className="p-1.5 rounded-md bg-[var(--color-app-surface-alt)] hover:bg-[var(--color-app-primary-soft)] transition-colors cursor-pointer">
-                          <FileOutput className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" />
-                        </span>
-                        <span title="Plano 2D (PDF)" className="p-1.5 rounded-md bg-[var(--color-app-surface-alt)] hover:bg-[var(--color-app-primary-soft)] transition-colors cursor-pointer">
-                          <FileCode2 className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" />
-                        </span>
+                        <button
+                          type="button"
+                          title={item.model_url ? 'Abrir modelo 3D' : 'Sin modelo 3D — súbelo en Diseño'}
+                          disabled={!item.model_url}
+                          onClick={() => openStorageFile(item.model_url)}
+                          className={
+                            item.model_url
+                              ? 'p-1.5 rounded-md bg-[var(--color-app-primary-soft)] hover:bg-[var(--color-app-primary)]/20 transition-colors cursor-pointer'
+                              : 'p-1.5 rounded-md bg-[var(--color-app-surface-alt)] opacity-40 cursor-not-allowed'
+                          }
+                        >
+                          <FileOutput
+                            className={
+                              item.model_url
+                                ? 'h-3.5 w-3.5 text-[var(--color-app-primary)]'
+                                : 'h-3.5 w-3.5 text-[var(--color-app-text-muted)]'
+                            }
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          title={item.drawing_url ? 'Abrir plano 2D (PDF)' : 'Sin plano 2D — súbelo en Diseño'}
+                          disabled={!item.drawing_url}
+                          onClick={() => openStorageFile(item.drawing_url)}
+                          className={
+                            item.drawing_url
+                              ? 'p-1.5 rounded-md bg-[var(--color-app-primary-soft)] hover:bg-[var(--color-app-primary)]/20 transition-colors cursor-pointer'
+                              : 'p-1.5 rounded-md bg-[var(--color-app-surface-alt)] opacity-40 cursor-not-allowed'
+                          }
+                        >
+                          <FileCode2
+                            className={
+                              item.drawing_url
+                                ? 'h-3.5 w-3.5 text-[var(--color-app-primary)]'
+                                : 'h-3.5 w-3.5 text-[var(--color-app-text-muted)]'
+                            }
+                          />
+                        </button>
                       </div>
                     </TableCell>
                     <TableCell>
