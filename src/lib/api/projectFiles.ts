@@ -175,7 +175,23 @@ async function uploadOne(
   const { error: upErr } = await supabase.storage
     .from(BUCKET)
     .upload(storagePath, file, { upsert: true });
-  if (upErr) throw upErr;
+  if (upErr) {
+    // Mensajes más accionables para los errores comunes de Storage.
+    const msg = (upErr.message || '').toLowerCase();
+    if (msg.includes('bucket not found')) {
+      throw new Error(
+        `El bucket "${BUCKET}" no existe en Supabase Storage. Créalo desde ` +
+          `Supabase → Storage → New bucket (nombre exacto: "${BUCKET}", privado).`
+      );
+    }
+    if (msg.includes('not authorized') || msg.includes('row-level security') || msg.includes('permission')) {
+      throw new Error(
+        `Supabase rechazó la subida por permisos. Agrega las RLS policies de ` +
+          `storage.objects para el bucket "${BUCKET}" (ver schema SQL).`
+      );
+    }
+    throw new Error(`Supabase Storage: ${upErr.message}`);
+  }
 
   const column = kind === 'drawing' ? 'drawing_url' : 'model_url';
   const { data, error } = await supabase

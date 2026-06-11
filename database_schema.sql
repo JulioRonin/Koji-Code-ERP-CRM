@@ -891,6 +891,45 @@ CREATE POLICY "log time" ON public.time_entries
     WITH CHECK (operator_id = auth.uid() OR public.is_admin());
 
 -- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- 15b. SUPABASE STORAGE — bucket de planos / modelos / archivos del proyecto
+-- ---------------------------------------------------------------------------
+-- El bucket "project-files" almacena los PDFs de planos 2D, modelos 3D
+-- (STEP/IGS/…) y demás documentos del proyecto. El nombre tiene que ser
+-- EXACTAMENTE "project-files" porque el código frontend lo cablea así.
+--
+-- 1. Crea el bucket desde Supabase → Storage → New bucket:
+--      Name: project-files
+--      Public bucket: OFF (se accede vía signed URLs)
+--
+-- 2. Aplica las policies de abajo en el SQL editor. Sin estas, Supabase
+--    rechaza los INSERT/SELECT contra storage.objects con
+--    "new row violates row-level security policy".
+
+-- Lectura: cualquier usuario autenticado puede generar signed URLs
+DROP POLICY IF EXISTS "project-files read" ON storage.objects;
+CREATE POLICY "project-files read" ON storage.objects
+    FOR SELECT TO authenticated
+    USING (bucket_id = 'project-files');
+
+-- Escritura: sólo Administrador / PM puede subir y reemplazar archivos
+DROP POLICY IF EXISTS "project-files write" ON storage.objects;
+CREATE POLICY "project-files write" ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'project-files' AND public.is_admin());
+
+DROP POLICY IF EXISTS "project-files update" ON storage.objects;
+CREATE POLICY "project-files update" ON storage.objects
+    FOR UPDATE TO authenticated
+    USING (bucket_id = 'project-files' AND public.is_admin())
+    WITH CHECK (bucket_id = 'project-files' AND public.is_admin());
+
+DROP POLICY IF EXISTS "project-files delete" ON storage.objects;
+CREATE POLICY "project-files delete" ON storage.objects
+    FOR DELETE TO authenticated
+    USING (bucket_id = 'project-files' AND public.is_admin());
+
+-- ---------------------------------------------------------------------------
 -- 16. DATOS INICIALES
 -- ---------------------------------------------------------------------------
 
