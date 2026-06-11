@@ -133,7 +133,7 @@ interface AttachDrawingsInput {
   projectId: string;
   files: File[];
   /** kind: 'drawing' guarda en drawing_url (PDF 2D), 'model' en model_url (3D). */
-  kind: 'drawing' | 'model';
+  kind: 'drawing' | 'model' | 'image';
   /** Items del BOM contra los que se intenta hacer match. */
   bomItems: { id: string; part_number: string }[];
 }
@@ -166,9 +166,9 @@ async function uploadOne(
   itemId: string,
   partNumber: string,
   projectId: string,
-  kind: 'drawing' | 'model'
+  kind: 'drawing' | 'model' | 'image'
 ): Promise<void> {
-  const folder = kind === 'drawing' ? 'drawings' : 'models';
+  const folder = kind === 'drawing' ? 'drawings' : kind === 'model' ? 'models' : 'images';
   const storagePath = `${projectId}/${folder}/${partNumber}-${file.name}`;
   if (!supabase) return;
 
@@ -193,7 +193,7 @@ async function uploadOne(
     throw new Error(`Supabase Storage: ${upErr.message}`);
   }
 
-  const column = kind === 'drawing' ? 'drawing_url' : 'model_url';
+  const column = kind === 'drawing' ? 'drawing_url' : kind === 'model' ? 'model_url' : 'image_url';
   const { data, error } = await supabase
     .from('bom_items')
     .update({ [column]: storagePath, updated_at: new Date().toISOString() })
@@ -202,7 +202,7 @@ async function uploadOne(
   if (error) throw error;
   if (!data || data.length === 0) {
     throw new Error(
-      'No se pudo guardar la referencia al plano. Verifica que tu profiles.role sea ' +
+      'No se pudo guardar la referencia al archivo. Verifica que tu profiles.role sea ' +
         '"Administrador" en Supabase.'
     );
   }
@@ -275,7 +275,7 @@ export function useAssignDrawingManually() {
       itemId: string,
       partNumber: string,
       projectId: string,
-      kind: 'drawing' | 'model'
+      kind: 'drawing' | 'model' | 'image'
     ): Promise<void> => {
       setState({ loading: true, error: null });
       try {
@@ -302,14 +302,14 @@ export function useDetachDrawing() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
 
   const detach = useCallback(
-    async (itemId: string, kind: 'drawing' | 'model'): Promise<void> => {
+    async (itemId: string, kind: 'drawing' | 'model' | 'image'): Promise<void> => {
       setState({ loading: true, error: null });
       try {
         if (!supabase) {
           setState({ loading: false, error: null });
           return;
         }
-        const column = kind === 'drawing' ? 'drawing_url' : 'model_url';
+        const column = kind === 'drawing' ? 'drawing_url' : kind === 'model' ? 'model_url' : 'image_url';
         const { error } = await supabase
           .from('bom_items')
           .update({ [column]: null, updated_at: new Date().toISOString() })

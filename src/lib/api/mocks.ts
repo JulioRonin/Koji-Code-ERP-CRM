@@ -135,6 +135,7 @@ const baseBom = {
   actual_delivery_date: null,
   notes: null,
   production_relevant: true,
+  image_url: null,
 };
 
 export const MOCK_BOM_ITEMS: BomItem[] = [

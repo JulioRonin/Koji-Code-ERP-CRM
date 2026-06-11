@@ -373,6 +373,10 @@ ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS notes                 TEXT
 -- Marca si el item es pieza a fabricar (true) o consumible/hardware/insumo
 -- que sólo se compra pero no entra al plan de producción (false).
 ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_relevant   BOOLEAN NOT NULL DEFAULT TRUE;
+-- Thumbnail / foto del checklist de producción (PNG / JPG). Distinto al
+-- drawing_url (PDF del plano técnico) — se imprime en la hoja de orden
+-- de trabajo y se muestra en el checklist visual.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS image_url            TEXT;
 
 -- ---------------------------------------------------------------------------
 -- 7. COMPRAS — Requisiciones y POs

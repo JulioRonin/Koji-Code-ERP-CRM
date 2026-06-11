@@ -7,6 +7,7 @@ import {
   Trash2,
   Eye,
   Box,
+  Image as ImageIcon,
   FileText,
   Factory,
   AlertTriangle,
@@ -37,8 +38,8 @@ interface PendingFile {
   suggestions: { itemId: string; partNumber: string; score: number }[];
   /** Item destino elegido por el usuario (id), inicialmente la mejor sugerencia. */
   assignedItemId: string;
-  /** 'drawing' o 'model' — para subirlo al campo correcto. */
-  kind: 'drawing' | 'model';
+  /** 'drawing' / 'model' / 'image' — para subirlo al campo correcto. */
+  kind: 'drawing' | 'model' | 'image';
 }
 
 /**
@@ -70,6 +71,7 @@ export function DesignFileManager() {
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const modelInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const filteredParts = useMemo(() => {
     let items = parts;
@@ -111,7 +113,7 @@ export function DesignFileManager() {
 
   const handleBulkUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    kind: 'drawing' | 'model'
+    kind: 'drawing' | 'model' | 'image'
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !selectedProjectId) return;
@@ -150,6 +152,7 @@ export function DesignFileManager() {
     } finally {
       if (drawingInputRef.current) drawingInputRef.current.value = '';
       if (modelInputRef.current) modelInputRef.current.value = '';
+      if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
 
@@ -186,7 +189,7 @@ export function DesignFileManager() {
     else flash('No se pudo abrir el archivo (¿Supabase Storage configurado?).', 'error');
   };
 
-  const handleDetach = async (item: BomItem, kind: 'drawing' | 'model') => {
+  const handleDetach = async (item: BomItem, kind: 'drawing' | 'model' | 'image') => {
     try {
       await detach(item.id, kind);
       await refetchParts();
@@ -240,6 +243,7 @@ export function DesignFileManager() {
   const totalProd = parts.filter(p => p.production_relevant !== false);
   const withDrawing = totalProd.filter(p => p.drawing_url).length;
   const withModel = totalProd.filter(p => p.model_url).length;
+  const withImage = totalProd.filter(p => p.image_url).length;
 
   return (
     <div className="space-y-5">
@@ -253,19 +257,19 @@ export function DesignFileManager() {
             <h2 className="text-base font-semibold">{selectedProject?.name}</h2>
             <p className="text-xs text-[var(--color-app-text-muted)] font-mono">
               {selectedProject?.id} · {totalProd.length} piezas en producción · {withDrawing}{' '}
-              con plano 2D · {withModel} con modelo 3D
+              con plano 2D · {withModel} con modelo 3D · {withImage} con imagen
             </p>
           </div>
         </div>
       </div>
 
       {/* Drop zones */}
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-3">
         <DropZone
           accept=".pdf"
           inputRef={drawingInputRef}
           title="Planos 2D (PDF)"
-          subtitle="El nombre del PDF debe contener el número de parte (ej. MS-A-4140-01.pdf)."
+          subtitle="Filename con el número de parte (ej. MS-A-4140-01.pdf)."
           icon={FileText}
           onFiles={e => handleBulkUpload(e, 'drawing')}
           busy={attaching}
@@ -273,10 +277,19 @@ export function DesignFileManager() {
         <DropZone
           accept=".step,.stp,.igs,.iges,.x_t,.x_b,.sldprt,.f3d,.stl"
           inputRef={modelInputRef}
-          title="Modelos 3D (STEP, IGS, etc.)"
-          subtitle="Mismo criterio de match: filename contiene el part_number."
+          title="Modelos 3D"
+          subtitle="STEP, IGS, SLDPRT — match por nombre."
           icon={Box}
           onFiles={e => handleBulkUpload(e, 'model')}
+          busy={attaching}
+        />
+        <DropZone
+          accept=".png,.jpg,.jpeg,.webp,.gif"
+          inputRef={imageInputRef}
+          title="Imágenes de checklist"
+          subtitle="PNG/JPG para la hoja de producción."
+          icon={ImageIcon}
+          onFiles={e => handleBulkUpload(e, 'image')}
           busy={attaching}
         />
       </div>
@@ -438,6 +451,7 @@ export function DesignFileManager() {
                   <th className="text-center p-2 font-medium">Cant.</th>
                   <th className="text-center p-2 font-medium">Plano 2D</th>
                   <th className="text-center p-2 font-medium">Modelo 3D</th>
+                  <th className="text-center p-2 font-medium">Imagen</th>
                   <th className="p-2" />
                 </tr>
               </thead>
@@ -446,13 +460,14 @@ export function DesignFileManager() {
                   const collapsed = collapsedGroups.has(category);
                   const cat2D = items.filter(i => i.drawing_url).length;
                   const cat3D = items.filter(i => i.model_url).length;
+                  const catImg = items.filter(i => i.image_url).length;
                   return (
                     <React.Fragment key={category}>
                       <tr
                         className="bg-[var(--color-app-surface-alt)]/80 cursor-pointer hover:bg-[var(--color-app-surface-alt)]"
                         onClick={() => toggleGroup(category)}
                       >
-                        <td colSpan={6} className="p-2">
+                        <td colSpan={7} className="p-2">
                           <div className="flex items-center gap-2 text-xs">
                             {collapsed ? (
                               <ChevronRight className="h-3.5 w-3.5" />
@@ -465,6 +480,7 @@ export function DesignFileManager() {
                             <Badge variant="outline">{items.length} items</Badge>
                             <Badge variant="default">{cat2D} con 2D</Badge>
                             {cat3D > 0 && <Badge variant="secondary">{cat3D} con 3D</Badge>}
+                            {catImg > 0 && <Badge variant="success">{catImg} con imagen</Badge>}
                           </div>
                         </td>
                       </tr>
@@ -525,6 +541,17 @@ export function DesignFileManager() {
                                 <Badge variant="secondary">Pendiente</Badge>
                               )}
                             </td>
+                            <td className="p-2 text-center">
+                              {item.image_url ? (
+                                <ImageThumb
+                                  path={item.image_url}
+                                  alt={item.part_number}
+                                  onRemove={() => handleDetach(item, 'image')}
+                                />
+                              ) : (
+                                <Badge variant="secondary">Pendiente</Badge>
+                              )}
+                            </td>
                             <td className="p-2" />
                           </tr>
                         ))}
@@ -536,6 +563,43 @@ export function DesignFileManager() {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Thumbnail de 48x48 de la imagen del checklist. Resuelve el signed URL
+ * de manera diferida (sólo al montar) para no bloquear la tabla.
+ */
+function ImageThumb({ path, alt, onRemove }: { path: string; alt: string; onRemove: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    getFileDownloadUrl(path).then(u => {
+      if (!cancelled) setUrl(u);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+  return (
+    <div className="inline-flex items-center justify-center gap-1.5">
+      {url ? (
+        <img
+          src={url}
+          alt={alt}
+          className="h-10 w-10 rounded object-cover border border-[var(--color-app-border)]"
+        />
+      ) : (
+        <div className="h-10 w-10 rounded bg-[var(--color-app-surface-alt)] animate-pulse" />
+      )}
+      <button
+        onClick={onRemove}
+        title="Quitar imagen"
+        className="p-1 rounded hover:bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)]"
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
     </div>
   );
 }
