@@ -24,11 +24,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  useProfiles,
   useProjects,
   useBomItems,
   getFileDownloadUrl,
   useUpdateManufacturingStatus,
+  useTechnicians,
 } from '@/lib/api';
 import type { BomItem, ManufacturingStatus } from '@/types/database';
 import { CheckCircle2, Circle, ChevronDown, Loader2 } from 'lucide-react';
@@ -92,7 +92,7 @@ export function ProductionProjectView(props: Props = {}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<BomItem | null>(null);
-  const { data: technicians } = useProfiles('Técnico');
+  const { data: technicians } = useTechnicians();
   const internalProjects = useProjects().data;
   const projectsList = props.projects ?? internalProjects;
   const internalBom = useBomItems(effectiveProjectId ?? undefined);
@@ -104,6 +104,63 @@ export function ProductionProjectView(props: Props = {}) {
   const { update: updateMfg, loading: updatingMfg } = useUpdateManufacturingStatus();
   const [busyToggleId, setBusyToggleId] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
+
+  // Estado de la modal de "Generar plan de producción"
+  const [planTechId, setPlanTechId] = useState('');
+  const [planMachineId, setPlanMachineId] = useState('');
+  const [planPriority, setPlanPriority] = useState<'Normal' | 'Alta' | 'Urgente'>('Normal');
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+  // Cuando se abre la modal con una pieza nueva, hidrata los selectores
+  React.useEffect(() => {
+    if (selectedPart) {
+      setPlanTechId(selectedPart.assigned_technician_id ?? '');
+      setPlanMachineId('');
+      setPlanPriority('Normal');
+      setPlanError(null);
+    }
+  }, [selectedPart?.id]);
+
+  const handleConfirmPlan = async () => {
+    if (!selectedPart) return;
+    if (!planTechId) {
+      setPlanError('Selecciona un técnico antes de confirmar.');
+      return;
+    }
+    setPlanSaving(true);
+    setPlanError(null);
+    try {
+      // 1. Guarda el técnico en bom_items.assigned_technician_id
+      const supabase = (await import('@/lib/supabase')).supabase;
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('bom_items')
+          .update({
+            assigned_technician_id: planTechId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', selectedPart.id)
+          .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error(
+            'No se pudo asignar el técnico. Verifica que tu profiles.role sea Administrador.'
+          );
+        }
+      }
+      // 2. Pasa la pieza a EN PROCESO si estaba en PENDIENTE
+      if (selectedPart.manufacturing_status === 'PENDIENTE') {
+        await updateMfg(selectedPart.id, 'EN PROCESO');
+      }
+      await refetchParts();
+      setIsPlanningModalOpen(false);
+      setSelectedPart(null);
+    } catch (err) {
+      setPlanError((err as Error).message || 'No se pudo confirmar la asignación.');
+    } finally {
+      setPlanSaving(false);
+    }
+  };
 
   const setStatus = async (item: BomItem, next: ManufacturingStatus) => {
     if (next === item.manufacturing_status) return;
@@ -345,18 +402,34 @@ export function ProductionProjectView(props: Props = {}) {
             <CardContent className="space-y-4 pb-6">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Asignar técnico</label>
-                <select className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]">
-                  <option value="">Selecciona técnico...</option>
+                <select
+                  value={planTechId}
+                  onChange={e => setPlanTechId(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+                >
+                  <option value="">Selecciona técnico…</option>
                   {technicians.map(tech => (
-                    <option key={tech.id} value={tech.id}>{tech.full_name} — {tech.role}</option>
+                    <option key={tech.id} value={tech.id}>
+                      {tech.full_name} — {tech.role}
+                    </option>
                   ))}
                 </select>
+                {technicians.length === 0 && (
+                  <p className="text-[10px] text-[var(--color-app-warning)] leading-snug">
+                    No hay técnicos registrados. Regístralos en Personal →
+                    Registrar personal (rol "Técnico").
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Máquina</label>
-                  <select className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]">
-                    <option value="">Selecciona equipo...</option>
+                  <select
+                    value={planMachineId}
+                    onChange={e => setPlanMachineId(e.target.value)}
+                    className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+                  >
+                    <option value="">Selecciona equipo…</option>
                     <option>CNC-001 (Fresadora 3 ejes)</option>
                     <option>CNC-002 (Torno CNC)</option>
                     <option>CNC-004 (Torno Suizo)</option>
@@ -364,7 +437,11 @@ export function ProductionProjectView(props: Props = {}) {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Prioridad</label>
-                  <select className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]">
+                  <select
+                    value={planPriority}
+                    onChange={e => setPlanPriority(e.target.value as 'Normal' | 'Alta' | 'Urgente')}
+                    className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+                  >
                     <option>Normal</option>
                     <option>Alta</option>
                     <option>Urgente</option>
@@ -375,21 +452,61 @@ export function ProductionProjectView(props: Props = {}) {
                 <h4 className="text-xs font-medium text-[var(--color-app-text-muted)] flex items-center gap-1.5">
                   <Info className="h-3.5 w-3.5" /> Referencias de ingeniería vinculadas
                 </h4>
-                <div className="flex gap-2">
-                  <Badge variant="outline" className="gap-1">
-                    <FileOutput className="h-3 w-3" /> 3D_MODEL.STEP
-                  </Badge>
-                  <Badge variant="outline" className="gap-1">
-                    <FileCode2 className="h-3 w-3" /> 2D_DRAWING.PDF
-                  </Badge>
+                <div className="flex gap-2 flex-wrap">
+                  {selectedPart?.model_url ? (
+                    <button
+                      type="button"
+                      onClick={() => openStorageFile(selectedPart.model_url)}
+                      className="inline-flex"
+                    >
+                      <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-white">
+                        <FileOutput className="h-3 w-3" /> Modelo 3D
+                      </Badge>
+                    </button>
+                  ) : (
+                    <Badge variant="secondary" className="gap-1 opacity-60">
+                      <FileOutput className="h-3 w-3" /> Sin 3D
+                    </Badge>
+                  )}
+                  {selectedPart?.drawing_url ? (
+                    <button
+                      type="button"
+                      onClick={() => openStorageFile(selectedPart.drawing_url)}
+                      className="inline-flex"
+                    >
+                      <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-white">
+                        <FileCode2 className="h-3 w-3" /> Plano 2D
+                      </Badge>
+                    </button>
+                  ) : (
+                    <Badge variant="secondary" className="gap-1 opacity-60">
+                      <FileCode2 className="h-3 w-3" /> Sin 2D
+                    </Badge>
+                  )}
                 </div>
               </div>
+
+              {planError && (
+                <div className="p-2 rounded-md bg-[var(--color-app-danger-soft)] text-xs text-[var(--color-app-danger)]">
+                  {planError}
+                </div>
+              )}
+
               <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setIsPlanningModalOpen(false)}>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setIsPlanningModalOpen(false)}
+                  disabled={planSaving}
+                >
                   Cancelar
                 </Button>
-                <Button className="flex-1" onClick={() => setIsPlanningModalOpen(false)}>
-                  Confirmar asignación
+                <Button
+                  className="flex-1"
+                  onClick={handleConfirmPlan}
+                  disabled={planSaving || !planTechId}
+                >
+                  {planSaving ? 'Guardando…' : 'Confirmar asignación'}
                 </Button>
               </div>
             </CardContent>

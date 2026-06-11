@@ -89,9 +89,16 @@ export const MOCK_PROFILES: Profile[] = [
   },
   {
     id: 'profile-005', full_name: 'Técnico Senior', email: 'tecnico@imcdesign.com', avatar_url: null,
-    role: 'Técnico Especialista', department: 'Técnico', phone: '+52 555 222 3333',
+    role: 'Técnico', department: 'Producción', phone: '+52 555 222 3333',
     status: 'Activo', join_date: '2024-01-01', bio: null, salary: 20000, pin_code: '1234',
     metadata: { bonus: 1000, efficiency: 87, shift: 'Matutino · 07:00 – 16:00' },
+    created_at: now, updated_at: now,
+  },
+  {
+    id: 'profile-007', full_name: 'Carlos Méndez', email: 'cmendez@imcdesign.com', avatar_url: null,
+    role: 'Técnico', department: 'Producción', phone: '+52 555 333 4444',
+    status: 'Activo', join_date: '2024-03-01', bio: 'Tornero CNC con 8 años de experiencia.', salary: 22000, pin_code: '5678',
+    metadata: { bonus: 1500, efficiency: 91, shift: 'Matutino · 07:00 – 16:00' },
     created_at: now, updated_at: now,
   },
   {

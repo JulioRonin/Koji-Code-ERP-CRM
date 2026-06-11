@@ -21,20 +21,61 @@ export function generateTempPassword(): string {
   return `${w1.charAt(0).toUpperCase() + w1.slice(1)}-${w2}${num}${sym}`;
 }
 
-export function useProfiles(department?: string): AsyncState<Profile[]> {
+/**
+ * Lista perfiles. Acepta un filtro por role o department.
+ * Por compatibilidad histórica, pasar un string se interpreta como rol
+ * (caso de uso típico: useProfiles('Técnico')).
+ */
+export function useProfiles(
+  filter?: string | { role?: string; department?: string }
+): AsyncState<Profile[]> {
+  const role = typeof filter === 'string' ? filter : filter?.role;
+  const department = typeof filter === 'string' ? undefined : filter?.department;
   return useAsync<Profile[]>(
     async () => {
-      if (!supabase) {
-        return department ? MOCK_PROFILES.filter(p => p.department === department) : MOCK_PROFILES;
-      }
+      const matchMock = (p: Profile) =>
+        (!role || p.role === role) && (!department || p.department === department);
+      if (!supabase) return MOCK_PROFILES.filter(matchMock);
       let query = supabase.from('profiles').select('*').order('full_name');
+      if (role) query = query.eq('role', role);
       if (department) query = query.eq('department', department);
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
-    department ? MOCK_PROFILES.filter(p => p.department === department) : MOCK_PROFILES,
-    [department]
+    MOCK_PROFILES.filter(p => (!role || p.role === role) && (!department || p.department === department)),
+    [role, department]
+  );
+}
+
+/**
+ * Lista cualquier perfil con rol que sea "Técnico" o derivados ("Técnico
+ * Senior", "Técnico de Calidad", "Técnico Especialista"). Se usa en los
+ * dropdowns de asignación de plan de producción y work orders.
+ */
+export function useTechnicians(): AsyncState<Profile[]> {
+  return useAsync<Profile[]>(
+    async () => {
+      const matchesTech = (p: Profile) =>
+        (p.role ?? '').toLowerCase().startsWith('técnico') ||
+        (p.role ?? '').toLowerCase().startsWith('tecnico');
+      if (!supabase) return MOCK_PROFILES.filter(matchesTech);
+      // En Supabase usamos ILIKE para captar las variantes en una sola
+      // query, sin asumir mayúsculas o acentos exactos.
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .or('role.ilike.Técnico%,role.ilike.Tecnico%')
+        .order('full_name');
+      if (error) throw error;
+      return (data ?? []) as Profile[];
+    },
+    MOCK_PROFILES.filter(
+      p =>
+        (p.role ?? '').toLowerCase().startsWith('técnico') ||
+        (p.role ?? '').toLowerCase().startsWith('tecnico')
+    ),
+    []
   );
 }
 
