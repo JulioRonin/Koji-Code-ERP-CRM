@@ -99,6 +99,7 @@ interface BulkInsertBomItem {
   requisition_date?: string | null;
   delivery_date?: string | null;
   notes?: string | null;
+  production_relevant?: boolean;
 }
 
 /**
@@ -123,6 +124,7 @@ export function useBulkInsertBom() {
         requisition_date: it.requisition_date ?? null,
         delivery_date: it.delivery_date ?? null,
         notes: it.notes ?? null,
+        production_relevant: it.production_relevant ?? true,
         bom_status: 'Pendiente' as BomStatus,
         manufacturing_status: 'PENDIENTE' as ManufacturingStatus,
       }));
@@ -154,6 +156,7 @@ export interface UpdateBomItemInput {
   delivery_date?: string | null;
   actual_delivery_date?: string | null;
   notes?: string | null;
+  production_relevant?: boolean;
 }
 
 /**
@@ -222,6 +225,37 @@ export function useDeleteBomItem() {
   }, []);
 
   return { remove, ...state };
+}
+
+/**
+ * Elimina TODOS los BOM items de un proyecto (para recargar uno nuevo).
+ * Devuelve cuántos se eliminaron.
+ */
+export function useDeleteProjectBom() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const removeAll = useCallback(async (projectId: string): Promise<number> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        setState({ loading: false, error: null });
+        return 0;
+      }
+      const { error, count } = await supabase
+        .from('bom_items')
+        .delete({ count: 'exact' })
+        .eq('project_id', projectId);
+      if (error) throw error;
+      setState({ loading: false, error: null });
+      return count ?? 0;
+    } catch (err) {
+      const error = err as Error;
+      setState({ loading: false, error });
+      throw error;
+    }
+  }, []);
+
+  return { removeAll, ...state };
 }
 
 /**

@@ -377,6 +377,7 @@ export interface BomItem {
   delivery_date: string | null;
   actual_delivery_date: string | null;
   notes: string | null;
+  production_relevant: boolean;
   created_at: string;
   updated_at: string;
 }

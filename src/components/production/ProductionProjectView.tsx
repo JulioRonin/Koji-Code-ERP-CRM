@@ -47,7 +47,11 @@ export function ProductionProjectView() {
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
-  const filteredParts = parts.filter(p =>
+  // Sólo las piezas marcadas para fabricar entran al plan de producción. Los
+  // consumibles, hardware y demás insumos viven en el módulo de Compras
+  // pero no aparecen aquí.
+  const productionParts = parts.filter(p => p.production_relevant !== false);
+  const filteredParts = productionParts.filter(p =>
     searchTerm.trim()
       ? p.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())

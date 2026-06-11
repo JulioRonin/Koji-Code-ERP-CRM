@@ -18,9 +18,11 @@ export function ProductionStatusHeader() {
     }
   }, [projects, selectedProjectId]);
 
-  const totalParts = bomItems.length;
-  const assignedParts = bomItems.filter(b => b.manufacturing_status !== 'PENDIENTE').length;
-  const finishedParts = bomItems.filter(b => b.manufacturing_status === 'TERMINADO').length;
+  // Sólo contamos piezas marcadas para fabricar (excluye hardware, consumibles, etc.)
+  const productionItems = bomItems.filter(b => b.production_relevant !== false);
+  const totalParts = productionItems.length;
+  const assignedParts = productionItems.filter(b => b.manufacturing_status !== 'PENDIENTE').length;
+  const finishedParts = productionItems.filter(b => b.manufacturing_status === 'TERMINADO').length;
   const progress = totalParts > 0 ? (finishedParts / totalParts) * 100 : 0;
 
   return (

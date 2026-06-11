@@ -14,6 +14,10 @@ import {
   Clock,
   DollarSign,
   TrendingUp,
+  Factory,
+  ChevronRight,
+  ChevronDown,
+  Eraser,
 } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -36,6 +40,7 @@ import {
   useBulkInsertBom,
   useUpdateBomItem,
   useDeleteBomItem,
+  useDeleteProjectBom,
   summarizePurchasing,
 } from '@/lib/api';
 import type { BomItem, BomStatus } from '@/types/database';
@@ -60,7 +65,11 @@ interface ParsedRow {
   requisition_date: string | null;
   delivery_date: string | null;
   notes: string | null;
+  production_relevant: boolean;
 }
+
+/** Categorías que NO van a producción por defecto al importar. */
+const NON_PROD_CATEGORIES = ['Hardware', 'Consumible', 'Consumibles', 'Insumo', 'Insumos'];
 
 /**
  * Convierte fechas de Excel (serial number o string) a YYYY-MM-DD. Devuelve
@@ -105,10 +114,16 @@ function mapRow(row: Record<string, unknown>): ParsedRow {
     }
     return null;
   };
+  const category = String(get('category', 'categoria', 'categoría', 'tipo', 'type') ?? 'General');
+  const prodRaw = get('production_relevant', 'produccion', 'producción', 'a fabricar', 'fabricar');
+  const productionRelevant: boolean =
+    prodRaw != null
+      ? ['true', '1', 'sí', 'si', 'yes', 'x'].includes(String(prodRaw).toLowerCase())
+      : !NON_PROD_CATEGORIES.some(c => category.toLowerCase().includes(c.toLowerCase()));
   return {
     part_number: String(get('part_number', 'part number', 'no parte', 'no. parte', 'numero de parte', 'parte', 'sku', 'name') ?? 'N/A'),
     description: String(get('description', 'descripcion', 'descripción', 'part description', 'detalle') ?? 'Sin descripción'),
-    category: String(get('category', 'categoria', 'categoría', 'tipo', 'type') ?? 'General'),
+    category,
     quantity: Number(get('quantity', 'cantidad', 'qty', 'cant') ?? 1) || 1,
     uom: String(get('uom', 'unidad', 'um') ?? 'Pzas'),
     unit_price: toNumber(get('unit_price', 'precio', 'precio unitario', 'price', 'costo')),
@@ -122,6 +137,7 @@ function mapRow(row: Record<string, unknown>): ParsedRow {
       const v = get('notes', 'notas', 'observaciones', 'nota');
       return v != null ? String(v) : null;
     })(),
+    production_relevant: productionRelevant,
   };
 }
 
@@ -144,12 +160,16 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
   const { insert: bulkInsert, loading: inserting } = useBulkInsertBom();
   const { update: updateItem } = useUpdateBomItem();
   const { remove: deleteItem } = useDeleteBomItem();
+  const { removeAll: deleteAllBom, loading: deletingAll } = useDeleteProjectBom();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>(lockedProjectId ?? '');
   const [filter, setFilter] = useState('');
   const [parsedRows, setParsedRows] = useState<ParsedRow[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BomItem | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [productionOnly, setProductionOnly] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -164,18 +184,46 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
   );
 
   const filteredItems = useMemo(() => {
-    if (!filter.trim()) return projectItems;
-    const q = filter.toLowerCase();
-    return projectItems.filter(
-      i =>
-        i.part_number.toLowerCase().includes(q) ||
-        (i.description ?? '').toLowerCase().includes(q) ||
-        (i.supplier_name ?? '').toLowerCase().includes(q) ||
-        i.category.toLowerCase().includes(q)
-    );
-  }, [projectItems, filter]);
+    let items = projectItems;
+    if (productionOnly) items = items.filter(i => i.production_relevant);
+    if (filter.trim()) {
+      const q = filter.toLowerCase();
+      items = items.filter(
+        i =>
+          i.part_number.toLowerCase().includes(q) ||
+          (i.description ?? '').toLowerCase().includes(q) ||
+          (i.supplier_name ?? '').toLowerCase().includes(q) ||
+          i.category.toLowerCase().includes(q)
+      );
+    }
+    return items;
+  }, [projectItems, filter, productionOnly]);
+
+  /** Agrupa los items filtrados por categoría preservando el orden de aparición. */
+  const groupedItems = useMemo(() => {
+    const groups = new Map<string, BomItem[]>();
+    filteredItems.forEach(i => {
+      const cat = i.category || 'Sin categoría';
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat)!.push(i);
+    });
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredItems]);
 
   const summary = useMemo(() => summarizePurchasing(projectItems), [projectItems]);
+  const productionCount = useMemo(
+    () => projectItems.filter(i => i.production_relevant).length,
+    [projectItems]
+  );
+
+  const toggleGroup = (cat: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
 
   const flash = (text: string, tone: 'success' | 'error' = 'success') => {
     setFeedback({ tone, text });
@@ -224,6 +272,7 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
           requisition_date: r.requisition_date,
           delivery_date: r.delivery_date,
           notes: r.notes,
+          production_relevant: r.production_relevant,
         }))
       );
       await refetchBom();
@@ -256,6 +305,18 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!selectedProjectId) return;
+    try {
+      const n = await deleteAllBom(selectedProjectId);
+      await refetchBom();
+      setConfirmDeleteAll(false);
+      flash(`Se eliminaron ${n} materiales del proyecto.`);
+    } catch (err) {
+      flash((err as Error).message || 'No se pudo eliminar la lista.', 'error');
+    }
+  };
+
   // ─── Plantilla descargable ────────────────────────────────────────────
   const downloadTemplate = () => {
     const sample = [
@@ -269,7 +330,21 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
         supplier: 'Aceros del Bajío',
         requisition_date: '2026-06-12',
         delivery_date: '2026-06-22',
-        notes: '',
+        production_relevant: 'sí',
+        notes: 'Va a producción',
+      },
+      {
+        part_number: 'HD-B-0820-10',
+        description: 'Tornillo Allen M8x20mm',
+        category: 'Hardware',
+        quantity: 200,
+        uom: 'Pzas',
+        unit_price: 4.5,
+        supplier: 'Tornillos Mexicanos',
+        requisition_date: '2026-06-12',
+        delivery_date: '2026-06-22',
+        production_relevant: 'no',
+        notes: 'Sólo compra, no entra al plan',
       },
     ];
     const ws = XLSX.utils.json_to_sheet(sample);
@@ -392,10 +467,10 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
         </div>
       )}
 
-      {/* Tabla de items */}
+      {/* Tabla de items agrupada por categoría */}
       {activeProject && (
         <Card className="p-0">
-          <div className="p-4 border-b border-[var(--color-app-border)] flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="p-4 border-b border-[var(--color-app-border)] flex flex-col md:flex-row md:items-start md:justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold flex items-center gap-2">
                 <Package className="h-4 w-4 text-[var(--color-app-text-muted)]" />
@@ -405,24 +480,54 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                 </span>
               </h3>
               <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
-                {projectItems.length} materiales en seguimiento
+                {projectItems.length} materiales en seguimiento · {productionCount} marcados para producción
               </p>
             </div>
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
-              <Input
-                placeholder="Filtrar parte, proveedor o categoría…"
-                value={filter}
-                onChange={e => setFilter(e.target.value)}
-                className="pl-9 h-9"
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                className={
+                  'inline-flex items-center gap-1.5 text-xs px-2.5 h-9 rounded-md border cursor-pointer transition-colors ' +
+                  (productionOnly
+                    ? 'border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]'
+                    : 'border-[var(--color-app-border-strong)] hover:bg-[var(--color-app-surface-alt)]')
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={productionOnly}
+                  onChange={e => setProductionOnly(e.target.checked)}
+                  className="sr-only"
+                />
+                <Factory className="h-3.5 w-3.5" />
+                Sólo producción
+              </label>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
+                <Input
+                  placeholder="Filtrar parte, proveedor o categoría…"
+                  value={filter}
+                  onChange={e => setFilter(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDeleteAll(true)}
+                disabled={projectItems.length === 0 || deletingAll}
+                className="text-[var(--color-app-danger)] hover:text-[var(--color-app-danger)]"
+              >
+                <Eraser className="h-4 w-4 mr-1.5" /> Eliminar BOM
+              </Button>
             </div>
           </div>
 
           {filteredItems.length === 0 ? (
             <div className="py-12 text-center text-sm text-[var(--color-app-text-muted)]">
               {projectItems.length === 0
-                ? 'Aún no hay materiales registrados para este proyecto. Importa una BOM o usa el botón "+ Agregar".'
+                ? 'Aún no hay materiales registrados para este proyecto. Importa una BOM con el cargador de arriba.'
+                : productionOnly
+                ? 'No hay items marcados como "producción" con ese filtro. Activa el toggle en cada fila para mandarlos a fabricación.'
                 : 'Sin resultados con ese filtro.'}
             </div>
           ) : (
@@ -432,7 +537,10 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                   <tr>
                     <th className="text-left p-2 font-medium">No. parte</th>
                     <th className="text-left p-2 font-medium">Descripción</th>
-                    <th className="text-left p-2 font-medium">Categoría</th>
+                    <th className="text-left p-2 font-medium">Grupo</th>
+                    <th className="text-center p-2 font-medium" title="Va a producción">
+                      <Factory className="h-3.5 w-3.5 inline" />
+                    </th>
                     <th className="text-right p-2 font-medium">Cantidad</th>
                     <th className="text-right p-2 font-medium">Precio unit.</th>
                     <th className="text-left p-2 font-medium">Proveedor</th>
@@ -443,14 +551,54 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map(item => (
-                    <BomRow
-                      key={item.id}
-                      item={item}
-                      onPatch={patch => handlePatch(item, patch)}
-                      onDelete={() => setConfirmDelete(item)}
-                    />
-                  ))}
+                  {groupedItems.map(([category, items]) => {
+                    const collapsed = collapsedGroups.has(category);
+                    const groupProd = items.filter(i => i.production_relevant).length;
+                    const groupTotal = items.length;
+                    const groupReceived = items.filter(
+                      i => i.bom_status === 'Recibido' || i.bom_status === 'Stock'
+                    ).length;
+                    return (
+                      <React.Fragment key={category}>
+                        <tr
+                          className="bg-[var(--color-app-surface-alt)]/80 cursor-pointer hover:bg-[var(--color-app-surface-alt)]"
+                          onClick={() => toggleGroup(category)}
+                        >
+                          <td colSpan={11} className="p-2">
+                            <div className="flex items-center gap-2 text-xs">
+                              {collapsed ? (
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              )}
+                              <span className="font-semibold uppercase tracking-wide text-[var(--color-app-text)]">
+                                {category}
+                              </span>
+                              <Badge variant="outline" className="ml-1">
+                                {groupTotal} items
+                              </Badge>
+                              <Badge variant="success">{groupReceived} recibidos</Badge>
+                              {groupProd > 0 && (
+                                <Badge variant="default" className="gap-1">
+                                  <Factory className="h-2.5 w-2.5" /> {groupProd} a fabricar
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {!collapsed &&
+                          items.map(item => (
+                            <BomRow
+                              key={item.id}
+                              item={item}
+                              categories={groupedItems.map(([c]) => c)}
+                              onPatch={patch => handlePatch(item, patch)}
+                              onDelete={() => setConfirmDelete(item)}
+                            />
+                          ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -513,7 +661,33 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* Confirmar borrado */}
+      {/* Confirmar borrado masivo */}
+      <Dialog open={confirmDeleteAll} onOpenChange={open => !open && setConfirmDeleteAll(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-[var(--color-app-danger)]" />
+              Eliminar BOM completo del proyecto
+            </DialogTitle>
+            <DialogDescription>
+              Se eliminarán <strong>{projectItems.length} materiales</strong> de{' '}
+              <strong>{activeProject?.name}</strong>, incluyendo precios, proveedores y fechas de
+              entrega. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteAll(false)} disabled={deletingAll}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAll} disabled={deletingAll}>
+              <Eraser className="h-4 w-4 mr-1.5" />
+              {deletingAll ? 'Eliminando…' : 'Eliminar todo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar borrado individual */}
       <Dialog open={!!confirmDelete} onOpenChange={open => !open && setConfirmDelete(null)}>
         <DialogContent>
           <DialogHeader>
@@ -583,6 +757,7 @@ function KpiCard({ icon: Icon, label, value, sub, progress, tone }: KpiProps) {
 
 interface RowProps {
   item: BomItem;
+  categories: string[];
   onPatch: (patch: Partial<BomItem>) => void;
   onDelete: () => void;
 }
@@ -591,7 +766,8 @@ interface RowProps {
  * Fila con edición inline. Guarda en onBlur para no spamear updates a la
  * base con cada keystroke. El estado del item se cambia via select.
  */
-function BomRow({ item, onPatch, onDelete }: RowProps) {
+function BomRow({ item, categories, onPatch, onDelete }: RowProps) {
+  const datalistId = `bom-categories-${item.project_id}`;
   const [draft, setDraft] = useState({
     part_number: item.part_number,
     description: item.description ?? '',
@@ -654,11 +830,28 @@ function BomRow({ item, onPatch, onDelete }: RowProps) {
       </td>
       <td className="p-2">
         <input
+          list={datalistId}
           value={draft.category}
           onChange={e => setDraft(d => ({ ...d, category: e.target.value }))}
-          onBlur={() => commit({ category: draft.category })}
-          className="w-32 px-2 py-1 rounded border border-transparent hover:border-[var(--color-app-border)] focus:border-[var(--color-app-primary)] focus:bg-white focus:outline-none"
+          onBlur={() => commit({ category: draft.category || 'General' })}
+          placeholder="Categoría / grupo"
+          className="w-32 px-2 py-1 rounded border border-transparent hover:border-[var(--color-app-border)] focus:border-[var(--color-app-primary)] focus:bg-white focus:outline-none text-xs"
         />
+        <datalist id={datalistId}>
+          {categories.map(c => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+      </td>
+      <td className="p-2 text-center">
+        <label className="inline-flex items-center justify-center cursor-pointer" title="Va a producción">
+          <input
+            type="checkbox"
+            checked={item.production_relevant}
+            onChange={e => onPatch({ production_relevant: e.target.checked })}
+            className="h-4 w-4 accent-[var(--color-app-primary)] cursor-pointer"
+          />
+        </label>
       </td>
       <td className="p-2 text-right">
         <input
