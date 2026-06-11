@@ -369,6 +369,14 @@ export interface BomItem {
   drawing_url: string | null;
   model_url: string | null;
   assigned_technician_id: string | null;
+  unit_price: number | null;
+  currency: string | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  requisition_date: string | null;
+  delivery_date: string | null;
+  actual_delivery_date: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }

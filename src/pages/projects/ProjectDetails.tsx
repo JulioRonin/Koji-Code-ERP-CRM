@@ -18,6 +18,7 @@ import {
   Loader2,
   Flag,
   AlertTriangle,
+  ShoppingCart,
 } from 'lucide-react';
 import { format, isValid, parseISO, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -61,6 +62,7 @@ import {
   useMasterPlan,
   useMasterPlanTasks,
   useBomItems,
+  summarizePurchasing,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { ProjectStatus, MasterPlanTask, ProjectTask } from '@/types/database';
@@ -132,6 +134,7 @@ export function ProjectDetails() {
 
   // ── Cálculos derivados ──────────────────────────────────────────────────
   const completedTasks = useMemo(() => tasks.filter(t => t.status === 'completed').length, [tasks]);
+  const purchasingSummary = useMemo(() => summarizePurchasing(bomItems), [bomItems]);
 
   const ganttTasks = useMemo(() => {
     if (!masterPlan && tasks.filter(t => t.start_date && t.end_date).length === 0) return [];
@@ -381,6 +384,42 @@ export function ProjectDetails() {
                 </div>
                 <Progress value={project.progress} className="h-2" />
               </div>
+
+              {bomItems.length > 0 && (
+                <div className="p-3 rounded-md border border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)]/40 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1.5 text-[var(--color-app-text-muted)]">
+                      <ShoppingCart className="h-3.5 w-3.5" /> Avance de compras
+                    </span>
+                    <span className="font-medium">
+                      {purchasingSummary.progress_pct}%{' '}
+                      <span className="text-xs text-[var(--color-app-text-muted)] font-normal">
+                        ({purchasingSummary.received_items}/{purchasingSummary.total_items})
+                      </span>
+                    </span>
+                  </div>
+                  <Progress value={purchasingSummary.progress_pct} className="h-1.5" />
+                  <div className="flex items-center justify-between text-xs text-[var(--color-app-text-muted)]">
+                    <span>
+                      Presupuesto:{' '}
+                      <strong className="text-[var(--color-app-text)]">
+                        {purchasingSummary.total_cost.toLocaleString('es-MX', {
+                          style: 'currency',
+                          currency: purchasingSummary.currency || 'MXN',
+                          maximumFractionDigits: 0,
+                        })}
+                      </strong>
+                    </span>
+                    {purchasingSummary.late_items > 0 ? (
+                      <span className="text-[var(--color-app-warning)] flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> {purchasingSummary.late_items} atrasadas
+                      </span>
+                    ) : (
+                      <span>Sin atrasos</span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {project.description && (
                 <div className="p-4 rounded-md bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)]">

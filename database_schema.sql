@@ -360,6 +360,17 @@ CREATE TABLE IF NOT EXISTS public.bom_items (
 CREATE INDEX IF NOT EXISTS idx_bom_items_project ON public.bom_items(project_id);
 CREATE INDEX IF NOT EXISTS idx_bom_items_mfg_status ON public.bom_items(manufacturing_status);
 
+-- Columnas de seguimiento de compra (precio, proveedor, fechas, notas).
+-- Se agregan via ALTER para ser idempotente con bases existentes.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS unit_price            NUMERIC;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS currency              TEXT DEFAULT 'MXN';
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS supplier_id           UUID REFERENCES public.suppliers(id) ON DELETE SET NULL;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS supplier_name         TEXT;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS requisition_date      DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS delivery_date         DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS actual_delivery_date  DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS notes                 TEXT;
+
 -- ---------------------------------------------------------------------------
 -- 7. COMPRAS — Requisiciones y POs
 -- ---------------------------------------------------------------------------
