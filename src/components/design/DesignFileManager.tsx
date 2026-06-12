@@ -70,7 +70,6 @@ export function DesignFileManager() {
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const modelInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const filteredParts = useMemo(() => {
     let items = parts;
@@ -150,7 +149,6 @@ export function DesignFileManager() {
     } finally {
       if (drawingInputRef.current) drawingInputRef.current.value = '';
       if (modelInputRef.current) modelInputRef.current.value = '';
-      if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
 
@@ -241,7 +239,6 @@ export function DesignFileManager() {
   const totalProd = parts.filter(p => p.production_relevant !== false);
   const withDrawing = totalProd.filter(p => p.drawing_url).length;
   const withModel = totalProd.filter(p => p.model_url).length;
-  const withImage = totalProd.filter(p => p.image_url).length;
 
   return (
     <div className="space-y-5">
@@ -255,14 +252,14 @@ export function DesignFileManager() {
             <h2 className="text-base font-semibold">{selectedProject?.name}</h2>
             <p className="text-xs text-[var(--color-app-text-muted)] font-mono">
               {selectedProject?.id} · {totalProd.length} piezas en producción · {withDrawing}{' '}
-              con plano 2D · {withModel} con modelo 3D · {withImage} con imagen
+              con plano 2D · {withModel} con modelo 3D
             </p>
           </div>
         </div>
       </div>
 
       {/* Drop zones */}
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2">
         <DropZone
           accept=".pdf"
           inputRef={drawingInputRef}
@@ -279,15 +276,6 @@ export function DesignFileManager() {
           subtitle="STEP, IGS, SLDPRT — match por nombre."
           icon={Box}
           onFiles={e => handleBulkUpload(e, 'model')}
-          busy={attaching}
-        />
-        <DropZone
-          accept=".png,.jpg,.jpeg,.webp,.gif"
-          inputRef={imageInputRef}
-          title="Imágenes de checklist"
-          subtitle="PNG/JPG para la hoja de producción."
-          icon={ImageIcon}
-          onFiles={e => handleBulkUpload(e, 'image')}
           busy={attaching}
         />
       </div>
@@ -432,7 +420,6 @@ export function DesignFileManager() {
                   <th className="text-center p-2 font-medium">Cant.</th>
                   <th className="text-center p-2 font-medium">Plano 2D</th>
                   <th className="text-center p-2 font-medium">Modelo 3D</th>
-                  <th className="text-center p-2 font-medium">Imagen</th>
                   <th className="p-2" />
                 </tr>
               </thead>
@@ -441,14 +428,13 @@ export function DesignFileManager() {
                   const collapsed = collapsedGroups.has(category);
                   const cat2D = items.filter(i => i.drawing_url).length;
                   const cat3D = items.filter(i => i.model_url).length;
-                  const catImg = items.filter(i => i.image_url).length;
                   return (
                     <React.Fragment key={category}>
                       <tr
                         className="bg-[var(--color-app-surface-alt)]/80 cursor-pointer hover:bg-[var(--color-app-surface-alt)]"
                         onClick={() => toggleGroup(category)}
                       >
-                        <td colSpan={7} className="p-2">
+                        <td colSpan={6} className="p-2">
                           <div className="flex items-center gap-2 text-xs">
                             {collapsed ? (
                               <ChevronRight className="h-3.5 w-3.5" />
@@ -461,7 +447,6 @@ export function DesignFileManager() {
                             <Badge variant="outline">{items.length} items</Badge>
                             <Badge variant="default">{cat2D} con 2D</Badge>
                             {cat3D > 0 && <Badge variant="secondary">{cat3D} con 3D</Badge>}
-                            {catImg > 0 && <Badge variant="success">{catImg} con imagen</Badge>}
                           </div>
                         </td>
                       </tr>
@@ -496,7 +481,11 @@ export function DesignFileManager() {
                                   </button>
                                 </div>
                               ) : (
-                                <Badge variant="secondary">Pendiente</Badge>
+                                <SingleDrawingUpload
+                                  item={item}
+                                  projectId={selectedProjectId}
+                                  onUploaded={refetchParts}
+                                />
                               )}
                             </td>
                             <td className="p-2 text-center">
@@ -522,17 +511,6 @@ export function DesignFileManager() {
                                 <Badge variant="secondary">Pendiente</Badge>
                               )}
                             </td>
-                            <td className="p-2 text-center">
-                              {item.image_url ? (
-                                <ImageThumb
-                                  path={item.image_url}
-                                  alt={item.part_number}
-                                  onRemove={() => handleDetach(item, 'image')}
-                                />
-                              ) : (
-                                <Badge variant="secondary">Pendiente</Badge>
-                              )}
-                            </td>
                             <td className="p-2" />
                           </tr>
                         ))}
@@ -544,6 +522,71 @@ export function DesignFileManager() {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Botón compacto para subir UN plano 2D directamente al item de esa fila,
+ * sin pasar por el match por nombre. Útil cuando el archivo no tiene el
+ * número de parte en el filename o cuando hay que rectificar una falta
+ * puntual.
+ */
+function SingleDrawingUpload({
+  item,
+  projectId,
+  onUploaded,
+}: {
+  item: BomItem;
+  projectId: string;
+  onUploaded: () => void | Promise<void>;
+}) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const { assign, loading } = useAssignDrawingManually();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      await assign(file, item.id, item.part_number, projectId, 'drawing');
+      await onUploaded();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="inline-flex flex-col items-center gap-0.5">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 gap-1"
+        disabled={loading}
+        onClick={() => inputRef.current?.click()}
+        title={`Subir el plano 2D de ${item.part_number}`}
+      >
+        <Upload className="h-3.5 w-3.5" />
+        {loading ? 'Subiendo…' : 'Subir 2D'}
+      </Button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf"
+        className="hidden"
+        onChange={handleChange}
+      />
+      {error && (
+        <span
+          className="text-[10px] text-[var(--color-app-danger)] max-w-[140px] truncate"
+          title={error}
+        >
+          {error}
+        </span>
+      )}
     </div>
   );
 }
