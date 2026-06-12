@@ -43,6 +43,9 @@ import {
   useDeleteProjectBom,
   summarizePurchasing,
 } from '@/lib/api';
+import { TableControls } from '@/components/shared/TableControls';
+import { applyTableState, type TableState } from '@/lib/tableControls';
+import { PURCHASING_FIELDS } from '@/lib/bomFields';
 import type { BomItem, BomStatus } from '@/types/database';
 
 const STATUS_VARIANT: Record<BomStatus, 'secondary' | 'warning' | 'default' | 'success' | 'outline'> = {
@@ -163,7 +166,13 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
   const { removeAll: deleteAllBom, loading: deletingAll } = useDeleteProjectBom();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>(lockedProjectId ?? '');
-  const [filter, setFilter] = useState('');
+  // Estado de filtros/agrupación configurable (tipo Airtable). Por defecto
+  // agrupa por categoría para conservar el comportamiento previo.
+  const [tableState, setTableState] = useState<TableState>({
+    search: '',
+    groupBy: 'category',
+    filters: [],
+  });
   const [parsedRows, setParsedRows] = useState<ParsedRow[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BomItem | null>(null);
@@ -183,32 +192,22 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
     [allItems, selectedProjectId]
   );
 
-  const filteredItems = useMemo(() => {
-    let items = projectItems;
-    if (productionOnly) items = items.filter(i => i.production_relevant);
-    if (filter.trim()) {
-      const q = filter.toLowerCase();
-      items = items.filter(
-        i =>
-          i.part_number.toLowerCase().includes(q) ||
-          (i.description ?? '').toLowerCase().includes(q) ||
-          (i.supplier_name ?? '').toLowerCase().includes(q) ||
-          i.category.toLowerCase().includes(q)
-      );
-    }
-    return items;
-  }, [projectItems, filter, productionOnly]);
+  // El toggle "Sólo producción" se aplica antes del motor genérico.
+  const baseItems = useMemo(
+    () => (productionOnly ? projectItems.filter(i => i.production_relevant) : projectItems),
+    [projectItems, productionOnly]
+  );
 
-  /** Agrupa los items filtrados por categoría preservando el orden de aparición. */
-  const groupedItems = useMemo(() => {
-    const groups = new Map<string, BomItem[]>();
-    filteredItems.forEach(i => {
-      const cat = i.category || 'Sin categoría';
-      if (!groups.has(cat)) groups.set(cat, []);
-      groups.get(cat)!.push(i);
-    });
-    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [filteredItems]);
+  const { filtered: filteredItems, groups } = useMemo(
+    () => applyTableState(baseItems, PURCHASING_FIELDS, tableState),
+    [baseItems, tableState]
+  );
+
+  /** Categorías disponibles (para el datalist de cada fila). */
+  const categoryNames = useMemo(
+    () => Array.from(new Set(projectItems.map(i => i.category || 'Sin categoría'))).sort(),
+    [projectItems]
+  );
 
   const summary = useMemo(() => summarizePurchasing(projectItems), [projectItems]);
   const productionCount = useMemo(
@@ -492,43 +491,46 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                 {projectItems.length} materiales en seguimiento · {productionCount} marcados para producción
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <label
-                className={
-                  'inline-flex items-center gap-1.5 text-xs px-2.5 h-9 rounded-md border cursor-pointer transition-colors ' +
-                  (productionOnly
-                    ? 'border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]'
-                    : 'border-[var(--color-app-border-strong)] hover:bg-[var(--color-app-surface-alt)]')
-                }
-              >
-                <input
-                  type="checkbox"
-                  checked={productionOnly}
-                  onChange={e => setProductionOnly(e.target.checked)}
-                  className="sr-only"
-                />
-                <Factory className="h-3.5 w-3.5" />
-                Sólo producción
-              </label>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
-                <Input
-                  placeholder="Filtrar parte, proveedor o categoría…"
-                  value={filter}
-                  onChange={e => setFilter(e.target.value)}
-                  className="pl-9 h-9"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setConfirmDeleteAll(true)}
-                disabled={projectItems.length === 0 || deletingAll}
-                className="text-[var(--color-app-danger)] hover:text-[var(--color-app-danger)]"
-              >
-                <Eraser className="h-4 w-4 mr-1.5" /> Eliminar BOM
-              </Button>
-            </div>
+          </div>
+
+          {/* Controles configurables tipo Airtable */}
+          <div className="px-4 pb-3">
+            <TableControls
+              fields={PURCHASING_FIELDS}
+              state={tableState}
+              onChange={setTableState}
+              searchPlaceholder="Buscar parte, proveedor o categoría…"
+              rightSlot={
+                <>
+                  <label
+                    className={
+                      'inline-flex items-center gap-1.5 text-xs px-2.5 h-9 rounded-md border cursor-pointer transition-colors ' +
+                      (productionOnly
+                        ? 'border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]'
+                        : 'border-[var(--color-app-border-strong)] hover:bg-[var(--color-app-surface-alt)]')
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={productionOnly}
+                      onChange={e => setProductionOnly(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <Factory className="h-3.5 w-3.5" />
+                    Sólo producción
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmDeleteAll(true)}
+                    disabled={projectItems.length === 0 || deletingAll}
+                    className="text-[var(--color-app-danger)] hover:text-[var(--color-app-danger)]"
+                  >
+                    <Eraser className="h-4 w-4 mr-1.5" /> Eliminar BOM
+                  </Button>
+                </>
+              }
+            />
           </div>
 
           {filteredItems.length === 0 ? (
@@ -560,47 +562,51 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {groupedItems.map(([category, items]) => {
-                    const collapsed = collapsedGroups.has(category);
+                  {groups.map(group => {
+                    // Grupo único "Todos" (sin agrupar) → filas planas, sin cabecera.
+                    const isAll = group.key === '__all__';
+                    const collapsed = collapsedGroups.has(group.key);
+                    const items = group.items;
                     const groupProd = items.filter(i => i.production_relevant).length;
-                    const groupTotal = items.length;
                     const groupReceived = items.filter(
                       i => i.bom_status === 'Recibido' || i.bom_status === 'Stock'
                     ).length;
                     return (
-                      <React.Fragment key={category}>
-                        <tr
-                          className="bg-[var(--color-app-surface-alt)]/80 cursor-pointer hover:bg-[var(--color-app-surface-alt)]"
-                          onClick={() => toggleGroup(category)}
-                        >
-                          <td colSpan={11} className="p-2">
-                            <div className="flex items-center gap-2 text-xs">
-                              {collapsed ? (
-                                <ChevronRight className="h-3.5 w-3.5" />
-                              ) : (
-                                <ChevronDown className="h-3.5 w-3.5" />
-                              )}
-                              <span className="font-semibold uppercase tracking-wide text-[var(--color-app-text)]">
-                                {category}
-                              </span>
-                              <Badge variant="outline" className="ml-1">
-                                {groupTotal} items
-                              </Badge>
-                              <Badge variant="success">{groupReceived} recibidos</Badge>
-                              {groupProd > 0 && (
-                                <Badge variant="default" className="gap-1">
-                                  <Factory className="h-2.5 w-2.5" /> {groupProd} a fabricar
+                      <React.Fragment key={group.key}>
+                        {!isAll && (
+                          <tr
+                            className="bg-[var(--color-app-surface-alt)]/80 cursor-pointer hover:bg-[var(--color-app-surface-alt)]"
+                            onClick={() => toggleGroup(group.key)}
+                          >
+                            <td colSpan={11} className="p-2">
+                              <div className="flex items-center gap-2 text-xs">
+                                {collapsed ? (
+                                  <ChevronRight className="h-3.5 w-3.5" />
+                                ) : (
+                                  <ChevronDown className="h-3.5 w-3.5" />
+                                )}
+                                <span className="font-semibold uppercase tracking-wide text-[var(--color-app-text)]">
+                                  {group.label}
+                                </span>
+                                <Badge variant="outline" className="ml-1">
+                                  {items.length} items
                                 </Badge>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        {!collapsed &&
+                                <Badge variant="success">{groupReceived} recibidos</Badge>
+                                {groupProd > 0 && (
+                                  <Badge variant="default" className="gap-1">
+                                    <Factory className="h-2.5 w-2.5" /> {groupProd} a fabricar
+                                  </Badge>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        {(isAll || !collapsed) &&
                           items.map(item => (
                             <BomRow
                               key={item.id}
                               item={item}
-                              categories={groupedItems.map(([c]) => c)}
+                              categories={categoryNames}
                               onPatch={patch => handlePatch(item, patch)}
                               onDelete={() => setConfirmDelete(item)}
                             />

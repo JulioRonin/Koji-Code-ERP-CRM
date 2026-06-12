@@ -33,6 +33,9 @@ import {
 } from '@/lib/api';
 import type { BomItem, ManufacturingStatus } from '@/types/database';
 import { CheckCircle2, Circle, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
+import { TableControls } from '@/components/shared/TableControls';
+import { applyTableState, type TableState } from '@/lib/tableControls';
+import { PRODUCTION_FIELDS } from '@/lib/bomFields';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -128,11 +131,20 @@ export function ProductionProjectView(props: Props = {}) {
     }
   }, [selectedPart?.id]);
 
-  // Filtros de la tabla
-  const [statusFilter, setStatusFilter] = useState<ManufacturingStatus | 'TODOS'>('TODOS');
-  const [assignFilter, setAssignFilter] = useState<'TODOS' | 'ASIGNADAS' | 'SIN_ASIGNAR' | 'MIAS'>(
-    'TODOS'
-  );
+  // Filtros/agrupación configurables (tipo Airtable)
+  const [tableState, setTableState] = useState<TableState>({
+    search: '',
+    groupBy: null,
+    filters: [],
+  });
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   const handleConfirmPlan = async () => {
     if (!selectedPart) return;
@@ -193,19 +205,11 @@ export function ProductionProjectView(props: Props = {}) {
   // consumibles, hardware y demás insumos viven en el módulo de Compras
   // pero no aparecen aquí.
   const productionParts = parts.filter(p => p.production_relevant !== false);
-  const filteredParts = productionParts.filter(p => {
-    if (statusFilter !== 'TODOS' && p.manufacturing_status !== statusFilter) return false;
-    if (assignFilter === 'ASIGNADAS' && !p.assigned_technician_id) return false;
-    if (assignFilter === 'SIN_ASIGNAR' && p.assigned_technician_id) return false;
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      return (
-        p.part_number.toLowerCase().includes(q) ||
-        (p.description ?? '').toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const { filtered: filteredParts, groups } = applyTableState(
+    productionParts,
+    PRODUCTION_FIELDS,
+    tableState
+  );
   if (!effectiveProjectId) {
     return (
       <div className="space-y-4">
@@ -266,31 +270,20 @@ export function ProductionProjectView(props: Props = {}) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              try {
-                await refetchParts();
-              } catch {
-                /* ignore */
-              }
-            }}
-            title="Volver a cargar los datos del proyecto"
-          >
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refrescar
-          </Button>
-          <div className="relative w-72">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
-            <Input
-              placeholder="Filtrar por parte o material..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            try {
+              await refetchParts();
+            } catch {
+              /* ignore */
+            }
+          }}
+          title="Volver a cargar los datos del proyecto"
+        >
+          <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refrescar
+        </Button>
       </div>
 
       {toggleError && (
@@ -302,69 +295,13 @@ export function ProductionProjectView(props: Props = {}) {
         </div>
       )}
 
-      {/* Filtros agrupadores */}
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[var(--color-app-text-muted)] uppercase tracking-wide text-[10px]">
-            Estado:
-          </span>
-          {(['TODOS', 'PENDIENTE', 'EN PROCESO', 'CALIDAD', 'TERMINADO', 'RECHAZADO'] as const).map(
-            s => {
-              const count =
-                s === 'TODOS'
-                  ? productionParts.length
-                  : productionParts.filter(p => p.manufacturing_status === s).length;
-              return (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={
-                    'h-7 px-2.5 rounded-md border transition-colors ' +
-                    (statusFilter === s
-                      ? 'bg-[var(--color-app-primary)] text-white border-[var(--color-app-primary)]'
-                      : 'bg-white border-[var(--color-app-border)] hover:border-[var(--color-app-primary)]/40')
-                  }
-                >
-                  {s} <span className="opacity-70 ml-1">{count}</span>
-                </button>
-              );
-            }
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[var(--color-app-text-muted)] uppercase tracking-wide text-[10px]">
-            Asignación:
-          </span>
-          {(
-            [
-              { id: 'TODOS', label: 'Todas' },
-              { id: 'ASIGNADAS', label: 'Asignadas' },
-              { id: 'SIN_ASIGNAR', label: 'Sin asignar' },
-            ] as const
-          ).map(opt => {
-            const count =
-              opt.id === 'TODOS'
-                ? productionParts.length
-                : opt.id === 'ASIGNADAS'
-                ? productionParts.filter(p => p.assigned_technician_id).length
-                : productionParts.filter(p => !p.assigned_technician_id).length;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => setAssignFilter(opt.id)}
-                className={
-                  'h-7 px-2.5 rounded-md border transition-colors ' +
-                  (assignFilter === opt.id
-                    ? 'bg-[var(--color-app-primary)] text-white border-[var(--color-app-primary)]'
-                    : 'bg-white border-[var(--color-app-border)] hover:border-[var(--color-app-primary)]/40')
-                }
-              >
-                {opt.label} <span className="opacity-70 ml-1">{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Controles configurables tipo Airtable */}
+      <TableControls
+        fields={PRODUCTION_FIELDS}
+        state={tableState}
+        onChange={setTableState}
+        searchPlaceholder="Buscar parte, descripción o categoría…"
+      />
 
       <Card className="p-0">
         <CardContent className="p-0">
@@ -389,7 +326,33 @@ export function ProductionProjectView(props: Props = {}) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredParts.map(item => (
+                {groups.map(group => {
+                  const isAll = group.key === '__all__';
+                  const collapsed = collapsedGroups.has(group.key);
+                  return (
+                    <React.Fragment key={group.key}>
+                      {!isAll && (
+                        <TableRow
+                          className="bg-[var(--color-app-surface-alt)]/80 cursor-pointer hover:bg-[var(--color-app-surface-alt)]"
+                          onClick={() => toggleGroup(group.key)}
+                        >
+                          <TableCell colSpan={8} className="py-2">
+                            <div className="flex items-center gap-2 text-xs">
+                              {collapsed ? (
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              )}
+                              <span className="font-semibold uppercase tracking-wide">
+                                {group.label}
+                              </span>
+                              <Badge variant="outline">{group.items.length}</Badge>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {(isAll || !collapsed) &&
+                        group.items.map(item => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-xs">{item.part_number}</TableCell>
                     <TableCell>
@@ -501,7 +464,10 @@ export function ProductionProjectView(props: Props = {}) {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                        ))}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
