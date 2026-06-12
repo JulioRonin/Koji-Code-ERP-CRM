@@ -6,22 +6,47 @@ import type { BomItem, BomStatus, ManufacturingStatus } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
 
 /**
+ * Trae TODAS las filas de bom_items que cumplan el filtro, paginando en
+ * bloques de 1000. Supabase JS devuelve máximo 1000 filas por consulta;
+ * sin paginar, los BOMs grandes (>1000 ítems) se truncaban silenciosamente
+ * y los registros que ordenan al final (ej. part numbers que empiezan con
+ * letras, después de los numéricos) simplemente desaparecían — aunque
+ * estuvieran guardados en la base.
+ */
+async function fetchAllBomItems(projectId?: string): Promise<BomItem[]> {
+  if (!supabase) {
+    return projectId
+      ? MOCK_BOM_ITEMS.filter(b => b.project_id === projectId)
+      : MOCK_BOM_ITEMS;
+  }
+  const PAGE = 1000;
+  const all: BomItem[] = [];
+  let from = 0;
+  // Bucle hasta que un bloque venga incompleto (= última página)
+  // Tope de seguridad: 50 páginas (50k ítems) para no loopear infinito.
+  for (let guard = 0; guard < 50; guard++) {
+    let query = supabase
+      .from('bom_items')
+      .select('*')
+      .order('part_number')
+      .range(from, from + PAGE - 1);
+    if (projectId) query = query.eq('project_id', projectId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const batch = (data ?? []) as BomItem[];
+    all.push(...batch);
+    if (batch.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+
+/**
  * Lista todos los BOM items, opcionalmente filtrados por proyecto.
  */
 export function useBomItems(projectId?: string): AsyncState<BomItem[]> {
   return useAsync<BomItem[]>(
-    async () => {
-      if (!supabase) {
-        return projectId
-          ? MOCK_BOM_ITEMS.filter(b => b.project_id === projectId)
-          : MOCK_BOM_ITEMS;
-      }
-      let query = supabase.from('bom_items').select('*').order('part_number');
-      if (projectId) query = query.eq('project_id', projectId);
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as BomItem[];
-    },
+    () => fetchAllBomItems(projectId),
     projectId ? MOCK_BOM_ITEMS.filter(b => b.project_id === projectId) : MOCK_BOM_ITEMS,
     [projectId]
   );
