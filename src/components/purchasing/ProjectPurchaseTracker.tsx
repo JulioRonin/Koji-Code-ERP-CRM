@@ -12,12 +12,12 @@ import {
   FileSpreadsheet,
   Truck,
   Clock,
-  DollarSign,
   TrendingUp,
   Factory,
   ChevronRight,
   ChevronDown,
   Eraser,
+  Inbox,
 } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -431,35 +431,44 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
         </div>
       )}
 
-      {/* KPIs por proyecto */}
+      {/* KPIs por proyecto — desglose por estatus de compra */}
       {activeProject && (
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
           <KpiCard
             icon={TrendingUp}
             label="Avance de compras"
             value={`${summary.progress_pct}%`}
-            sub={`${summary.received_items} de ${summary.total_items} items`}
+            sub={`${summary.received_items} de ${summary.total_items}`}
             progress={summary.progress_pct}
+          />
+          <KpiCard
+            icon={Inbox}
+            label="Pendientes"
+            value={String(summary.pending_items)}
+            sub="Sin solicitar"
+          />
+          <KpiCard
+            icon={FileSpreadsheet}
+            label="Solicitados"
+            value={String(summary.requested_items)}
+            sub="En cotización / PO"
           />
           <KpiCard
             icon={Truck}
             label="En tránsito"
             value={String(summary.in_transit_items)}
-            sub={`${summary.pending_items} pendientes`}
+            sub="Camino al taller"
           />
           <KpiCard
-            icon={DollarSign}
-            label="Gasto presupuestado"
-            value={summary.total_cost.toLocaleString('es-MX', {
-              style: 'currency',
-              currency: summary.currency || 'MXN',
-              maximumFractionDigits: 0,
-            })}
-            sub={`Moneda ${summary.currency}`}
+            icon={CheckCircle2}
+            label="Recibidos"
+            value={String(summary.received_items)}
+            sub="En almacén / stock"
+            tone="success"
           />
           <KpiCard
             icon={Clock}
-            label="Entregas atrasadas"
+            label="Atrasadas"
             value={String(summary.late_items)}
             sub={summary.late_items > 0 ? 'Requieren seguimiento' : 'Todo al día'}
             tone={summary.late_items > 0 ? 'warning' : 'success'}

@@ -312,22 +312,26 @@ export function useDeleteProjectBom() {
  */
 export interface PurchasingSummary {
   total_items: number;
-  received_items: number;
+  /** No solicitados aún */
   pending_items: number;
+  /** Solicitados al proveedor pero todavía sin enviar */
+  requested_items: number;
+  /** En camino */
   in_transit_items: number;
+  /** Recibidos o en stock */
+  received_items: number;
   progress_pct: number;
-  total_cost: number;
-  currency: string;
   late_items: number;
+  currency: string;
 }
 
 export function summarizePurchasing(items: BomItem[]): PurchasingSummary {
   const total = items.length;
-  const received = items.filter(i => i.bom_status === 'Recibido' || i.bom_status === 'Stock').length;
+  const pending = items.filter(i => i.bom_status === 'Pendiente').length;
+  const requested = items.filter(i => i.bom_status === 'Solicitado').length;
   const inTransit = items.filter(i => i.bom_status === 'Tránsito').length;
-  const pending = items.filter(i => i.bom_status === 'Pendiente' || i.bom_status === 'Solicitado').length;
+  const received = items.filter(i => i.bom_status === 'Recibido' || i.bom_status === 'Stock').length;
   const progress = total === 0 ? 0 : Math.round((received / total) * 100);
-  const totalCost = items.reduce((acc, i) => acc + (Number(i.unit_price) || 0) * (Number(i.quantity) || 0), 0);
   const today = new Date().toISOString().slice(0, 10);
   const late = items.filter(
     i =>
@@ -339,12 +343,12 @@ export function summarizePurchasing(items: BomItem[]): PurchasingSummary {
   const currency = items.find(i => i.currency)?.currency ?? 'MXN';
   return {
     total_items: total,
-    received_items: received,
     pending_items: pending,
+    requested_items: requested,
     in_transit_items: inTransit,
+    received_items: received,
     progress_pct: progress,
-    total_cost: totalCost,
-    currency,
     late_items: late,
+    currency,
   };
 }

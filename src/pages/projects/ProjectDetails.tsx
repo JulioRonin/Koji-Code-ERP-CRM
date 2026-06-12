@@ -399,16 +399,13 @@ export function ProjectDetails() {
                     </span>
                   </div>
                   <Progress value={purchasingSummary.progress_pct} className="h-1.5" />
-                  <div className="flex items-center justify-between text-xs text-[var(--color-app-text-muted)]">
-                    <span>
-                      Presupuesto:{' '}
-                      <strong className="text-[var(--color-app-text)]">
-                        {purchasingSummary.total_cost.toLocaleString('es-MX', {
-                          style: 'currency',
-                          currency: purchasingSummary.currency || 'MXN',
-                          maximumFractionDigits: 0,
-                        })}
-                      </strong>
+                  <div className="flex items-center justify-between text-xs text-[var(--color-app-text-muted)] flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-2 flex-wrap">
+                      <span><strong>{purchasingSummary.pending_items}</strong> pendientes</span>
+                      <span>·</span>
+                      <span><strong>{purchasingSummary.requested_items}</strong> solicitados</span>
+                      <span>·</span>
+                      <span><strong>{purchasingSummary.in_transit_items}</strong> en tránsito</span>
                     </span>
                     {purchasingSummary.late_items > 0 ? (
                       <span className="text-[var(--color-app-warning)] flex items-center gap-1">

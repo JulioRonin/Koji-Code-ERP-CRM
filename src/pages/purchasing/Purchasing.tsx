@@ -82,7 +82,7 @@ export function Purchasing() {
   const { data: requisitions } = useRequisitions();
   const { data: bomItems } = useBomItems();
 
-  // KPIs reales derivados de bom_items
+  // KPIs reales derivados de bom_items — desglose por estatus de compra
   const kpis = React.useMemo(() => {
     const summary = summarizePurchasing(bomItems);
     const pendingReqs = requisitions.filter(r => r.status === 'Pendiente' || r.status === 'Cotizando').length;
@@ -91,10 +91,13 @@ export function Purchasing() {
     return {
       pendingReqs,
       activeOrders,
-      totalCost: summary.total_cost,
-      currency: summary.currency,
-      suppliers,
+      pending: summary.pending_items,
+      requested: summary.requested_items,
+      inTransit: summary.in_transit_items,
+      received: summary.received_items,
+      progress: summary.progress_pct,
       late: summary.late_items,
+      suppliers,
     };
   }, [bomItems, requisitions]);
 
@@ -197,22 +200,24 @@ export function Purchasing() {
         </Button>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* KPI cards — desglose por estatus de compra del BOM activo */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: 'Req. pendientes', value: String(kpis.pendingReqs), sub: 'Requieren cotización', icon: AlertCircle },
-          { label: 'Órdenes activas',  value: String(kpis.activeOrders), sub: 'Aprobadas u ordenadas', icon: ShoppingCart },
           {
-            label: 'Gasto presupuestado',
-            value: kpis.totalCost.toLocaleString('es-MX', {
-              style: 'currency',
-              currency: kpis.currency || 'MXN',
-              maximumFractionDigits: 0,
-            }),
-            sub: kpis.late > 0 ? `${kpis.late} entregas atrasadas` : 'Sin atrasos',
-            icon: DollarSign,
+            label: 'Avance global',
+            value: `${kpis.progress}%`,
+            sub: `${kpis.received} recibidos`,
+            icon: ShoppingCart,
           },
-          { label: 'Proveedores',      value: String(kpis.suppliers), sub: 'Únicos en BOM activa', icon: FileText },
+          { label: 'Pendientes',  value: String(kpis.pending),   sub: 'Sin solicitar',     icon: AlertCircle },
+          { label: 'Solicitados', value: String(kpis.requested), sub: 'Cotización / PO',   icon: FileText },
+          { label: 'En tránsito', value: String(kpis.inTransit), sub: 'Camino al taller',  icon: ShoppingCart },
+          {
+            label: 'Atrasadas',
+            value: String(kpis.late),
+            sub: kpis.late > 0 ? 'Requieren seguimiento' : 'Todo al día',
+            icon: AlertCircle,
+          },
         ].map(k => (
           <Card key={k.label} className="p-0">
             <CardContent className="p-5">
