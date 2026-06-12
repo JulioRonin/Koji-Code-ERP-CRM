@@ -111,6 +111,19 @@ export function Production() {
       {activeTab === 'floor' && (
         <>
           {/* Machine cards */}
+          {machines.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center space-y-2">
+                <Settings className="h-8 w-8 mx-auto text-[var(--color-app-text-subtle)]" />
+                <p className="text-sm font-medium">Sin máquinas registradas</p>
+                <p className="text-xs text-[var(--color-app-text-muted)] max-w-md mx-auto">
+                  Aún no hay máquinas dadas de alta en el catálogo. Cuando registres tu
+                  parque de equipo aparecerán aquí con su estado en tiempo real (Operando,
+                  Setup, Mantenimiento, etc.).
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {machines.map(m => {
               const activeWO = workOrders.find(w => w.machine_id === m.id && w.status === 'En Proceso');
@@ -153,6 +166,7 @@ export function Production() {
               );
             })}
           </div>
+          )}
 
           {/* Active work orders */}
           <Card className="p-0">
@@ -174,6 +188,17 @@ export function Production() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
+              {workOrders.length === 0 ? (
+                <div className="py-10 text-center text-sm text-[var(--color-app-text-muted)] space-y-1">
+                  <p className="font-medium text-[var(--color-app-text)]">
+                    Sin órdenes de trabajo activas
+                  </p>
+                  <p className="text-xs">
+                    Las órdenes se generan al confirmar el plan de producción en la pestaña{' '}
+                    <strong>Planificación</strong> o desde el botón “Nueva orden de trabajo”.
+                  </p>
+                </div>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -220,6 +245,7 @@ export function Production() {
                     ))}
                 </TableBody>
               </Table>
+              )}
             </CardContent>
           </Card>
         </>

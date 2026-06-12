@@ -20,7 +20,12 @@ export function ProductionStatusHeader({
   // Sólo contamos piezas marcadas para fabricar (excluye hardware, consumibles, etc.)
   const productionItems = bomItems.filter(b => b.production_relevant !== false);
   const totalParts = productionItems.length;
-  const assignedParts = productionItems.filter(b => b.manufacturing_status !== 'PENDIENTE').length;
+  // Asignadas = piezas con técnico asignado (independiente del estatus)
+  const assignedParts = productionItems.filter(b => b.assigned_technician_id != null).length;
+  // En proceso = en activo (EN PROCESO, CALIDAD)
+  const wipParts = productionItems.filter(
+    b => b.manufacturing_status === 'EN PROCESO' || b.manufacturing_status === 'CALIDAD'
+  ).length;
   const finishedParts = productionItems.filter(b => b.manufacturing_status === 'TERMINADO').length;
   const progress = totalParts > 0 ? (finishedParts / totalParts) * 100 : 0;
 
@@ -49,13 +54,14 @@ export function ProductionStatusHeader({
           </div>
 
           {/* KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 flex-1 w-full">
             <Kpi icon={Box}          label="Total piezas" value={totalParts}    suffix="items" />
-            <Kpi icon={Clock}        label="Asignadas"    value={assignedParts} suffix="WIP" />
+            <Kpi icon={Target}       label="Con técnico"  value={assignedParts} suffix={totalParts > 0 ? `${Math.round((assignedParts / totalParts) * 100)}%` : 'asignadas'} />
+            <Kpi icon={Clock}        label="En proceso"   value={wipParts}      suffix="WIP" tone="primary" />
             <Kpi icon={CheckCircle2} label="Terminadas"   value={finishedParts} suffix="listo" tone="success" />
             <div className="space-y-2 rounded-md bg-[var(--color-app-surface-alt)] p-3 border border-[var(--color-app-border)]">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-[var(--color-app-text-muted)]">Progreso global</span>
+                <span className="text-xs text-[var(--color-app-text-muted)]">Progreso</span>
                 <span className="text-sm font-semibold">{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} className="h-1.5" />
@@ -78,7 +84,7 @@ function Kpi({
   label: string;
   value: number;
   suffix: string;
-  tone?: 'success';
+  tone?: 'success' | 'primary';
 }) {
   return (
     <div className="rounded-md bg-[var(--color-app-surface-alt)] p-3 border border-[var(--color-app-border)]">
@@ -90,6 +96,8 @@ function Kpi({
           className={
             tone === 'success'
               ? 'text-xl font-semibold text-[var(--color-app-success)]'
+              : tone === 'primary'
+              ? 'text-xl font-semibold text-[var(--color-app-primary)]'
               : 'text-xl font-semibold text-[var(--color-app-text)]'
           }
         >
