@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CheckSquare,
   Square,
@@ -144,7 +145,7 @@ export function DesignChecklist() {
       {/* Estilos de impresión: cabecera compacta + páginas A4 de 2×4 = 8 piezas */}
       <style>{`
         @media screen {
-          .print-only { display: none !important; }
+          .print-only, #koji-print-portal { display: none !important; }
         }
         @media print {
           @page { size: A4 portrait; margin: 8mm; }
@@ -152,40 +153,28 @@ export function DesignChecklist() {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
             background: white;
-            /* Vital: deja al print engine ver TODA la altura del contenido */
             height: auto !important;
             min-height: 0 !important;
             overflow: visible !important;
-          }
-          /* AppShell: el wrapper raíz tiene h-[100dvh] overflow-hidden,
-             eso normalmente colapsa el print a una sola "viewport". Lo
-             liberamos sólo durante impresión. */
-          body #root,
-          body > div,
-          body main,
-          body main > div,
-          body main > div > div {
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            overflow: visible !important;
-            display: block !important;
-            padding: 0 !important;
             margin: 0 !important;
-            max-width: none !important;
-            width: auto !important;
+            padding: 0 !important;
           }
-          /* Sidebar / header / drawer no deben aparecer en el PDF */
-          body aside,
-          body header,
-          body nav {
+          /* CLAVE: oculta TODO el árbol normal del AppShell en print.
+             Sólo el portal (que cuelga directo de <body>) se ve. */
+          body > #root {
             display: none !important;
           }
-          .no-print, .screen-only { display: none !important; }
-          .print-only { display: block !important; }
-
-          /* Reset: oculta TODO menos nuestro contenedor de impresión */
-          .print-root { display: block; }
+          body > #koji-print-portal {
+            display: block !important;
+            position: static !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          #koji-print-portal,
+          #koji-print-portal * {
+            visibility: visible !important;
+          }
 
           /* Header impreso: una sola tira, ~12mm */
           .print-banner {
@@ -390,39 +379,20 @@ export function DesignChecklist() {
       )}
 
       {/* ── VISTA DE IMPRESIÓN ───────────────────────────────────── */}
-      <div className="print-only print-root">
-        {/* Banner sólo en la primera página */}
-        <div className="print-banner">
-          <div>
-            <h1>
-              {selectedProject?.name ?? '—'} · {selectedProject?.id ?? ''}
-            </h1>
-            <div style={{ fontSize: '8pt', color: '#475569' }}>
-              Checklist de producción · {filteredParts.length} piezas · Cliente:{' '}
-              {selectedProject?.client_name ?? 'N/A'}
-            </div>
-          </div>
-          <div className="meta">
-            <div>Entrega: {deadlineStr}</div>
-            <div>Impreso: {format(new Date(), "dd MMM yyyy HH:mm", { locale: es })}</div>
-          </div>
-        </div>
-
-        {/* Un solo grid con TODAS las cards; el navegador pagina solo
-            apoyándose en break-inside: avoid de cada card. Esto funciona
-            mejor que tratar de forzar break-after en cada "página"
-            (Chrome lo ignora dentro de display:grid). */}
-        <div className="print-grid">
-          {filteredParts.map(item => (
-            <ChecklistCardPrint
-              key={item.id}
-              item={item}
-              imageUrl={item.image_url ? imageUrls[item.image_url] : undefined}
-              pdfThumbUrl={item.drawing_url ? pdfThumbUrls[item.drawing_url] : undefined}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Portal directo a <body> para que ningún padre del AppShell
+          (h-[100dvh], overflow-hidden, etc.) lo constraiga. Sólo se ve
+          en @media print; en pantalla queda con display:none. */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <PrintArea
+            project={selectedProject}
+            deadlineStr={deadlineStr}
+            filteredParts={filteredParts}
+            imageUrls={imageUrls}
+            pdfThumbUrls={pdfThumbUrls}
+          />,
+          document.body
+        )}
 
       {/* Zoom modal */}
       {zoomImage && (
@@ -574,6 +544,56 @@ function ChecklistCardPrint({ item, imageUrl, pdfThumbUrl }: PrintCardProps) {
           {item.category} · {item.quantity} {item.uom}
         </span>
         <span className="print-checkbox" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Contenedor que vive vía createPortal directamente bajo <body>.
+ * Esto evita que los wrappers del AppShell (h-[100dvh], overflow-hidden)
+ * recorten el contenido durante @media print.
+ */
+function PrintArea({
+  project,
+  deadlineStr,
+  filteredParts,
+  imageUrls,
+  pdfThumbUrls,
+}: {
+  project: ReturnType<typeof useProjects>['data'][number] | undefined;
+  deadlineStr: string;
+  filteredParts: BomItem[];
+  imageUrls: Record<string, string>;
+  pdfThumbUrls: Record<string, string>;
+}) {
+  return (
+    <div id="koji-print-portal">
+      <div className="print-banner">
+        <div>
+          <h1>
+            {project?.name ?? '—'} · {project?.id ?? ''}
+          </h1>
+          <div style={{ fontSize: '8pt', color: '#475569' }}>
+            Checklist de producción · {filteredParts.length} piezas · Cliente:{' '}
+            {project?.client_name ?? 'N/A'}
+          </div>
+        </div>
+        <div className="meta">
+          <div>Entrega: {deadlineStr}</div>
+          <div>Impreso: {format(new Date(), 'dd MMM yyyy HH:mm', { locale: es })}</div>
+        </div>
+      </div>
+
+      <div className="print-grid">
+        {filteredParts.map(item => (
+          <ChecklistCardPrint
+            key={item.id}
+            item={item}
+            imageUrl={item.image_url ? imageUrls[item.image_url] : undefined}
+            pdfThumbUrl={item.drawing_url ? pdfThumbUrls[item.drawing_url] : undefined}
+          />
+        ))}
       </div>
     </div>
   );
