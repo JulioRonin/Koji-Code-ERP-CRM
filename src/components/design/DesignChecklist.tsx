@@ -148,7 +148,39 @@ export function DesignChecklist() {
         }
         @media print {
           @page { size: A4 portrait; margin: 8mm; }
-          html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
+          html, body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            background: white;
+            /* Vital: deja al print engine ver TODA la altura del contenido */
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+          }
+          /* AppShell: el wrapper raíz tiene h-[100dvh] overflow-hidden,
+             eso normalmente colapsa el print a una sola "viewport". Lo
+             liberamos sólo durante impresión. */
+          body #root,
+          body > div,
+          body main,
+          body main > div,
+          body main > div > div {
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: none !important;
+            width: auto !important;
+          }
+          /* Sidebar / header / drawer no deben aparecer en el PDF */
+          body aside,
+          body header,
+          body nav {
+            display: none !important;
+          }
           .no-print, .screen-only { display: none !important; }
           .print-only { display: block !important; }
 
