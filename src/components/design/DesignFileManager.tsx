@@ -62,7 +62,6 @@ export function DesignFileManager() {
   const { assign: assignOne, loading: assigning } = useAssignDrawingManually();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [productionOnly, setProductionOnly] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [lastResult, setLastResult] = useState<AttachDrawingsResult | null>(null);
   /** Cola de archivos sin match — el usuario los asigna a mano desde el panel. */
@@ -75,7 +74,6 @@ export function DesignFileManager() {
 
   const filteredParts = useMemo(() => {
     let items = parts;
-    if (productionOnly) items = items.filter(p => p.production_relevant !== false);
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       items = items.filter(
@@ -85,7 +83,7 @@ export function DesignFileManager() {
       );
     }
     return items;
-  }, [parts, productionOnly, searchTerm]);
+  }, [parts, searchTerm]);
 
   const groupedParts = useMemo(() => {
     const groups = new Map<string, BomItem[]>();
@@ -413,23 +411,6 @@ export function DesignFileManager() {
             className="pl-9 h-9"
           />
         </div>
-        <label
-          className={
-            'inline-flex items-center gap-1.5 text-xs px-2.5 h-9 rounded-md border cursor-pointer transition-colors ' +
-            (productionOnly
-              ? 'border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]'
-              : 'border-[var(--color-app-border-strong)] hover:bg-[var(--color-app-surface-alt)]')
-          }
-        >
-          <input
-            type="checkbox"
-            checked={productionOnly}
-            onChange={e => setProductionOnly(e.target.checked)}
-            className="sr-only"
-          />
-          <Factory className="h-3.5 w-3.5" />
-          Sólo piezas de producción
-        </label>
       </div>
 
       {/* Tabla agrupada por categoría */}

@@ -198,12 +198,22 @@ async function uploadOne(
     .from('bom_items')
     .update({ [column]: storagePath, updated_at: new Date().toISOString() })
     .eq('id', itemId)
-    .select('id');
+    .select(`id, ${column}`);
   if (error) throw error;
   if (!data || data.length === 0) {
     throw new Error(
       'No se pudo guardar la referencia al archivo. Verifica que tu profiles.role sea ' +
         '"Administrador" en Supabase.'
+    );
+  }
+  // Verificación final: lo que la base reporta DEBE coincidir con el path
+  // que acabamos de escribir. Si no, hay un trigger / RLS que está silenciando.
+  const saved = (data[0] as Record<string, unknown>)[column];
+  if (saved !== storagePath) {
+    throw new Error(
+      `La base no aceptó la actualización del campo ${column}. ` +
+        `Esperado: ${storagePath} · Recibido: ${saved ?? 'null'}. ` +
+        'Reporta este error: posible trigger o policy bloqueando.'
     );
   }
 }

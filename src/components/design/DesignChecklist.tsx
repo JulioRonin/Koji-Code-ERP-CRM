@@ -70,7 +70,6 @@ export function DesignChecklist() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [productionOnly, setProductionOnly] = useState(true);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -96,7 +95,6 @@ export function DesignChecklist() {
 
   const filteredParts = useMemo(() => {
     let list = parts;
-    if (productionOnly) list = list.filter(p => p.production_relevant !== false);
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
@@ -106,7 +104,7 @@ export function DesignChecklist() {
       );
     }
     return list;
-  }, [parts, productionOnly, searchTerm]);
+  }, [parts, searchTerm]);
 
   const pages = useMemo(() => chunkPages(filteredParts, ITEMS_PER_PAGE), [filteredParts]);
   const imageUrls = useSignedUrls(filteredParts.map(p => p.image_url));
@@ -331,23 +329,6 @@ export function DesignChecklist() {
                   className="pl-9"
                 />
               </div>
-              <label
-                className={cn(
-                  'inline-flex items-center gap-1.5 text-xs px-2.5 h-9 rounded-md border cursor-pointer transition-colors',
-                  productionOnly
-                    ? 'border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]'
-                    : 'border-[var(--color-app-border-strong)] hover:bg-[var(--color-app-surface-alt)]'
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={productionOnly}
-                  onChange={e => setProductionOnly(e.target.checked)}
-                  className="sr-only"
-                />
-                <Factory className="h-3.5 w-3.5" />
-                Sólo producción
-              </label>
             </div>
           </div>
         </CardContent>

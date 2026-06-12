@@ -177,7 +177,6 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
   const [parseError, setParseError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BomItem | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
-  const [productionOnly, setProductionOnly] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -192,15 +191,9 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
     [allItems, selectedProjectId]
   );
 
-  // El toggle "Sólo producción" se aplica antes del motor genérico.
-  const baseItems = useMemo(
-    () => (productionOnly ? projectItems.filter(i => i.production_relevant) : projectItems),
-    [projectItems, productionOnly]
-  );
-
   const { filtered: filteredItems, groups } = useMemo(
-    () => applyTableState(baseItems, PURCHASING_FIELDS, tableState),
-    [baseItems, tableState]
+    () => applyTableState(projectItems, PURCHASING_FIELDS, tableState),
+    [projectItems, tableState]
   );
 
   /** Categorías disponibles (para el datalist de cada fila). */
@@ -501,34 +494,15 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
               onChange={setTableState}
               searchPlaceholder="Buscar parte, proveedor o categoría…"
               rightSlot={
-                <>
-                  <label
-                    className={
-                      'inline-flex items-center gap-1.5 text-xs px-2.5 h-9 rounded-md border cursor-pointer transition-colors ' +
-                      (productionOnly
-                        ? 'border-[var(--color-app-primary)] bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]'
-                        : 'border-[var(--color-app-border-strong)] hover:bg-[var(--color-app-surface-alt)]')
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      checked={productionOnly}
-                      onChange={e => setProductionOnly(e.target.checked)}
-                      className="sr-only"
-                    />
-                    <Factory className="h-3.5 w-3.5" />
-                    Sólo producción
-                  </label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setConfirmDeleteAll(true)}
-                    disabled={projectItems.length === 0 || deletingAll}
-                    className="text-[var(--color-app-danger)] hover:text-[var(--color-app-danger)]"
-                  >
-                    <Eraser className="h-4 w-4 mr-1.5" /> Eliminar BOM
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConfirmDeleteAll(true)}
+                  disabled={projectItems.length === 0 || deletingAll}
+                  className="text-[var(--color-app-danger)] hover:text-[var(--color-app-danger)]"
+                >
+                  <Eraser className="h-4 w-4 mr-1.5" /> Eliminar BOM
+                </Button>
               }
             />
           </div>
@@ -537,8 +511,6 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
             <div className="py-12 text-center text-sm text-[var(--color-app-text-muted)]">
               {projectItems.length === 0
                 ? 'Aún no hay materiales registrados para este proyecto. Importa una BOM con el cargador de arriba.'
-                : productionOnly
-                ? 'No hay items marcados como "producción" con ese filtro. Activa el toggle en cada fila para mandarlos a fabricación.'
                 : 'Sin resultados con ese filtro.'}
             </div>
           ) : (

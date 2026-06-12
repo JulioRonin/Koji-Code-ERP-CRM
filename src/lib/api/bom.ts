@@ -24,14 +24,11 @@ async function fetchAllBomItems(projectId?: string): Promise<BomItem[]> {
   let from = 0;
   // Bucle hasta que un bloque venga incompleto (= última página)
   // Tope de seguridad: 50 páginas (50k ítems) para no loopear infinito.
+  // IMPORTANTE: filtros (.eq) van ANTES de modificadores (.order, .range).
   for (let guard = 0; guard < 50; guard++) {
-    let query = supabase
-      .from('bom_items')
-      .select('*')
-      .order('part_number')
-      .range(from, from + PAGE - 1);
-    if (projectId) query = query.eq('project_id', projectId);
-    const { data, error } = await query;
+    let q = supabase.from('bom_items').select('*');
+    if (projectId) q = q.eq('project_id', projectId);
+    const { data, error } = await q.order('part_number').range(from, from + PAGE - 1);
     if (error) throw error;
     const batch = (data ?? []) as BomItem[];
     all.push(...batch);
