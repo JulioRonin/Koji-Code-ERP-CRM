@@ -180,7 +180,7 @@ export function TechnicianDashboard() {
     const prefill =
       `📦 *Pieza ${item.part_number}* — ${item.description ?? ''}\n` +
       `Proyecto ${project?.id ?? group.projectId}${project ? ` (${project.name})` : ''}\n` +
-      `Cantidad: ${item.quantity} ${item.uom}\n` +
+      `Cantidad a fabricar: ${item.production_quantity ?? item.quantity} ${item.uom}\n` +
       `Estatus actual: ${item.manufacturing_status}\n\n` +
       `Hola equipo, `;
     navigate(
@@ -487,7 +487,7 @@ function TechnicianPartCard({ item, busy, onSetStatus, onOpenChat }: PartCardPro
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-xs font-mono font-semibold">{item.part_number}</span>
             <Badge variant="outline" className="text-[10px]">
-              {item.quantity} {item.uom}
+              {item.production_quantity ?? item.quantity} {item.uom}
             </Badge>
             <Badge variant={STATUS_VARIANT[item.manufacturing_status]}>
               {item.manufacturing_status}

@@ -377,6 +377,11 @@ ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_relevant   BOOL
 -- drawing_url (PDF del plano técnico) — se imprime en la hoja de orden
 -- de trabajo y se muestra en el checklist visual.
 ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS image_url            TEXT;
+-- quantity         = cantidad que COMPRAS adquiere (columna "Qty" del template).
+-- production_quantity = piezas a FABRICAR (columna "Qty for Production").
+-- Esta última es la que se muestra en Producción, Diseño y Calidad.
+-- Si es NULL, esos módulos hacen fallback a quantity.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_quantity  NUMERIC;
 
 -- ---------------------------------------------------------------------------
 -- 7. COMPRAS — Requisiciones y POs

@@ -42,6 +42,7 @@ import {
   useDeleteBomItem,
   useDeleteProjectBom,
   summarizePurchasing,
+  useUpdateProductionQuantities,
 } from '@/lib/api';
 import { TableControls } from '@/components/shared/TableControls';
 import { applyTableState, type TableState } from '@/lib/tableControls';
@@ -62,6 +63,8 @@ interface ParsedRow {
   description: string;
   category: string;
   quantity: number;
+  /** Cantidad a fabricar (columna "Qty for Production"). null si no viene. */
+  production_quantity: number | null;
   uom: string;
   unit_price: number | null;
   supplier_name: string | null;
@@ -127,15 +130,33 @@ function mapRow(row: Record<string, unknown>): ParsedRow {
     part_number: String(get('part_number', 'part number', 'no parte', 'no. parte', 'numero de parte', 'parte', 'sku', 'name') ?? 'N/A'),
     description: String(get('description', 'descripcion', 'descripción', 'part description', 'detalle') ?? 'Sin descripción'),
     category,
+    // "Qty" = lo que compras adquiere
     quantity: Number(get('quantity', 'cantidad', 'qty', 'cant') ?? 1) || 1,
+    // "Qty for Production" = piezas a fabricar (acepta el typo "Prodcution")
+    production_quantity: toNumber(
+      get(
+        'qty for production',
+        'qty for prodcution',
+        'qty production',
+        'cantidad produccion',
+        'cantidad producción',
+        'cantidad a producir',
+        'production_quantity',
+        'prod qty'
+      )
+    ),
     uom: String(get('uom', 'unidad', 'um') ?? 'Pzas'),
     unit_price: toNumber(get('unit_price', 'precio', 'precio unitario', 'price', 'costo')),
     supplier_name: ((): string | null => {
       const v = get('supplier', 'proveedor', 'vendor');
       return v != null ? String(v) : null;
     })(),
-    requisition_date: toIsoDate(get('requisition_date', 'fecha requisicion', 'fecha requisición', 'fecha req', 'req date')),
-    delivery_date: toIsoDate(get('delivery_date', 'fecha entrega', 'eta', 'delivery', 'fecha promesa')),
+    requisition_date: toIsoDate(
+      get('requisition_date', 'fecha requisicion', 'fecha requisición', 'fecha req', 'req date', 'start')
+    ),
+    delivery_date: toIsoDate(
+      get('delivery_date', 'fecha entrega', 'eta', 'delivery', 'fecha promesa', 'due date')
+    ),
     notes: ((): string | null => {
       const v = get('notes', 'notas', 'observaciones', 'nota');
       return v != null ? String(v) : null;
@@ -164,6 +185,7 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
   const { update: updateItem } = useUpdateBomItem();
   const { remove: deleteItem } = useDeleteBomItem();
   const { removeAll: deleteAllBom, loading: deletingAll } = useDeleteProjectBom();
+  const { update: updateProdQty, loading: updatingProdQty } = useUpdateProductionQuantities();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>(lockedProjectId ?? '');
   // Estado de filtros/agrupación configurable (tipo Airtable). Por defecto
@@ -248,6 +270,7 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
     }
   };
 
+  /** Modo CREAR: inserta toda la BOM (proyecto nuevo / primera carga). */
   const handleImport = async () => {
     if (!parsedRows || !selectedProjectId) return;
     try {
@@ -258,6 +281,7 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
           description: r.description,
           category: r.category,
           quantity: r.quantity,
+          production_quantity: r.production_quantity,
           uom: r.uom,
           unit_price: r.unit_price,
           supplier_name: r.supplier_name,
@@ -272,6 +296,33 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
       setParsedRows(null);
     } catch (err) {
       flash((err as Error).message || 'No se pudo importar.', 'error');
+    }
+  };
+
+  /** Modo ACTUALIZAR: sólo escribe production_quantity sobre items
+   *  existentes (match por número de parte). No inserta ni duplica. */
+  const handleUpdateProductionQty = async () => {
+    if (!parsedRows || !selectedProjectId) return;
+    const rows = parsedRows
+      .filter(r => r.production_quantity != null)
+      .map(r => ({ part_number: r.part_number, production_quantity: r.production_quantity as number }));
+    if (rows.length === 0) {
+      flash('El archivo no trae la columna "Qty for Production" con valores.', 'error');
+      return;
+    }
+    try {
+      const res = await updateProdQty(selectedProjectId, rows);
+      await refetchBom();
+      const ok = res.matched.length;
+      const fail = res.unmatched.length;
+      if (fail === 0) {
+        flash(`Cantidades de producción actualizadas en ${ok} piezas.`);
+      } else {
+        flash(`${ok} actualizadas · ${fail} sin match (revisa los números de parte).`, 'error');
+      }
+      setParsedRows(null);
+    } catch (err) {
+      flash((err as Error).message || 'No se pudo actualizar.', 'error');
     }
   };
 
@@ -313,30 +364,32 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
   const downloadTemplate = () => {
     const sample = [
       {
-        part_number: 'MS-A-4140-01',
-        description: 'Acero 4140 redondo 2"x12"',
-        category: 'Materia Prima',
-        quantity: 10,
+        Name: 'MS-A-4140-01',
+        'Part Description': 'Acero 4140 redondo 2"x12"',
+        Type: 'Materia Prima',
+        Qty: 10,
+        'Qty for Production': 4,
         uom: 'Barras',
         unit_price: 4200,
-        supplier: 'Aceros del Bajío',
-        requisition_date: '2026-06-12',
-        delivery_date: '2026-06-22',
+        Supplier: 'Aceros del Bajío',
+        Start: '2026-06-12',
+        'Due Date': '2026-06-22',
         production_relevant: 'sí',
-        notes: 'Va a producción',
+        Notes: 'Qty=compras · Qty for Production=piezas a fabricar',
       },
       {
-        part_number: 'HD-B-0820-10',
-        description: 'Tornillo Allen M8x20mm',
-        category: 'Hardware',
-        quantity: 200,
+        Name: 'HD-B-0820-10',
+        'Part Description': 'Tornillo Allen M8x20mm',
+        Type: 'Hardware',
+        Qty: 200,
+        'Qty for Production': '',
         uom: 'Pzas',
         unit_price: 4.5,
-        supplier: 'Tornillos Mexicanos',
-        requisition_date: '2026-06-12',
-        delivery_date: '2026-06-22',
+        Supplier: 'Tornillos Mexicanos',
+        Start: '2026-06-12',
+        'Due Date': '2026-06-22',
         production_relevant: 'no',
-        notes: 'Sólo compra, no entra al plan',
+        Notes: 'Sólo compra, no entra al plan',
       },
     ];
     const ws = XLSX.utils.json_to_sheet(sample);
@@ -602,18 +655,43 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
               Vista previa de importación
             </DialogTitle>
             <DialogDescription>
-              {parsedRows?.length ?? 0} filas detectadas. Se asignarán a{' '}
+              {parsedRows?.length ?? 0} filas detectadas para{' '}
               <strong>{activeProject?.name ?? '—'}</strong>.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-96 overflow-y-auto border border-[var(--color-app-border)] rounded-md">
+
+          {/* Resumen de qué trae el archivo y qué hará cada modo */}
+          {parsedRows && (() => {
+            const withProdQty = parsedRows.filter(r => r.production_quantity != null).length;
+            const existingHasData = projectItems.length > 0;
+            return (
+              <div className="text-xs text-[var(--color-app-text-muted)] space-y-1 px-1">
+                <p>
+                  · Columna <strong>Qty</strong> (compras): {parsedRows.length} filas.
+                </p>
+                <p>
+                  · Columna <strong>Qty for Production</strong> (a fabricar):{' '}
+                  {withProdQty > 0 ? `${withProdQty} filas` : 'no detectada / vacía'}.
+                </p>
+                {existingHasData && (
+                  <p className="text-[var(--color-app-warning)]">
+                    ⚠ Este proyecto ya tiene {projectItems.length} materiales. Si sólo quieres
+                    agregar las cantidades de producción sin duplicar, usa{' '}
+                    <strong>“Sólo actualizar producción”</strong>.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
+          <div className="max-h-80 overflow-y-auto border border-[var(--color-app-border)] rounded-md">
             <table className="w-full text-xs">
               <thead className="bg-[var(--color-app-surface-alt)] sticky top-0">
                 <tr>
                   <th className="text-left p-2">Parte</th>
                   <th className="text-left p-2">Descripción</th>
                   <th className="text-right p-2">Qty</th>
-                  <th className="text-right p-2">Precio</th>
+                  <th className="text-right p-2">Qty prod.</th>
                   <th className="text-left p-2">Proveedor</th>
                   <th className="text-left p-2">Entrega</th>
                 </tr>
@@ -626,8 +704,8 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                     <td className="p-2 text-right tabular-nums">
                       {r.quantity} {r.uom}
                     </td>
-                    <td className="p-2 text-right tabular-nums">
-                      {r.unit_price != null ? `$${r.unit_price.toLocaleString('es-MX')}` : '—'}
+                    <td className="p-2 text-right tabular-nums font-medium text-[var(--color-app-primary)]">
+                      {r.production_quantity != null ? r.production_quantity : '—'}
                     </td>
                     <td className="p-2">{r.supplier_name ?? '—'}</td>
                     <td className="p-2">{r.delivery_date ?? '—'}</td>
@@ -636,13 +714,21 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
               </tbody>
             </table>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setParsedRows(null)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setParsedRows(null)} className="sm:mr-auto">
               Cancelar
             </Button>
-            <Button onClick={handleImport} disabled={inserting}>
+            <Button
+              variant="outline"
+              onClick={handleUpdateProductionQty}
+              disabled={updatingProdQty || inserting}
+              title="Match por número de parte; sólo escribe Qty for Production"
+            >
+              {updatingProdQty ? 'Actualizando…' : 'Sólo actualizar producción'}
+            </Button>
+            <Button onClick={handleImport} disabled={inserting || updatingProdQty}>
               <Save className="h-4 w-4 mr-1.5" />
-              {inserting ? 'Importando…' : 'Confirmar e importar'}
+              {inserting ? 'Importando…' : 'Importar todo (crear)'}
             </Button>
           </DialogFooter>
         </DialogContent>

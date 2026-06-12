@@ -362,7 +362,7 @@ export function ProductionProjectView(props: Props = {}) {
                       </div>
                     </TableCell>
                     <TableCell className="text-[var(--color-app-text-muted)] tabular-nums">
-                      {item.quantity} {item.uom}
+                      {item.production_quantity ?? item.quantity} {item.uom}
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-center gap-2">

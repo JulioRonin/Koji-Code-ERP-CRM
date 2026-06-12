@@ -119,6 +119,7 @@ interface BulkInsertBomItem {
   description: string | null;
   category: string;
   quantity: number;
+  production_quantity?: number | null;
   uom: string;
   material?: string | null;
   unit_price?: number | null;
@@ -146,6 +147,7 @@ export function useBulkInsertBom() {
       const rows = items.map(it => ({
         ...it,
         material: it.material ?? null,
+        production_quantity: it.production_quantity ?? null,
         unit_price: it.unit_price ?? null,
         currency: it.currency ?? 'MXN',
         supplier_name: it.supplier_name ?? null,
@@ -169,11 +171,91 @@ export function useBulkInsertBom() {
   return { insert, ...state };
 }
 
+/** Normaliza un part_number para comparar: minúsculas, sin separadores. */
+function normalizePart(s: string): string {
+  return (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export interface ProductionQtyRow {
+  part_number: string;
+  production_quantity: number;
+}
+
+export interface UpdateProductionQtyResult {
+  matched: { part_number: string; production_quantity: number }[];
+  unmatched: string[];
+}
+
+/**
+ * Actualiza SÓLO la columna production_quantity de items existentes,
+ * haciendo match por part_number dentro de un proyecto. No inserta filas
+ * nuevas ni toca ningún otro campo: es la operación segura para "agregar
+ * la cantidad de producción a un BOM ya cargado" sin duplicar ni romper
+ * la data existente.
+ *
+ * El match ignora mayúsculas y separadores (-, _, espacios).
+ */
+export function useUpdateProductionQuantities() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const update = useCallback(
+    async (projectId: string, rows: ProductionQtyRow[]): Promise<UpdateProductionQtyResult> => {
+      setState({ loading: true, error: null });
+      const matched: UpdateProductionQtyResult['matched'] = [];
+      const unmatched: string[] = [];
+      try {
+        if (!supabase) {
+          setState({ loading: false, error: null });
+          return { matched: rows.map(r => ({ ...r })), unmatched: [] };
+        }
+
+        // 1. Trae los items existentes del proyecto (id + part_number).
+        const existing = await fetchAllBomItems(projectId);
+        const byNorm = new Map<string, string>(); // normPart -> id
+        existing.forEach(it => byNorm.set(normalizePart(it.part_number), it.id));
+
+        const now = new Date().toISOString();
+        // 2. Por cada fila del archivo, busca match y actualiza sólo la qty.
+        for (const r of rows) {
+          const id = byNorm.get(normalizePart(r.part_number));
+          if (!id) {
+            unmatched.push(r.part_number);
+            continue;
+          }
+          const { data, error } = await supabase
+            .from('bom_items')
+            .update({ production_quantity: r.production_quantity, updated_at: now })
+            .eq('id', id)
+            .select('id');
+          if (error) throw error;
+          if (!data || data.length === 0) {
+            throw new Error(
+              `No se pudo actualizar ${r.part_number}. Verifica que tu profiles.role sea "Administrador".`
+            );
+          }
+          matched.push({ part_number: r.part_number, production_quantity: r.production_quantity });
+        }
+
+        setState({ loading: false, error: null });
+        return { matched, unmatched };
+      } catch (err) {
+        const error = err as Error;
+        setState({ loading: false, error });
+        throw error;
+      }
+    },
+    []
+  );
+
+  return { update, ...state };
+}
+
 export interface UpdateBomItemInput {
   part_number?: string;
   description?: string | null;
   category?: string;
   quantity?: number;
+  production_quantity?: number | null;
   uom?: string;
   bom_status?: BomStatus;
   unit_price?: number | null;

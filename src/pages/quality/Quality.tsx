@@ -699,7 +699,7 @@ function QualityRow({ item, technicianName, busy, onSetStatus }: QualityRowProps
         <div className="flex items-center gap-2 flex-wrap mb-1">
           <span className="text-xs font-mono font-semibold">{item.part_number}</span>
           <Badge variant="outline" className="text-[10px]">
-            {item.quantity} {item.uom}
+            {item.production_quantity ?? item.quantity} {item.uom}
           </Badge>
           {technicianName && (
             <span className="text-[11px] text-[var(--color-app-text-muted)]">

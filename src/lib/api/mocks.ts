@@ -143,6 +143,7 @@ const baseBom = {
   notes: null,
   production_relevant: true,
   image_url: null,
+  production_quantity: null,
 };
 
 export const MOCK_BOM_ITEMS: BomItem[] = [

@@ -474,7 +474,7 @@ export function DesignFileManager() {
                             <td className="p-2 font-mono text-xs">{item.part_number}</td>
                             <td className="p-2">{item.description}</td>
                             <td className="p-2 text-center tabular-nums text-[var(--color-app-text-muted)]">
-                              {item.quantity} {item.uom}
+                              {item.production_quantity ?? item.quantity} {item.uom}
                             </td>
                             <td className="p-2 text-center">
                               {item.drawing_url ? (

@@ -485,7 +485,7 @@ function ChecklistCardScreen({ item, imageUrl, pdfThumbUrl, checked, onToggle, o
           <div className="flex items-center gap-1.5 pt-2 border-t border-[var(--color-app-border)]">
             <Badge variant="secondary">{item.category}</Badge>
             <Badge variant="outline">
-              {item.quantity} {item.uom}
+              {item.production_quantity ?? item.quantity} {item.uom}
             </Badge>
             {item.drawing_url && (
               <Badge variant="default" className="gap-1">
@@ -522,7 +522,7 @@ function ChecklistCardPrint({ item, imageUrl, pdfThumbUrl }: PrintCardProps) {
       <div className="print-card-desc">{item.description}</div>
       <div className="print-card-bottom">
         <span>
-          {item.category} · {item.quantity} {item.uom}
+          {item.category} · {item.production_quantity ?? item.quantity} {item.uom}
         </span>
         <span className="print-checkbox" />
       </div>

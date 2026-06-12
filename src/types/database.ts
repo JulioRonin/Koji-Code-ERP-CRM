@@ -363,6 +363,7 @@ export interface BomItem {
   category: string;
   material: string | null;
   quantity: number;
+  production_quantity: number | null;
   uom: string;
   bom_status: BomStatus;
   manufacturing_status: ManufacturingStatus;
