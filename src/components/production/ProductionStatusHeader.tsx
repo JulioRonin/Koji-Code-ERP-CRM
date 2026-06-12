@@ -1,26 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { CheckCircle2, Clock, Target, Box } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { useProjects, useBomItems } from '@/lib/api';
+import type { BomItem, Project } from '@/types/database';
 
-export function ProductionStatusHeader() {
-  const { data: projects } = useProjects();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const { data: bomItems } = useBomItems(selectedProjectId || undefined);
+interface Props {
+  projects: Project[];
+  bomItems: BomItem[];
+  selectedProjectId: string;
+  onSelectProject: (id: string) => void;
+}
 
-  // Selecciona el primer proyecto cuando llegan
-  useEffect(() => {
-    if (projects.length > 0 && !selectedProjectId) {
-      // Prefiere proyectos en producción
-      const inProd = projects.find(p => p.status === 'En Producción') ?? projects[0];
-      setSelectedProjectId(inProd.id);
-    }
-  }, [projects, selectedProjectId]);
-
-  const totalParts = bomItems.length;
-  const assignedParts = bomItems.filter(b => b.manufacturing_status !== 'PENDIENTE').length;
-  const finishedParts = bomItems.filter(b => b.manufacturing_status === 'TERMINADO').length;
+export function ProductionStatusHeader({
+  projects,
+  bomItems,
+  selectedProjectId,
+  onSelectProject,
+}: Props) {
+  // Sólo contamos piezas marcadas para fabricar (excluye hardware, consumibles, etc.)
+  const productionItems = bomItems.filter(b => b.production_relevant !== false);
+  const totalParts = productionItems.length;
+  // Asignadas = piezas con técnico asignado (independiente del estatus)
+  const assignedParts = productionItems.filter(b => b.assigned_technician_id != null).length;
+  // En proceso = en activo (EN PROCESO, CALIDAD)
+  const wipParts = productionItems.filter(
+    b => b.manufacturing_status === 'EN PROCESO' || b.manufacturing_status === 'CALIDAD'
+  ).length;
+  const finishedParts = productionItems.filter(b => b.manufacturing_status === 'TERMINADO').length;
   const progress = totalParts > 0 ? (finishedParts / totalParts) * 100 : 0;
 
   return (
@@ -35,7 +41,7 @@ export function ProductionStatusHeader() {
             </div>
             <select
               value={selectedProjectId}
-              onChange={e => setSelectedProjectId(e.target.value)}
+              onChange={e => onSelectProject(e.target.value)}
               className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm text-[var(--color-app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)] transition-colors"
             >
               {projects.length === 0 && <option value="">No hay proyectos</option>}
@@ -48,13 +54,14 @@ export function ProductionStatusHeader() {
           </div>
 
           {/* KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 flex-1 w-full">
             <Kpi icon={Box}          label="Total piezas" value={totalParts}    suffix="items" />
-            <Kpi icon={Clock}        label="Asignadas"    value={assignedParts} suffix="WIP" />
+            <Kpi icon={Target}       label="Con técnico"  value={assignedParts} suffix={totalParts > 0 ? `${Math.round((assignedParts / totalParts) * 100)}%` : 'asignadas'} />
+            <Kpi icon={Clock}        label="En proceso"   value={wipParts}      suffix="WIP" tone="primary" />
             <Kpi icon={CheckCircle2} label="Terminadas"   value={finishedParts} suffix="listo" tone="success" />
             <div className="space-y-2 rounded-md bg-[var(--color-app-surface-alt)] p-3 border border-[var(--color-app-border)]">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-[var(--color-app-text-muted)]">Progreso global</span>
+                <span className="text-xs text-[var(--color-app-text-muted)]">Progreso</span>
                 <span className="text-sm font-semibold">{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} className="h-1.5" />
@@ -77,7 +84,7 @@ function Kpi({
   label: string;
   value: number;
   suffix: string;
-  tone?: 'success';
+  tone?: 'success' | 'primary';
 }) {
   return (
     <div className="rounded-md bg-[var(--color-app-surface-alt)] p-3 border border-[var(--color-app-border)]">
@@ -89,6 +96,8 @@ function Kpi({
           className={
             tone === 'success'
               ? 'text-xl font-semibold text-[var(--color-app-success)]'
+              : tone === 'primary'
+              ? 'text-xl font-semibold text-[var(--color-app-primary)]'
               : 'text-xl font-semibold text-[var(--color-app-text)]'
           }
         >

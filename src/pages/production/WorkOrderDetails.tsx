@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import {
   useWorkOrders,
   useMachines,
-  useProfiles,
+  useTechnicians,
   useWorkOrderStages,
   useCreateWorkOrderStages,
   useStartStage,
@@ -55,7 +55,7 @@ export function WorkOrderDetails() {
 
   const { data: workOrders } = useWorkOrders();
   const { data: machines } = useMachines();
-  const { data: technicians } = useProfiles('Técnico');
+  const { data: technicians } = useTechnicians();
 
   const workOrder = workOrders.find(w => w.id === id);
   const machine = machines.find(m => m.id === workOrder?.machine_id);

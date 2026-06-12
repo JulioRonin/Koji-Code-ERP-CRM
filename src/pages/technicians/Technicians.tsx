@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
-import { useProfiles, useWorkOrders, useMachines } from '@/lib/api';
+import { useTechnicians, useWorkOrders, useMachines } from '@/lib/api';
 import type { Profile, WorkOrder } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -48,7 +48,7 @@ const statusBadge: Record<string, 'default' | 'secondary' | 'warning' | 'success
 
 export function Technicians() {
   const navigate = useNavigate();
-  const { data: technicians } = useProfiles('Técnico');
+  const { data: technicians } = useTechnicians();
   const { data: allWorkOrders } = useWorkOrders();
   const { data: machines } = useMachines();
 

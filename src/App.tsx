@@ -7,6 +7,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { Login } from './pages/auth/Login';
+import { ForgotPassword } from './pages/auth/ForgotPassword';
+import { ResetPassword } from './pages/auth/ResetPassword';
 import { Dashboard } from './pages/dashboard/Dashboard';
 import { Projects } from './pages/projects/Projects';
 import { ProjectDetails } from './pages/projects/ProjectDetails';
@@ -31,18 +33,13 @@ import {
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
 import { TechnicianDashboard } from './pages/technicians/TechnicianDashboard';
+import { canAccessPath, defaultRouteForRole } from './lib/permissions';
 
 // Role-based Access Guard
-const ProtectedRoute = ({ 
-  children, 
-  allowedDepartments = ['ALL'] 
-}: { 
-  children: React.ReactNode, 
-  allowedDepartments?: string[] 
-}) => {
-  const { isAuthenticated, user, isLoading } = useAuth();
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, user, isLoading, isRecovery } = useAuth();
   const location = useLocation();
-  
+
   if (isLoading) {
     return (
       <div className="h-screen w-screen bg-cyber-dark flex items-center justify-center">
@@ -50,30 +47,35 @@ const ProtectedRoute = ({
       </div>
     );
   }
-  
+
+  // Si el usuario llegó por un enlace de recuperación, NO lo dejamos entrar
+  // al ERP: lo mandamos a fijar su nueva contraseña.
+  if (isRecovery) {
+    return <Navigate to="/reset-password" replace />;
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Technician Specific Redirection
-  if (user?.department === 'Técnico' && !location.pathname.startsWith('/technician-portal')) {
+  // Técnicos viven en /technician-portal pero pueden ir a /chat para
+  // discutir piezas concretas. Cualquier otra ruta los regresa al portal.
+  if (
+    user?.role === 'Técnico' &&
+    !location.pathname.startsWith('/technician-portal') &&
+    !location.pathname.startsWith('/chat')
+  ) {
     return <Navigate to="/technician-portal" replace />;
   }
-
-  // Prevent Non-Technicians from accessing the portal
-  if (user?.department !== 'Técnico' && location.pathname.startsWith('/technician-portal')) {
+  if (user?.role !== 'Técnico' && location.pathname.startsWith('/technician-portal')) {
     return <Navigate to="/" replace />;
   }
 
-  // Access Control by Department
-  const canAccess = allowedDepartments.includes('ALL') || 
-                   (user && allowedDepartments.includes(user.department)) ||
-                   (user && ['Administrador', 'Administración / PM', 'Compras'].includes(user.department)); // Admins see everything
-
-  if (!canAccess) {
-    return <Navigate to="/" replace />;
+  // Permisos por ruta — single source of truth en src/lib/permissions.ts
+  if (!canAccessPath(user?.role, location.pathname)) {
+    return <Navigate to={defaultRouteForRole(user?.role)} replace />;
   }
-  
+
   return <>{children}</>;
 };
 
@@ -82,6 +84,8 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Public Client Portal (magic-link, no auth guard) */}
         <Route path="/cliente/:token" element={<ClientPortal />} />
@@ -100,106 +104,24 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route index element={<Dashboard />} />
-          
-          <Route path="projects" element={
-            <ProtectedRoute allowedDepartments={['Producción', 'Diseño']}>
-               <Projects />
-            </ProtectedRoute>
-          } />
-
-          <Route path="projects/new" element={
-            <ProtectedRoute allowedDepartments={['Producción', 'Diseño']}>
-               <NewProjectWizard />
-            </ProtectedRoute>
-          } />
-
-          <Route path="projects/:id" element={
-            <ProtectedRoute allowedDepartments={['Producción', 'Diseño']}>
-               <ProjectDetails />
-            </ProtectedRoute>
-          } />
-
-          <Route path="purchasing" element={
-            <ProtectedRoute allowedDepartments={['Producción']}>
-               <Purchasing />
-            </ProtectedRoute>
-          } />
-
-          <Route path="design" element={
-            <ProtectedRoute allowedDepartments={['Producción', 'Diseño']}>
-                <Design />
-            </ProtectedRoute>
-          } />
-
-          <Route path="production" element={
-            <ProtectedRoute allowedDepartments={['Producción']}>
-                <Production />
-            </ProtectedRoute>
-          } />
-
-          <Route path="production/wo/:id" element={
-            <ProtectedRoute allowedDepartments={['Producción']}>
-                <WorkOrderDetails />
-            </ProtectedRoute>
-          } />
-
-          <Route path="shipping" element={
-            <ProtectedRoute allowedDepartments={['Producción']}>
-                <Shipping />
-            </ProtectedRoute>
-          } />
-
-          <Route path="pmo" element={
-            <ProtectedRoute allowedDepartments={['Producción']}>
-                <Pmo />
-            </ProtectedRoute>
-          } />
-
-          <Route path="quotes" element={
-            <ProtectedRoute allowedDepartments={['Compras']}>
-                <Quotes />
-            </ProtectedRoute>
-          } />
-
-          <Route path="quotes/:id" element={
-            <ProtectedRoute allowedDepartments={['Compras']}>
-                <QuoteBuilder />
-            </ProtectedRoute>
-          } />
-
-          <Route path="settings/integrations" element={
-            <ProtectedRoute allowedDepartments={[]}>
-                <Integrations />
-            </ProtectedRoute>
-          } />
-
-          <Route path="quality" element={
-            <ProtectedRoute allowedDepartments={['Producción', 'Calidad']}>
-                <Quality />
-            </ProtectedRoute>
-          } />
-
-          <Route path="technicians" element={
-            <ProtectedRoute allowedDepartments={['Producción']}>
-               <Technicians />
-            </ProtectedRoute>
-          } />
-
-          <Route path="personnel" element={
-            <ProtectedRoute allowedDepartments={[]}> {/* Admins only via fallback check in ProtectedRoute */}
-               <Personnel />
-            </ProtectedRoute>
-          } />
-
-          <Route path="chat" element={<Chat />} />
-          
-          <Route path="billing" element={
-            <ProtectedRoute allowedDepartments={[]}> {/* Admins only */}
-              <Billing />
-            </ProtectedRoute>
-          } />
-
-          <Route path="settings" element={<Settings />} />
+          <Route path="projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+          <Route path="projects/new" element={<ProtectedRoute><NewProjectWizard /></ProtectedRoute>} />
+          <Route path="projects/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
+          <Route path="purchasing" element={<ProtectedRoute><Purchasing /></ProtectedRoute>} />
+          <Route path="design" element={<ProtectedRoute><Design /></ProtectedRoute>} />
+          <Route path="production" element={<ProtectedRoute><Production /></ProtectedRoute>} />
+          <Route path="production/wo/:id" element={<ProtectedRoute><WorkOrderDetails /></ProtectedRoute>} />
+          <Route path="shipping" element={<ProtectedRoute><Shipping /></ProtectedRoute>} />
+          <Route path="pmo" element={<ProtectedRoute><Pmo /></ProtectedRoute>} />
+          <Route path="quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
+          <Route path="quotes/:id" element={<ProtectedRoute><QuoteBuilder /></ProtectedRoute>} />
+          <Route path="settings/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
+          <Route path="quality" element={<ProtectedRoute><Quality /></ProtectedRoute>} />
+          <Route path="technicians" element={<ProtectedRoute><Technicians /></ProtectedRoute>} />
+          <Route path="personnel" element={<ProtectedRoute><Personnel /></ProtectedRoute>} />
+          <Route path="chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+          <Route path="billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+          <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           
           {/* Universal Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />

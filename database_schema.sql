@@ -360,6 +360,29 @@ CREATE TABLE IF NOT EXISTS public.bom_items (
 CREATE INDEX IF NOT EXISTS idx_bom_items_project ON public.bom_items(project_id);
 CREATE INDEX IF NOT EXISTS idx_bom_items_mfg_status ON public.bom_items(manufacturing_status);
 
+-- Columnas de seguimiento de compra (precio, proveedor, fechas, notas).
+-- Se agregan via ALTER para ser idempotente con bases existentes.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS unit_price            NUMERIC;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS currency              TEXT DEFAULT 'MXN';
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS supplier_id           UUID REFERENCES public.suppliers(id) ON DELETE SET NULL;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS supplier_name         TEXT;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS requisition_date      DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS delivery_date         DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS actual_delivery_date  DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS notes                 TEXT;
+-- Marca si el item es pieza a fabricar (true) o consumible/hardware/insumo
+-- que sólo se compra pero no entra al plan de producción (false).
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_relevant   BOOLEAN NOT NULL DEFAULT TRUE;
+-- Thumbnail / foto del checklist de producción (PNG / JPG). Distinto al
+-- drawing_url (PDF del plano técnico) — se imprime en la hoja de orden
+-- de trabajo y se muestra en el checklist visual.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS image_url            TEXT;
+-- quantity         = cantidad que COMPRAS adquiere (columna "Qty" del template).
+-- production_quantity = piezas a FABRICAR (columna "Qty for Production").
+-- Esta última es la que se muestra en Producción, Diseño y Calidad.
+-- Si es NULL, esos módulos hacen fallback a quantity.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_quantity  NUMERIC;
+
 -- ---------------------------------------------------------------------------
 -- 7. COMPRAS — Requisiciones y POs
 -- ---------------------------------------------------------------------------
@@ -817,6 +840,15 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Técnicos pueden actualizar bom_items DONDE están asignados (cambia
+-- manufacturing_status durante la fabricación). USING acota a sus piezas
+-- propias; WITH CHECK evita que se reasignen el item a otro técnico.
+DROP POLICY IF EXISTS "tech update own assignments" ON public.bom_items;
+CREATE POLICY "tech update own assignments" ON public.bom_items
+    FOR UPDATE TO authenticated
+    USING (assigned_technician_id = auth.uid())
+    WITH CHECK (assigned_technician_id = auth.uid());
+
 -- Admins pueden actualizar perfiles del personal (sólo UPDATE; INSERT lo hace
 -- el trigger handle_new_user al registrar un auth.user). Sin política dedicada
 -- la actualización fallaba en silencio para los Administradores.
@@ -875,6 +907,45 @@ CREATE POLICY "log time" ON public.time_entries
     FOR ALL TO authenticated
     USING (operator_id = auth.uid() OR public.is_admin())
     WITH CHECK (operator_id = auth.uid() OR public.is_admin());
+
+-- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- 15b. SUPABASE STORAGE — bucket de planos / modelos / archivos del proyecto
+-- ---------------------------------------------------------------------------
+-- El bucket "project-files" almacena los PDFs de planos 2D, modelos 3D
+-- (STEP/IGS/…) y demás documentos del proyecto. El nombre tiene que ser
+-- EXACTAMENTE "project-files" porque el código frontend lo cablea así.
+--
+-- 1. Crea el bucket desde Supabase → Storage → New bucket:
+--      Name: project-files
+--      Public bucket: OFF (se accede vía signed URLs)
+--
+-- 2. Aplica las policies de abajo en el SQL editor. Sin estas, Supabase
+--    rechaza los INSERT/SELECT contra storage.objects con
+--    "new row violates row-level security policy".
+
+-- Lectura: cualquier usuario autenticado puede generar signed URLs
+DROP POLICY IF EXISTS "project-files read" ON storage.objects;
+CREATE POLICY "project-files read" ON storage.objects
+    FOR SELECT TO authenticated
+    USING (bucket_id = 'project-files');
+
+-- Escritura: sólo Administrador / PM puede subir y reemplazar archivos
+DROP POLICY IF EXISTS "project-files write" ON storage.objects;
+CREATE POLICY "project-files write" ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'project-files' AND public.is_admin());
+
+DROP POLICY IF EXISTS "project-files update" ON storage.objects;
+CREATE POLICY "project-files update" ON storage.objects
+    FOR UPDATE TO authenticated
+    USING (bucket_id = 'project-files' AND public.is_admin())
+    WITH CHECK (bucket_id = 'project-files' AND public.is_admin());
+
+DROP POLICY IF EXISTS "project-files delete" ON storage.objects;
+CREATE POLICY "project-files delete" ON storage.objects
+    FOR DELETE TO authenticated
+    USING (bucket_id = 'project-files' AND public.is_admin());
 
 -- ---------------------------------------------------------------------------
 -- 16. DATOS INICIALES
