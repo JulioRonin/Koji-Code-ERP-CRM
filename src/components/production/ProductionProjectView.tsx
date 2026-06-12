@@ -29,6 +29,7 @@ import {
   getFileDownloadUrl,
   useUpdateManufacturingStatus,
   useTechnicians,
+  useAssignTechnician,
 } from '@/lib/api';
 import type { BomItem, ManufacturingStatus } from '@/types/database';
 import { CheckCircle2, Circle, ChevronDown, Loader2 } from 'lucide-react';
@@ -93,15 +94,21 @@ export function ProductionProjectView(props: Props = {}) {
   const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<BomItem | null>(null);
   const { data: technicians } = useTechnicians();
+  // Sólo dispara la consulta interna si el padre NO está pasándonos datos.
+  // Tener ambas (internal + props) causaba doble fetch y carreras entre
+  // refetchs que dejaban la lista vacía durante una fracción de segundo.
   const internalProjects = useProjects().data;
   const projectsList = props.projects ?? internalProjects;
-  const internalBom = useBomItems(effectiveProjectId ?? undefined);
+  const internalBom = useBomItems(
+    props.bomItems === undefined ? effectiveProjectId ?? undefined : undefined
+  );
   const parts = props.bomItems ?? internalBom.data;
   const refetchParts = async () => {
     if (props.onChanged) await props.onChanged();
     else await internalBom.refetch();
   };
   const { update: updateMfg, loading: updatingMfg } = useUpdateManufacturingStatus();
+  const { assign: assignTech } = useAssignTechnician();
   const [busyToggleId, setBusyToggleId] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
@@ -121,6 +128,12 @@ export function ProductionProjectView(props: Props = {}) {
     }
   }, [selectedPart?.id]);
 
+  // Filtros de la tabla
+  const [statusFilter, setStatusFilter] = useState<ManufacturingStatus | 'TODOS'>('TODOS');
+  const [assignFilter, setAssignFilter] = useState<'TODOS' | 'ASIGNADAS' | 'SIN_ASIGNAR' | 'MIAS'>(
+    'TODOS'
+  );
+
   const handleConfirmPlan = async () => {
     if (!selectedPart) return;
     if (!planTechId) {
@@ -130,25 +143,7 @@ export function ProductionProjectView(props: Props = {}) {
     setPlanSaving(true);
     setPlanError(null);
     try {
-      // 1. Guarda el técnico en bom_items.assigned_technician_id
-      const supabase = (await import('@/lib/supabase')).supabase;
-      if (supabase) {
-        const { data, error } = await supabase
-          .from('bom_items')
-          .update({
-            assigned_technician_id: planTechId,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', selectedPart.id)
-          .select('id');
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          throw new Error(
-            'No se pudo asignar el técnico. Verifica que tu profiles.role sea Administrador.'
-          );
-        }
-      }
-      // 2. Pasa la pieza a EN PROCESO si estaba en PENDIENTE
+      await assignTech(selectedPart.id, planTechId);
       if (selectedPart.manufacturing_status === 'PENDIENTE') {
         await updateMfg(selectedPart.id, 'EN PROCESO');
       }
@@ -157,6 +152,22 @@ export function ProductionProjectView(props: Props = {}) {
       setSelectedPart(null);
     } catch (err) {
       setPlanError((err as Error).message || 'No se pudo confirmar la asignación.');
+    } finally {
+      setPlanSaving(false);
+    }
+  };
+
+  const handleUnassign = async () => {
+    if (!selectedPart) return;
+    setPlanSaving(true);
+    setPlanError(null);
+    try {
+      await assignTech(selectedPart.id, null);
+      await refetchParts();
+      setIsPlanningModalOpen(false);
+      setSelectedPart(null);
+    } catch (err) {
+      setPlanError((err as Error).message || 'No se pudo desasignar.');
     } finally {
       setPlanSaving(false);
     }
@@ -182,13 +193,19 @@ export function ProductionProjectView(props: Props = {}) {
   // consumibles, hardware y demás insumos viven en el módulo de Compras
   // pero no aparecen aquí.
   const productionParts = parts.filter(p => p.production_relevant !== false);
-  const filteredParts = productionParts.filter(p =>
-    searchTerm.trim()
-      ? p.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())
-      : true
-  );
-
+  const filteredParts = productionParts.filter(p => {
+    if (statusFilter !== 'TODOS' && p.manufacturing_status !== statusFilter) return false;
+    if (assignFilter === 'ASIGNADAS' && !p.assigned_technician_id) return false;
+    if (assignFilter === 'SIN_ASIGNAR' && p.assigned_technician_id) return false;
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      return (
+        p.part_number.toLowerCase().includes(q) ||
+        (p.description ?? '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
   if (!effectiveProjectId) {
     return (
       <div className="space-y-4">
@@ -269,11 +286,77 @@ export function ProductionProjectView(props: Props = {}) {
         </div>
       )}
 
+      {/* Filtros agrupadores */}
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[var(--color-app-text-muted)] uppercase tracking-wide text-[10px]">
+            Estado:
+          </span>
+          {(['TODOS', 'PENDIENTE', 'EN PROCESO', 'CALIDAD', 'TERMINADO', 'RECHAZADO'] as const).map(
+            s => {
+              const count =
+                s === 'TODOS'
+                  ? productionParts.length
+                  : productionParts.filter(p => p.manufacturing_status === s).length;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={
+                    'h-7 px-2.5 rounded-md border transition-colors ' +
+                    (statusFilter === s
+                      ? 'bg-[var(--color-app-primary)] text-white border-[var(--color-app-primary)]'
+                      : 'bg-white border-[var(--color-app-border)] hover:border-[var(--color-app-primary)]/40')
+                  }
+                >
+                  {s} <span className="opacity-70 ml-1">{count}</span>
+                </button>
+              );
+            }
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[var(--color-app-text-muted)] uppercase tracking-wide text-[10px]">
+            Asignación:
+          </span>
+          {(
+            [
+              { id: 'TODOS', label: 'Todas' },
+              { id: 'ASIGNADAS', label: 'Asignadas' },
+              { id: 'SIN_ASIGNAR', label: 'Sin asignar' },
+            ] as const
+          ).map(opt => {
+            const count =
+              opt.id === 'TODOS'
+                ? productionParts.length
+                : opt.id === 'ASIGNADAS'
+                ? productionParts.filter(p => p.assigned_technician_id).length
+                : productionParts.filter(p => !p.assigned_technician_id).length;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => setAssignFilter(opt.id)}
+                className={
+                  'h-7 px-2.5 rounded-md border transition-colors ' +
+                  (assignFilter === opt.id
+                    ? 'bg-[var(--color-app-primary)] text-white border-[var(--color-app-primary)]'
+                    : 'bg-white border-[var(--color-app-border)] hover:border-[var(--color-app-primary)]/40')
+                }
+              >
+                {opt.label} <span className="opacity-70 ml-1">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <Card className="p-0">
         <CardContent className="p-0">
           {filteredParts.length === 0 ? (
             <div className="py-12 text-center text-sm text-[var(--color-app-text-muted)]">
-              Sin partes en el BOM de este proyecto. Cárgalas desde Compras → BOM / Listas.
+              {productionParts.length === 0
+                ? 'Sin partes en el BOM de este proyecto. Cárgalas desde Compras → BOM / Listas.'
+                : 'Ningún item coincide con los filtros actuales.'}
             </div>
           ) : (
             <Table>
@@ -285,6 +368,7 @@ export function ProductionProjectView(props: Props = {}) {
                   <TableHead className="text-center">Referencias</TableHead>
                   <TableHead>Estatus compra</TableHead>
                   <TableHead>Plan producción</TableHead>
+                  <TableHead>Técnico</TableHead>
                   <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
@@ -363,15 +447,41 @@ export function ProductionProjectView(props: Props = {}) {
                         onChange={s => setStatus(item, s)}
                       />
                     </TableCell>
+                    <TableCell>
+                      {item.assigned_technician_id ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-6 w-6 rounded-full bg-[var(--color-app-primary)] text-white text-[10px] font-medium flex items-center justify-center">
+                            {(
+                              technicians.find(t => t.id === item.assigned_technician_id)
+                                ?.full_name || '?'
+                            )
+                              .split(' ')
+                              .map(s => s[0])
+                              .slice(0, 2)
+                              .join('')
+                              .toUpperCase()}
+                          </div>
+                          <span className="text-xs truncate max-w-[120px]">
+                            {technicians.find(t => t.id === item.assigned_technician_id)
+                              ?.full_name ?? 'Asignado'}
+                          </span>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Sin asignar
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         size="sm"
+                        variant={item.assigned_technician_id ? 'outline' : 'default'}
                         onClick={() => {
                           setSelectedPart(item);
                           setIsPlanningModalOpen(true);
                         }}
                       >
-                        Asignar plan
+                        {item.assigned_technician_id ? 'Editar plan' : 'Asignar plan'}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -489,6 +599,27 @@ export function ProductionProjectView(props: Props = {}) {
               {planError && (
                 <div className="p-2 rounded-md bg-[var(--color-app-danger-soft)] text-xs text-[var(--color-app-danger)]">
                   {planError}
+                </div>
+              )}
+
+              {selectedPart?.assigned_technician_id && (
+                <div className="p-2.5 rounded-md bg-[var(--color-app-primary-soft)]/40 border border-[var(--color-app-primary)]/20 text-xs flex items-center justify-between gap-2">
+                  <span>
+                    Actualmente asignada a:{' '}
+                    <strong>
+                      {technicians.find(t => t.id === selectedPart.assigned_technician_id)?.full_name ?? '—'}
+                    </strong>
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-[var(--color-app-danger)] h-7"
+                    onClick={handleUnassign}
+                    disabled={planSaving}
+                  >
+                    Desasignar
+                  </Button>
                 </div>
               )}
 

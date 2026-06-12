@@ -28,7 +28,11 @@ export const ROLE_ACCESS: Record<string, string[]> = {
   Compras: ['/', '/projects', '/quotes', '/chat', '/purchasing', '/billing'],
   Producción: ['/', '/chat', '/quality', '/technicians', '/production'],
   Calidad: ['/', '/chat', '/quality', '/technicians', '/production'],
-  Técnico: ['/chat', '/technicians'],
+  // Los técnicos viven en /technician-portal (su dashboard exclusivo) y
+  // pueden saltar a /chat para discutir piezas. /technicians lo dejamos
+  // permitido sólo para que el redirect del sidebar no rompa: el
+  // ProtectedRoute los redirige a /technician-portal al detectar el rol.
+  Técnico: ['/technician-portal', '/chat', '/technicians'],
 };
 
 /** Devuelve true si el rol puede entrar a la ruta. */
@@ -44,6 +48,9 @@ export function canAccessPath(role: string | undefined, path: string): boolean {
 /** Ruta home / fallback adecuado para cada rol — la primera ruta accesible. */
 export function defaultRouteForRole(role: string | undefined): string {
   if (!role) return '/login';
+  // Caso especial: los técnicos siempre van a su portal exclusivo, sin
+  // pasar por el dashboard administrativo.
+  if (role === 'Técnico') return '/technician-portal';
   const allowed = ROLE_ACCESS[role];
   if (!allowed || allowed.length === 0) return '/chat';
   if (allowed.includes('ALL')) return '/';

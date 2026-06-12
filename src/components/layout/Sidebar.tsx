@@ -51,7 +51,15 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { user } = useAuth();
 
-  const filteredNavItems = navItems.filter(item => canAccessPath(user?.role, item.path));
+  // Para técnicos, "Técnicos" apunta a su portal exclusivo en lugar del
+  // dashboard administrativo de /technicians.
+  const filteredNavItems = navItems
+    .filter(item => canAccessPath(user?.role, item.path))
+    .map(item =>
+      user?.role === 'Técnico' && item.path === '/technicians'
+        ? { ...item, name: 'Mi portal', path: '/technician-portal' }
+        : item
+    );
   const canSeeSettings = user?.role === 'Administrador' || user?.role === 'Administración / PM';
 
   return (

@@ -202,6 +202,45 @@ export function useUpdateBomItem() {
 }
 
 /**
+ * Asigna o desasigna un técnico a un BOM item.
+ * Pasa null como techId para desasignar. Detecta RLS silenciosa.
+ */
+export function useAssignTechnician() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const assign = useCallback(async (itemId: string, techId: string | null): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        setState({ loading: false, error: null });
+        return;
+      }
+      const { data, error } = await supabase
+        .from('bom_items')
+        .update({
+          assigned_technician_id: techId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', itemId)
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(
+          'No se pudo guardar la asignación. Verifica que tu profiles.role sea "Administrador" en Supabase.'
+        );
+      }
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const error = err as Error;
+      setState({ loading: false, error });
+      throw error;
+    }
+  }, []);
+
+  return { assign, ...state };
+}
+
+/**
  * Elimina un BOM item.
  */
 export function useDeleteBomItem() {
