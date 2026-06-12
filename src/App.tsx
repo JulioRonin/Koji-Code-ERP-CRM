@@ -7,6 +7,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { Login } from './pages/auth/Login';
+import { ForgotPassword } from './pages/auth/ForgotPassword';
+import { ResetPassword } from './pages/auth/ResetPassword';
 import { Dashboard } from './pages/dashboard/Dashboard';
 import { Projects } from './pages/projects/Projects';
 import { ProjectDetails } from './pages/projects/ProjectDetails';
@@ -35,7 +37,7 @@ import { canAccessPath, defaultRouteForRole } from './lib/permissions';
 
 // Role-based Access Guard
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, user, isLoading } = useAuth();
+  const { isAuthenticated, user, isLoading, isRecovery } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -44,6 +46,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyber-neon"></div>
       </div>
     );
+  }
+
+  // Si el usuario llegó por un enlace de recuperación, NO lo dejamos entrar
+  // al ERP: lo mandamos a fijar su nueva contraseña.
+  if (isRecovery) {
+    return <Navigate to="/reset-password" replace />;
   }
 
   if (!isAuthenticated) {
@@ -76,6 +84,8 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Public Client Portal (magic-link, no auth guard) */}
         <Route path="/cliente/:token" element={<ClientPortal />} />

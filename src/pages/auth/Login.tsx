@@ -38,16 +38,16 @@ export function Login() {
     e.preventDefault();
     setError('');
 
-    const success = await login(selectedDept, email, password);
+    const result = await login(selectedDept, email, password);
 
-    if (success) {
+    if (result.ok) {
       if (selectedDept === 'Técnico') {
         navigate('/technician-portal');
       } else {
         navigate('/');
       }
     } else {
-      setError('Credenciales inválidas para este departamento.');
+      setError(result.error || 'No se pudo iniciar sesión.');
     }
   };
 
@@ -170,6 +170,13 @@ export function Login() {
                     <Button type="submit" disabled={isLoading} className="w-full">
                       {isLoading ? 'Verificando...' : 'Iniciar sesión'}
                     </Button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/forgot-password')}
+                      className="text-xs text-center text-[var(--color-app-primary)] hover:underline"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
                     <p className="text-xs text-center text-[var(--color-app-text-muted)]">
                       ¿Problemas para acceder? Contacta a tu administrador.
                     </p>
