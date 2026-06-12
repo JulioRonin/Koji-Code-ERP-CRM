@@ -207,29 +207,14 @@ export function DesignChecklist() {
             text-align: right;
           }
 
-          /* Cada página es un grid 2×4. break-after fuerza salto. */
-          .print-page {
+          /* Un solo grid 2-col con todas las cards. El navegador pagina
+             y respeta el break-inside:avoid de cada card. Altura fija
+             por card → 8 piezas por hoja A4 portrait. */
+          .print-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: repeat(4, 1fr);
             gap: 4mm;
-            page-break-after: always;
-            break-after: page;
-            page-break-inside: avoid;
-            break-inside: avoid;
           }
-          .print-page:last-child {
-            page-break-after: auto;
-            break-after: auto;
-          }
-          /* Primera página: deja espacio para el banner restando ~16mm */
-          .print-page.first {
-            height: calc(297mm - 16mm - 8mm * 2);
-          }
-          .print-page:not(.first) {
-            height: calc(297mm - 8mm * 2);
-          }
-
           .print-card {
             border: 1px solid #94a3b8;
             border-radius: 2mm;
@@ -238,6 +223,9 @@ export function DesignChecklist() {
             flex-direction: column;
             overflow: hidden;
             background: white;
+            /* Altura fija → 4 filas por A4 (281mm útiles / 4 = ~70mm
+               con gaps, dejamos 67mm para que entren cómodas) */
+            height: 67mm;
             page-break-inside: avoid;
             break-inside: avoid;
           }
@@ -420,18 +408,20 @@ export function DesignChecklist() {
           </div>
         </div>
 
-        {pages.map((pageItems, idx) => (
-          <div key={idx} className={cn('print-page', idx === 0 && 'first')}>
-            {pageItems.map(item => (
-              <ChecklistCardPrint
-                key={item.id}
-                item={item}
-                imageUrl={item.image_url ? imageUrls[item.image_url] : undefined}
-                pdfThumbUrl={item.drawing_url ? pdfThumbUrls[item.drawing_url] : undefined}
-              />
-            ))}
-          </div>
-        ))}
+        {/* Un solo grid con TODAS las cards; el navegador pagina solo
+            apoyándose en break-inside: avoid de cada card. Esto funciona
+            mejor que tratar de forzar break-after en cada "página"
+            (Chrome lo ignora dentro de display:grid). */}
+        <div className="print-grid">
+          {filteredParts.map(item => (
+            <ChecklistCardPrint
+              key={item.id}
+              item={item}
+              imageUrl={item.image_url ? imageUrls[item.image_url] : undefined}
+              pdfThumbUrl={item.drawing_url ? pdfThumbUrls[item.drawing_url] : undefined}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Zoom modal */}
