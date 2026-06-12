@@ -50,8 +50,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Técnicos van al portal de planta; el resto a la app principal.
-  if (user?.role === 'Técnico' && !location.pathname.startsWith('/technician-portal')) {
+  // Técnicos viven en /technician-portal pero pueden ir a /chat para
+  // discutir piezas concretas. Cualquier otra ruta los regresa al portal.
+  if (
+    user?.role === 'Técnico' &&
+    !location.pathname.startsWith('/technician-portal') &&
+    !location.pathname.startsWith('/chat')
+  ) {
     return <Navigate to="/technician-portal" replace />;
   }
   if (user?.role !== 'Técnico' && location.pathname.startsWith('/technician-portal')) {
