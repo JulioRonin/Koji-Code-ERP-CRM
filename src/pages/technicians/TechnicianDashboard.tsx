@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Pause,
   Wrench,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -207,6 +208,9 @@ export function TechnicianDashboard() {
             <p className="text-xs text-[var(--color-app-text-muted)]">Turno actual</p>
             <p className="text-sm font-medium">Matutino · 07:00 – 16:00</p>
           </div>
+          <Button variant="outline" onClick={() => refetchBom()} title="Recargar mis piezas">
+            <RefreshCw className="w-4 h-4 mr-2" /> Refrescar
+          </Button>
           <Button variant="outline" onClick={logout}>
             <LogOut className="w-4 h-4 mr-2" /> Salir
           </Button>

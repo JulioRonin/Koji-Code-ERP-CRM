@@ -32,7 +32,7 @@ import {
   useAssignTechnician,
 } from '@/lib/api';
 import type { BomItem, ManufacturingStatus } from '@/types/database';
-import { CheckCircle2, Circle, ChevronDown, Loader2 } from 'lucide-react';
+import { CheckCircle2, Circle, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -266,14 +266,30 @@ export function ProductionProjectView(props: Props = {}) {
             </p>
           </div>
         </div>
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
-          <Input
-            placeholder="Filtrar por parte o material..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                await refetchParts();
+              } catch {
+                /* ignore */
+              }
+            }}
+            title="Volver a cargar los datos del proyecto"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refrescar
+          </Button>
+          <div className="relative w-72">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
+            <Input
+              placeholder="Filtrar por parte o material..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
       </div>
 

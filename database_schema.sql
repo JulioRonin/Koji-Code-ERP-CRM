@@ -835,6 +835,15 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Técnicos pueden actualizar bom_items DONDE están asignados (cambia
+-- manufacturing_status durante la fabricación). USING acota a sus piezas
+-- propias; WITH CHECK evita que se reasignen el item a otro técnico.
+DROP POLICY IF EXISTS "tech update own assignments" ON public.bom_items;
+CREATE POLICY "tech update own assignments" ON public.bom_items
+    FOR UPDATE TO authenticated
+    USING (assigned_technician_id = auth.uid())
+    WITH CHECK (assigned_technician_id = auth.uid());
+
 -- Admins pueden actualizar perfiles del personal (sólo UPDATE; INSERT lo hace
 -- el trigger handle_new_user al registrar un auth.user). Sin política dedicada
 -- la actualización fallaba en silencio para los Administradores.
