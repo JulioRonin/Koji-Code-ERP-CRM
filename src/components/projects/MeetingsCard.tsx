@@ -73,7 +73,32 @@ export function MeetingsCard({ projectId }: Props) {
   };
 
   if (meetings.length === 0) {
-    return null;
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Juntas de seguimiento
+          </CardTitle>
+          <CardDescription>
+            Aún no hay juntas programadas para este proyecto.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="p-4 rounded-md border border-dashed border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)]/40 text-center space-y-2">
+            <CalendarClock className="h-6 w-6 text-[var(--color-app-text-subtle)] mx-auto" />
+            <p className="text-sm text-[var(--color-app-text)]">
+              Sin calendario de juntas
+            </p>
+            <p className="text-xs text-[var(--color-app-text-muted)]">
+              Cuando generes (o regeneres) el Master Plan con el wizard, se crearán
+              automáticamente las juntas de seguimiento PMI (Kick-off, semanales,
+              hitos, cierre). También puedes lanzar el wizard desde el botón{' '}
+              <strong>Generar master plan</strong> en la cabecera del proyecto.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
