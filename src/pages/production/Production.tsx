@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ProductionStatusHeader } from '@/components/production/ProductionStatusHeader';
 import { ProductionProjectView } from '@/components/production/ProductionProjectView';
+import { ProductionStatusReport } from '@/components/production/ProductionStatusReport';
 import { MachineFormModal } from '@/components/production/MachineFormModal';
 import { cn } from '@/lib/utils';
 import { useMachines, useWorkOrders, useBomItems, useProjects } from '@/lib/api';
@@ -402,17 +403,11 @@ export function Production() {
       )}
 
       {activeTab === 'status' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Reporte de estatus</CardTitle>
-            <CardDescription>Selecciona un proyecto para ver el desglose detallado.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-64 flex items-center justify-center border-t border-dashed border-[var(--color-app-border)]">
-            <p className="text-sm text-[var(--color-app-text-muted)]">
-              Selecciona un proyecto en el panel superior para desplegar el reporte.
-            </p>
-          </CardContent>
-        </Card>
+        <ProductionStatusReport
+          projectName={projects.find(p => p.id === selectedProjectId)?.name}
+          selectedProjectId={selectedProjectId}
+          bomItems={bomItems}
+        />
       )}
 
       <MachineFormModal
