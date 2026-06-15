@@ -1071,6 +1071,65 @@ function EditableTaskList({ editableTasks, scheduled, onPatch, onRemove, onAdd }
                     : '—'}
                 </span>
               </div>
+
+              {/* Dependencias editables — quitar con X, agregar con el selector */}
+              <div className="flex flex-wrap items-center gap-1 pl-14">
+                <span className="text-[10px] uppercase text-[var(--color-app-text-muted)] mr-1">
+                  Dep:
+                </span>
+                {(task.depends_on ?? []).length === 0 && (
+                  <span className="text-[10px] text-[var(--color-app-text-subtle)] italic">
+                    ninguna
+                  </span>
+                )}
+                {(task.depends_on ?? []).map(d => (
+                  <span
+                    key={d}
+                    className="inline-flex items-center gap-0.5 h-5 pl-1.5 pr-0.5 rounded border border-[var(--color-app-border)] bg-white font-mono text-[10px]"
+                  >
+                    {d}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onPatch(task.uid, {
+                          depends_on: (task.depends_on ?? []).filter(x => x !== d),
+                        })
+                      }
+                      title={`Quitar dependencia ${d}`}
+                      className="p-0.5 rounded hover:bg-[var(--color-app-danger-soft)] text-[var(--color-app-text-muted)] hover:text-[var(--color-app-danger)]"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+                {(() => {
+                  const candidates = editableTasks.filter(
+                    t => t.wbs !== task.wbs && !(task.depends_on ?? []).includes(t.wbs)
+                  );
+                  if (candidates.length === 0) return null;
+                  return (
+                    <select
+                      value=""
+                      onChange={e => {
+                        if (!e.target.value) return;
+                        onPatch(task.uid, {
+                          depends_on: [...(task.depends_on ?? []), e.target.value],
+                        });
+                        e.target.value = '';
+                      }}
+                      className="h-5 px-1 rounded border border-dashed border-[var(--color-app-border-strong)] bg-white text-[10px] text-[var(--color-app-text-muted)] focus:outline-none"
+                      title="Agregar dependencia"
+                    >
+                      <option value="">+ dep</option>
+                      {candidates.map(c => (
+                        <option key={c.uid} value={c.wbs}>
+                          {c.wbs}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                })()}
+              </div>
             </div>
           );
         })}

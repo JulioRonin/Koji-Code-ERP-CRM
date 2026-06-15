@@ -758,6 +758,57 @@ export function useUpdateMasterPlanTaskDates() {
   return { update, ...state };
 }
 
+/**
+ * Actualiza la lista de dependencias (wbs codes) de una tarea del master plan.
+ * Se usa para quitar (o reordenar) las dependencias de una actividad ya
+ * publicada. No mueve fechas: quitar una dependencia simplemente libera la
+ * tarea; el usuario puede luego ajustar las fechas a mano si lo desea.
+ */
+export function useUpdateMasterPlanTaskDependencies() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const update = useCallback(
+    async (taskId: string, dependencies: string[]): Promise<void> => {
+      setState({ loading: true, error: null });
+      try {
+        const now = new Date().toISOString();
+
+        if (!supabase) {
+          const all = readDemo<MasterPlanTask>(DEMO_TASKS_KEY);
+          const idx = all.findIndex(t => t.id === taskId);
+          if (idx >= 0) {
+            all[idx] = { ...all[idx], dependencies, updated_at: now };
+            writeDemo(DEMO_TASKS_KEY, all);
+          }
+          setState({ loading: false, error: null });
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('master_plan_tasks')
+          .update({ dependencies, updated_at: now })
+          .eq('id', taskId)
+          .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error(
+            'No se actualizaron las dependencias. Verifica que tu profiles.role sea ' +
+              '"Administrador" o "Administración / PM" en Supabase.'
+          );
+        }
+        setState({ loading: false, error: null });
+      } catch (err) {
+        const e = err as Error;
+        setState({ loading: false, error: e });
+        throw e;
+      }
+    },
+    []
+  );
+
+  return { update, ...state };
+}
+
 export function useUpdateMasterPlanTaskProgress() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
 
