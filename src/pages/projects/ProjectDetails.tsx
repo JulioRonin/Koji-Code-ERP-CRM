@@ -469,8 +469,8 @@ export function ProjectDetails() {
             </Card>
           )}
 
-          {/* Calendario de juntas (si existen) */}
-          <MeetingsCard projectId={project.id} />
+          {/* Calendario de juntas (generar / editar) */}
+          <MeetingsCard project={project} />
 
           {/* Plan de trabajo — si hay master plan, muestra sus activities editables;
               si no, las tareas ad-hoc del proyecto. */}

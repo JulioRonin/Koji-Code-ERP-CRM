@@ -217,6 +217,59 @@ export function useCreateMeetings() {
   return { create, ...state };
 }
 
+interface UpdateMeetingInput {
+  title?: string;
+  meeting_type?: MeetingType;
+  scheduled_at?: string;
+  duration_minutes?: number;
+  attendees?: string[];
+  notes?: string | null;
+}
+
+/**
+ * Edita los datos de una junta existente (fecha/hora, título, tipo, duración).
+ * Detecta bloqueo RLS silencioso con .select('id').
+ */
+export function useUpdateMeeting() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const update = useCallback(
+    async (meetingId: string, patch: UpdateMeetingInput): Promise<void> => {
+      setState({ loading: true, error: null });
+      try {
+        const now = new Date().toISOString();
+        if (!supabase) {
+          const all = readDemo();
+          const idx = all.findIndex(m => m.id === meetingId);
+          if (idx >= 0) {
+            all[idx] = { ...all[idx], ...patch, updated_at: now } as ProjectMeeting;
+            writeDemo(all);
+          }
+          setState({ loading: false, error: null });
+          return;
+        }
+        const { data, error } = await supabase
+          .from('project_meetings')
+          .update({ ...patch, updated_at: now })
+          .eq('id', meetingId)
+          .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('No se pudo actualizar la junta. Verifica tu profiles.role en Supabase.');
+        }
+        setState({ loading: false, error: null });
+      } catch (err) {
+        const e = err as Error;
+        setState({ loading: false, error: e });
+        throw e;
+      }
+    },
+    []
+  );
+
+  return { update, ...state };
+}
+
 export function useUpdateMeetingStatus() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
 
