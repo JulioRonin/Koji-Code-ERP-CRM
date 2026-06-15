@@ -193,8 +193,29 @@ export function useCreateStaffWithAuth() {
           },
         });
         if (signUpErr) {
-          if ((signUpErr.message || '').toLowerCase().includes('already registered')) {
-            throw new Error('Ese correo ya tiene cuenta en Supabase Auth.');
+          const raw = (signUpErr.message || '').toLowerCase();
+          if (raw.includes('already registered')) {
+            throw new Error(
+              'Ese correo ya tiene cuenta en Supabase Auth. Si la persona olvidó su contraseña, usa "¿Olvidaste tu contraseña?" desde el login.'
+            );
+          }
+          if (raw.includes('rate limit') || raw.includes('email rate')) {
+            throw new Error(
+              'Supabase tiene un límite de 4 correos por hora en su servidor SMTP gratuito. ' +
+                'Esto se quita de dos maneras:\n' +
+                '1) (Recomendado para onboarding interno) Authentication → Sign In/Up → desactivar "Confirm email". ' +
+                'Así el alta no manda correo y los usuarios entran directo con la contraseña que les compartes.\n' +
+                '2) Configurar tu propio SMTP en Authentication → Emails → SMTP Settings (SendGrid, Resend, Gmail, etc.).\n' +
+                'Mientras tanto puedes esperar 1 hora y reintentar.'
+            );
+          }
+          if (raw.includes('weak') || raw.includes('password')) {
+            throw new Error(
+              'Supabase rechazó la contraseña (muy débil o no cumple política). Usa "Generar" para una segura.'
+            );
+          }
+          if (raw.includes('invalid') && raw.includes('email')) {
+            throw new Error('El correo no es válido. Revisa que esté bien escrito.');
           }
           throw new Error(`Supabase Auth: ${signUpErr.message}`);
         }
