@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BarChart,
   Bar,
@@ -28,10 +29,6 @@ import {
 import { format, parseISO, isValid, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-import {
-  Dialog,
-  DialogContent,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { GanttChart } from './GanttChart';
@@ -42,7 +39,7 @@ import {
   useProjectNotes,
   useProjectMeetings,
 } from '@/lib/api';
-import type { ProjectNote } from '@/types/database';
+import type { ProjectNote, ProjectMeeting } from '@/types/database';
 import { cn } from '@/lib/utils';
 
 const fmtDate = (s: string | null | undefined) => {
@@ -86,10 +83,39 @@ interface ProjectReportProps {
  * lista para imprimir o "Guardar como PDF" desde el navegador.
  */
 export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectReportProps) {
-  const { data: masterPlan } = useMasterPlan(project.id);
-  const { data: masterPlanTasks } = useMasterPlanTasks(masterPlan?.id);
-  const { data: projectTasks } = useProjectTasks(project.id);
-  const { data: notes } = useProjectNotes(project.id);
+  const { data: masterPlan, refetch: refetchPlan } = useMasterPlan(project.id);
+  const { data: masterPlanTasks, refetch: refetchTasks } = useMasterPlanTasks(masterPlan?.id);
+  const { data: projectTasks, refetch: refetchProjTasks } = useProjectTasks(project.id);
+  const { data: notes, refetch: refetchNotes } = useProjectNotes(project.id);
+  const { data: meetings, refetch: refetchMeetings } = useProjectMeetings(project.id);
+
+  // Al abrir el reporte, refresca TODO para que las cifras de avance,
+  // hitos, juntas y notas sean las más recientes (el reporte queda montado
+  // en el árbol, así que sin esto mostraría datos del primer render).
+  useEffect(() => {
+    if (!isOpen) return;
+    refetchPlan();
+    refetchTasks();
+    refetchProjTasks();
+    refetchNotes();
+    refetchMeetings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Bloquea scroll de fondo + cierra con Escape mientras está abierto.
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [isOpen, onClose]);
 
   const today = new Date();
   const deadlineDate = (() => {
@@ -172,63 +198,108 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
   );
 
   const handlePrint = () => {
-    // Pequeño delay para que la UI se asiente antes del print
-    setTimeout(() => window.print(), 50);
+    // Pequeño delay para que recharts y el layout se asienten antes del print
+    setTimeout(() => window.print(), 120);
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[95vh] p-0 overflow-hidden flex flex-col">
-        <style>{`
-          @media print {
-            @page { size: letter portrait; margin: 0; }
-            html, body { background: white !important; }
-            body * { visibility: hidden !important; }
-            #pmi-report, #pmi-report * { visibility: visible !important; }
-            #pmi-report {
-              position: absolute !important;
-              left: 0 !important; top: 0 !important;
-              width: 100% !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              background: white !important;
-              color: black !important;
-            }
-            .no-print-pmi { display: none !important; }
-            .pmi-page {
-              page-break-after: always;
-              break-after: page;
-              min-height: 100vh;
-              padding: 18mm 16mm !important;
-              box-sizing: border-box;
-            }
-            .pmi-page:last-child { page-break-after: auto; }
-            .pmi-keep { page-break-inside: avoid; break-inside: avoid; }
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div id="koji-report-root">
+      <style>{`
+        /* ── PANTALLA ── modal a pantalla completa con documento scrolleable */
+        @media screen {
+          #koji-report-root {
+            position: fixed; inset: 0; z-index: 60;
+            background: rgba(15, 23, 42, 0.55);
+            overflow-y: auto;
+            display: flex; flex-direction: column; align-items: center;
+            padding: 24px 12px;
+          }
+          #pmi-report {
+            width: 100%; max-width: 920px;
+            background: #f1f5f9;
+            border-radius: 10px;
+            overflow: hidden;
           }
           #pmi-report .pmi-page {
             min-height: auto;
             padding: 36px 40px;
           }
-        `}</style>
+        }
+        /* ── IMPRESIÓN ── oculta la app y deja fluir SOLO el reporte */
+        @media print {
+          @page { size: letter portrait; margin: 12mm; }
+          html, body {
+            background: white !important;
+            height: auto !important; min-height: 0 !important;
+            overflow: visible !important;
+            margin: 0 !important; padding: 0 !important;
+          }
+          /* Oculta toda la app principal */
+          body > #root { display: none !important; }
+          /* El portal del reporte se vuelve estático y visible */
+          body > #koji-report-root {
+            position: static !important;
+            inset: auto !important;
+            background: white !important;
+            overflow: visible !important;
+            display: block !important;
+            padding: 0 !important; margin: 0 !important;
+          }
+          .report-toolbar, .no-print-pmi { display: none !important; }
+          #pmi-report {
+            max-width: none !important; width: 100% !important;
+            background: white !important; color: black !important;
+            border-radius: 0 !important; overflow: visible !important;
+            height: auto !important;
+          }
+          .pmi-page {
+            page-break-after: always;
+            break-after: page;
+            page-break-inside: avoid;
+            padding: 4mm 2mm !important;
+            margin: 0 auto !important;
+            max-width: none !important;
+            box-shadow: none !important;
+            background: white !important;
+          }
+          .pmi-page:last-child { page-break-after: auto; break-after: auto; }
+          .pmi-keep { page-break-inside: avoid; break-inside: avoid; }
+          /* Evita que los gráficos (SVG de recharts) se desborden de la hoja */
+          #pmi-report svg { max-width: 100% !important; }
+          #pmi-report img { max-width: 100% !important; }
+          /* Tablas largas: repite encabezado en cada hoja y no parte filas */
+          #pmi-report thead { display: table-header-group; }
+          #pmi-report tr { page-break-inside: avoid; break-inside: avoid; }
+        }
+      `}</style>
 
-        {/* Toolbar (oculta al imprimir) */}
-        <div className="no-print-pmi flex items-center justify-between px-5 py-3 border-b border-[var(--color-app-border)] bg-white shrink-0">
-          <div className="text-sm">
-            <span className="font-medium">Reporte ejecutivo</span>
-            <span className="text-[var(--color-app-text-muted)] ml-2">· {project.id}</span>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="h-3.5 w-3.5 mr-1.5" /> Descargar / Imprimir
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+      {/* Backdrop para cerrar (solo pantalla) */}
+      <div
+        className="no-print-pmi"
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, zIndex: -1 }}
+      />
+
+      {/* Toolbar (oculta al imprimir) */}
+      <div className="report-toolbar no-print-pmi flex items-center justify-between w-full max-w-[920px] mb-3 px-4 py-2.5 rounded-lg border border-[var(--color-app-border)] bg-white shrink-0">
+        <div className="text-sm">
+          <span className="font-medium">Reporte ejecutivo</span>
+          <span className="text-[var(--color-app-text-muted)] ml-2">· {project.id}</span>
         </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Printer className="h-3.5 w-3.5 mr-1.5" /> Descargar / Imprimir
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
-        {/* Documento */}
-        <div id="pmi-report" className="flex-1 overflow-y-auto bg-[#f1f5f9]">
+      {/* Documento */}
+      <div id="pmi-report">
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 1 — PORTADA
               ─────────────────────────────────────────────────────────────── */}
@@ -411,15 +482,15 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 7 — NOTAS Y HALLAZGOS + JUNTAS
               ─────────────────────────────────────────────────────────────── */}
-          <NotesAndMeetingsPage projectId={project.id} notes={notes} />
+          <NotesAndMeetingsPage notes={notes} meetings={meetings} />
 
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 8 — FIRMAS Y CIERRE
               ─────────────────────────────────────────────────────────────── */}
           <SignaturePage project={project} />
-        </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -593,7 +664,9 @@ function ScoreboardPage({ tasks }: { tasks: ReturnType<typeof useMasterPlanTasks
     <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm">
       <PageHeader title="Scoreboard de etapas" subtitle="Estado detallado por actividad" />
 
-      <div className="border border-[#e2e8f0] rounded-lg overflow-hidden pmi-keep">
+      {/* Sin break-inside:avoid — si hay muchas actividades, la tabla pagina
+          fila por fila en lugar de cortarse o dejar una página en blanco. */}
+      <div className="border border-[#e2e8f0] rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-[#f8fafc]">
             <tr className="text-left text-xs text-[#475569]">
@@ -791,14 +864,12 @@ function Signature({ title, name }: { title: string; name: string }) {
 // ============================================================================
 
 function NotesAndMeetingsPage({
-  projectId,
   notes,
+  meetings,
 }: {
-  projectId: string;
   notes: ProjectNote[];
+  meetings: ProjectMeeting[];
 }) {
-  const { data: meetings } = useProjectMeetings(projectId);
-
   const noteTypeLabel: Record<string, string> = {
     note: 'Nota del equipo',
     system: 'Sistema',
