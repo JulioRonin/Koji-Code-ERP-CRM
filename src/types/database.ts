@@ -583,6 +583,65 @@ export interface MeasurementInstrument {
 }
 
 // ============================================================================
+// TABLA: dimensional_reports (FAIR / inspección dimensional ISO 9001)
+// ============================================================================
+
+export type DimensionalStatus = 'Borrador' | 'Aprobado' | 'Rechazado';
+
+/** Una burbuja ("globo") colocada sobre el plano. x/y en % (0–100) relativo
+ *  al tamaño renderizado de la imagen, para que escale con el zoom. */
+export interface DimensionalBalloon {
+  n: number;
+  x: number;
+  y: number;
+}
+
+/** Una característica a inspeccionar (un renglón del reporte), ligada a la
+ *  burbuja con el mismo número. `readings` tiene una lectura por pieza de la
+ *  muestra (longitud = sample_size); null = sin capturar. */
+export interface DimensionalCharacteristic {
+  n: number;
+  label: string;
+  /** Cota nominal */
+  nominal: number | null;
+  /** Tolerancias como magnitudes positivas. USL = nominal + tolPlus,
+   *  LSL = nominal - tolMinus. */
+  tolPlus: number | null;
+  tolMinus: number | null;
+  unit: string;
+  /** Instrumento de medición usado (opcional, trazabilidad ISO) */
+  instrument?: string | null;
+  readings: (number | null)[];
+}
+
+export interface DimensionalPayload {
+  balloons: DimensionalBalloon[];
+  characteristics: DimensionalCharacteristic[];
+  /** Relación de aspecto de la imagen base (alto/ancho) para reconstruir el
+   *  lienzo al reabrir el reporte. */
+  imageAspect?: number;
+}
+
+export interface DimensionalReport {
+  id: string;
+  project_id: string;
+  bom_item_id: string;
+  part_number: string | null;
+  title: string | null;
+  inspector_id: string | null;
+  inspector_name: string | null;
+  sample_size: number;
+  status: DimensionalStatus;
+  drawing_image: string | null;
+  report_url: string | null;
+  payload: DimensionalPayload;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
 // TABLA: embarques
 // ============================================================================
 

@@ -606,6 +606,35 @@ CREATE TABLE IF NOT EXISTS public.measurement_instruments (
     updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Reportes dimensionales / First Article Inspection (FAIR ISO 9001).
+-- El plano "globalizado" (ballooned) y las lecturas por pieza viven en
+-- `payload` (JSONB) para flexibilidad; las columnas sueltas son para
+-- listar/filtrar y trazabilidad. `drawing_image` es el storage path de la
+-- imagen base (render del PDF o foto subida) sobre la que se dibujan las
+-- burbujas; `report_url` es un PDF/foto adjunto opcional.
+CREATE TABLE IF NOT EXISTS public.dimensional_reports (
+    id                TEXT PRIMARY KEY,            -- DIM-2026-001
+    project_id        TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
+    bom_item_id       UUID REFERENCES public.bom_items(id) ON DELETE CASCADE,
+    part_number       TEXT,
+    title             TEXT,
+    inspector_id      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    inspector_name    TEXT,
+    sample_size       INTEGER NOT NULL DEFAULT 1,
+    status            TEXT NOT NULL DEFAULT 'Borrador'
+                      CHECK (status IN ('Borrador','Aprobado','Rechazado')),
+    drawing_image     TEXT,                        -- storage path de la imagen base
+    report_url        TEXT,                        -- PDF/foto adjunto opcional
+    payload           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    notes             TEXT,
+    created_by        UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at        TIMESTAMPTZ DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dim_project ON public.dimensional_reports(project_id);
+CREATE INDEX IF NOT EXISTS idx_dim_bom     ON public.dimensional_reports(bom_item_id);
+
 -- ---------------------------------------------------------------------------
 -- 10. EMBARQUE — Packing lists + etiquetas de caja
 -- ---------------------------------------------------------------------------
@@ -802,6 +831,7 @@ ALTER TABLE public.time_entries            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quality_inspections     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ncrs                    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.measurement_instruments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dimensional_reports     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipments               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipping_labels         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipping_label_items    ENABLE ROW LEVEL SECURITY;
@@ -835,6 +865,7 @@ BEGIN
             'bom_items','requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages','time_entries',
             'quality_inspections','ncrs','measurement_instruments',
+            'dimensional_reports',
             'shipments','shipping_labels','shipping_label_items',
             'pmo_reports','chat_channels','chat_messages'
         ])
@@ -861,6 +892,7 @@ BEGIN
             'requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages',
             'quality_inspections','ncrs','measurement_instruments',
+            'dimensional_reports',
             'shipments','shipping_labels','shipping_label_items',
             'pmo_reports','chat_channels'
         ])
@@ -925,6 +957,34 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Calidad (más Admin/PM) puede escribir inspecciones, NCRs y reportes
+-- dimensionales. Sin esto, un usuario del departamento de Calidad no podría
+-- guardar un reporte de inspección (la política sólo dejaba a is_admin()).
+CREATE OR REPLACE FUNCTION public.is_quality()
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND department IN ('Calidad','Administrador','Administración / PM')
+    );
+$$;
+
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN SELECT unnest(ARRAY['quality_inspections','ncrs','dimensional_reports'])
+    LOOP
+        EXECUTE format(
+            'DROP POLICY IF EXISTS "quality write %I" ON public.%I;
+             CREATE POLICY "quality write %I" ON public.%I
+             FOR ALL TO authenticated USING (public.is_quality()) WITH CHECK (public.is_quality());',
+            t, t, t, t
+        );
+    END LOOP;
+END$$;
+
 -- Cualquier autenticado puede mandar mensajes y abrir time entries
 DROP POLICY IF EXISTS "send chat" ON public.chat_messages;
 CREATE POLICY "send chat" ON public.chat_messages
@@ -964,17 +1024,18 @@ CREATE POLICY "project-files read" ON storage.objects
     FOR SELECT TO authenticated
     USING (bucket_id = 'project-files');
 
--- Escritura: sólo Administrador / PM puede subir y reemplazar archivos
+-- Escritura: Administrador / PM (planos, modelos) y además Calidad para
+-- subir imágenes/fotos de los reportes dimensionales.
 DROP POLICY IF EXISTS "project-files write" ON storage.objects;
 CREATE POLICY "project-files write" ON storage.objects
     FOR INSERT TO authenticated
-    WITH CHECK (bucket_id = 'project-files' AND public.is_admin());
+    WITH CHECK (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()));
 
 DROP POLICY IF EXISTS "project-files update" ON storage.objects;
 CREATE POLICY "project-files update" ON storage.objects
     FOR UPDATE TO authenticated
-    USING (bucket_id = 'project-files' AND public.is_admin())
-    WITH CHECK (bucket_id = 'project-files' AND public.is_admin());
+    USING (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()))
+    WITH CHECK (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()));
 
 DROP POLICY IF EXISTS "project-files delete" ON storage.objects;
 CREATE POLICY "project-files delete" ON storage.objects

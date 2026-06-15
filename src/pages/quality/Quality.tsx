@@ -40,8 +40,10 @@ import {
   useBomItems,
   useTechnicians,
   useUpdateManufacturingStatus,
+  useDimensionalReports,
   getFileDownloadUrl,
 } from '@/lib/api';
+import { DimensionalModal } from '@/components/quality/DimensionalModal';
 import type { BomItem, ManufacturingStatus } from '@/types/database';
 
 const severityVariant: Record<string, 'destructive' | 'warning' | 'secondary'> = {
@@ -121,9 +123,11 @@ export function Quality() {
   const [collapsedStatuses, setCollapsedStatuses] = useState<Set<ManufacturingStatus>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dimItem, setDimItem] = useState<BomItem | null>(null);
 
   const { data: projects } = useProjects();
   const { data: bomItems, refetch: refetchBom } = useBomItems(selectedProjectId || undefined);
+  const { data: dimReports, refetch: refetchDim } = useDimensionalReports(selectedProjectId || undefined);
   const { data: technicians } = useTechnicians();
   const { data: inspections } = useInspections();
   const { data: ncrs } = useNcrs();
@@ -135,6 +139,13 @@ export function Quality() {
       setSelectedProjectId(projects[0].id);
     }
   }, [projects, selectedProjectId]);
+
+  // Conteo de reportes dimensionales por pieza, para el badge en cada renglón.
+  const dimCountByItem = useMemo(() => {
+    const m = new Map<string, number>();
+    dimReports.forEach(r => m.set(r.bom_item_id, (m.get(r.bom_item_id) ?? 0) + 1));
+    return m;
+  }, [dimReports]);
 
   // Filtra a piezas de producción y aplica search + status filter
   const allParts = useMemo(() => bomItems.filter(p => p.production_relevant !== false), [bomItems]);
@@ -466,6 +477,8 @@ export function Quality() {
                               technicians.find(t => t.id === item.assigned_technician_id)?.full_name
                             }
                             busy={busyId === item.id}
+                            dimensionalCount={dimCountByItem.get(item.id) ?? 0}
+                            onOpenDimensional={() => setDimItem(item)}
                             onSetStatus={s => setStatus(item, s)}
                           />
                         ))}
@@ -636,6 +649,16 @@ export function Quality() {
           </CardContent>
         </Card>
       )}
+
+      {dimItem && (
+        <DimensionalModal
+          item={dimItem}
+          projectName={projects.find(p => p.id === dimItem.project_id)?.name}
+          open={!!dimItem}
+          onOpenChange={o => !o && setDimItem(null)}
+          onChanged={refetchDim}
+        />
+      )}
     </div>
   );
 }
@@ -685,10 +708,12 @@ interface QualityRowProps {
   item: BomItem;
   technicianName?: string;
   busy: boolean;
+  dimensionalCount: number;
+  onOpenDimensional: () => void;
   onSetStatus: (next: ManufacturingStatus) => void;
 }
 
-function QualityRow({ item, technicianName, busy, onSetStatus }: QualityRowProps) {
+function QualityRow({ item, technicianName, busy, dimensionalCount, onOpenDimensional, onSetStatus }: QualityRowProps) {
   const isCalidad = item.manufacturing_status === 'CALIDAD';
   const isAprobada = item.manufacturing_status === 'TERMINADO';
   const isRechazada = item.manufacturing_status === 'RECHAZADO';
@@ -722,8 +747,16 @@ function QualityRow({ item, technicianName, busy, onSetStatus }: QualityRowProps
           <Button size="sm" variant="outline" className="h-6 text-[10px]">
             <FileUp className="w-3 h-3 mr-1" /> Cert. material
           </Button>
-          <Button size="sm" variant="outline" className="h-6 text-[10px]">
-            <FileUp className="w-3 h-3 mr-1" /> Dimensional
+          <Button
+            size="sm"
+            variant={dimensionalCount > 0 ? 'default' : 'outline'}
+            onClick={onOpenDimensional}
+            className="h-6 text-[10px]"
+          >
+            <Ruler className="w-3 h-3 mr-1" /> Dimensional
+            {dimensionalCount > 0 && (
+              <span className="ml-1 px-1 rounded bg-white/25 tabular-nums">{dimensionalCount}</span>
+            )}
           </Button>
         </div>
       </div>

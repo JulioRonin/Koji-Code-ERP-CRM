@@ -137,3 +137,35 @@ export function useBatchPdfThumbnails(paths: (string | null | undefined)[]) {
 
   return { urls, progress, prime };
 }
+
+/**
+ * Renderiza la primera página de un PDF a alta resolución para usarla como
+ * lienzo del editor dimensional (globalizado del plano). Devuelve el data URL
+ * PNG y el alto/ancho para conservar la relación de aspecto. No usa el cache
+ * de thumbnails (queremos más nitidez que en el preview).
+ */
+export async function renderPdfPageHiRes(
+  storagePath: string,
+  maxWidth = 1800
+): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  try {
+    const signed = await getFileDownloadUrl(storagePath);
+    if (!signed) return null;
+    const pdfjs = await loadPdfJs();
+    const pdf = await pdfjs.getDocument(signed).promise;
+    const page = await pdf.getPage(1);
+    const base = page.getViewport({ scale: 1 });
+    const scale = Math.min(3, maxWidth / base.width);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    await page.render({ canvasContext: ctx, viewport, canvas } as never).promise;
+    return { dataUrl: canvas.toDataURL('image/png'), width: viewport.width, height: viewport.height };
+  } catch (err) {
+    console.warn('Falló render HiRes de PDF', storagePath, err);
+    return null;
+  }
+}
