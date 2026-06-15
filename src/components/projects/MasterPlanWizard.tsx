@@ -32,8 +32,10 @@ import {
   MASTER_PLAN_TEMPLATES,
   scheduleTasks,
   projectEndDate,
+  backwardStartForDeadline,
   useCreateMasterPlan,
   useCreateMeetings,
+  useBomItems,
   DEFAULT_MEETING_CONFIGS,
   generateMeetingDates,
   type MasterPlanTemplate,
@@ -91,14 +93,39 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
   const [meetingConfigs, setMeetingConfigs] = useState<MeetingTemplateConfig[]>(
     DEFAULT_MEETING_CONFIGS.map(c => ({ ...c }))
   );
+  // Cantidad real de piezas a fabricar — escala las duraciones de manufactura.
+  // Se prellena con la suma de Qty for Production del BOM del proyecto.
+  const [quantity, setQuantity] = useState<number>(MASTER_PLAN_TEMPLATES[0].base_quantity);
+  const [quantityTouched, setQuantityTouched] = useState(false);
 
   const { create } = useCreateMasterPlan();
   const { create: createMeetings } = useCreateMeetings();
+  const { data: bomItems } = useBomItems(project.id);
 
-  // Cuando cambia la plantilla, resetea tasks editables
+  // Suma de piezas a fabricar del BOM (production_quantity ?? quantity, sólo
+  // las piezas de producción). Prefill de la cantidad si el usuario no la tocó.
+  const bomProductionQty = useMemo(() => {
+    const prod = bomItems.filter(b => b.production_relevant !== false);
+    const sum = prod.reduce((acc, b) => acc + Number(b.production_quantity ?? b.quantity ?? 0), 0);
+    return Math.round(sum);
+  }, [bomItems]);
+
+  React.useEffect(() => {
+    if (!quantityTouched && bomProductionQty > 0) {
+      setQuantity(bomProductionQty);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bomProductionQty]);
+
+  // Cuando cambia la plantilla, resetea tasks editables y la cantidad
+  // por defecto (BOM si hay, si no la cantidad base de la plantilla).
   React.useEffect(() => {
     setEditableTasks(tasksToEditable(template));
     setRiskSummary(template.defaultRiskSummary);
+    if (!quantityTouched) {
+      setQuantity(bomProductionQty > 0 ? bomProductionQty : template.base_quantity);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template.id]);
 
   // Construye una plantilla derivada con los tasks editables (para passar a scheduleTasks)
@@ -110,31 +137,44 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
     [template, editableTasks]
   );
 
-  // Si está en modo backward, calcula startDate desde el deadline
+  // Opciones de scheduling: días hábiles + escalado por cantidad real.
+  const scheduleOpts = useMemo(
+    () => ({ quantity, baseQuantity: template.base_quantity }),
+    [quantity, template.base_quantity]
+  );
+
+  // En modo backward, calcula el inicio para aterrizar EXACTO en el deadline.
+  // Se recalcula cuando cambian las tareas o la cantidad → el plan se rebalancea
+  // solo al agregar/quitar actividades o ajustar la cantidad.
   const projectDeadline = parseISO(project.deadline);
   React.useEffect(() => {
     if (planningMode !== 'backward') return;
-    // Programa con fecha placeholder para medir duración total
-    const placeholder = new Date(2030, 0, 1);
-    const sched = scheduleTasks(derivedTemplate, placeholder);
-    const end = projectEndDate(sched);
-    const days = Math.ceil((end.getTime() - placeholder.getTime()) / (1000 * 60 * 60 * 24));
-    const newStart = new Date(projectDeadline);
-    newStart.setDate(newStart.getDate() - days);
+    const newStart = backwardStartForDeadline(derivedTemplate, projectDeadline, scheduleOpts);
     setStartDate(format(newStart, 'yyyy-MM-dd'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planningMode, derivedTemplate, project.deadline]);
+  }, [planningMode, derivedTemplate, scheduleOpts, project.deadline]);
 
   // Cronograma calculado en vivo
   const scheduled = useMemo(() => {
-    return scheduleTasks(derivedTemplate, parseISO(startDate));
-  }, [derivedTemplate, startDate]);
+    return scheduleTasks(derivedTemplate, parseISO(startDate), scheduleOpts);
+  }, [derivedTemplate, startDate, scheduleOpts]);
 
   const calculatedEnd = useMemo(() => projectEndDate(scheduled), [scheduled]);
   const slackDays = Math.round((projectDeadline.getTime() - calculatedEnd.getTime()) / (1000 * 60 * 60 * 24));
 
   const criticalCount = scheduled.filter(t => t.is_critical).length;
   const milestoneCount = scheduled.filter(t => t.is_milestone).length;
+
+  // Lapso total del plan (calendario) y si el inicio sugerido ya pasó.
+  const startParsed = parseISO(startDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startInPast = startParsed < today;
+  const daysUntilStart = Math.round((startParsed.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const totalSpanDays = Math.max(
+    0,
+    Math.round((calculatedEnd.getTime() - startParsed.getTime()) / (1000 * 60 * 60 * 24))
+  );
 
   const handleTemplateChange = (t: MasterPlanTemplate) => {
     setTemplate(t);
@@ -397,6 +437,47 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
                 </div>
               </div>
 
+              {/* Cantidad a fabricar — escala las duraciones de manufactura */}
+              <div className="pt-2 space-y-1.5">
+                <label className="text-sm font-medium flex items-center justify-between">
+                  Cantidad de piezas a fabricar
+                  {bomProductionQty > 0 && !quantityTouched && (
+                    <span className="text-[10px] font-normal text-[var(--color-app-text-muted)]">
+                      Tomada del BOM ({bomProductionQty.toLocaleString('es-MX')} pzas)
+                    </span>
+                  )}
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={quantity}
+                    onChange={e => {
+                      setQuantity(Math.max(1, Number(e.target.value) || 1));
+                      setQuantityTouched(true);
+                    }}
+                    className="w-40"
+                  />
+                  {bomProductionQty > 0 && quantity !== bomProductionQty && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuantity(bomProductionQty);
+                        setQuantityTouched(false);
+                      }}
+                      className="text-xs text-[var(--color-app-primary)] hover:underline"
+                    >
+                      Usar BOM ({bomProductionQty.toLocaleString('es-MX')})
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-[var(--color-app-text-muted)] leading-snug">
+                  Las tareas de maquinado, tratamientos, inspección de lote y empaque escalan con
+                  esta cantidad (base de la plantilla: {template.base_quantity.toLocaleString('es-MX')} pzas).
+                  Las tareas fijas (kick-off, diseño, hitos) no cambian.
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Metodología</label>
@@ -443,21 +524,64 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
               {/* Resumen */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard label="Actividades" value={String(scheduled.length)} />
+                <StatCard label="Duración total" value={`${totalSpanDays}d`} />
                 <StatCard label="En ruta crítica" value={String(criticalCount)} tone="danger" />
-                <StatCard label="Hitos" value={String(milestoneCount)} />
                 <StatCard
-                  label={slackDays >= 0 ? 'Holgura' : 'Atraso vs deadline'}
-                  value={`${Math.abs(slackDays)}d`}
-                  tone={slackDays >= 0 ? 'success' : 'danger'}
+                  label={planningMode === 'backward' ? (startInPast ? 'Inicio requerido' : 'Arranca en') : slackDays >= 0 ? 'Holgura' : 'Atraso'}
+                  value={
+                    planningMode === 'backward'
+                      ? `${Math.abs(daysUntilStart)}d`
+                      : `${Math.abs(slackDays)}d`
+                  }
+                  tone={
+                    planningMode === 'backward'
+                      ? startInPast
+                        ? 'danger'
+                        : 'success'
+                      : slackDays >= 0
+                      ? 'success'
+                      : 'danger'
+                  }
                 />
               </div>
 
-              {slackDays < 0 && (
+              {/* Resumen de fechas clave */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div className="p-2.5 rounded-md bg-[var(--color-app-surface-alt)]/60 border border-[var(--color-app-border)]">
+                  <p className="text-[10px] uppercase text-[var(--color-app-text-muted)]">Inicio</p>
+                  <p className="font-semibold mt-0.5">{format(startParsed, 'EEE dd MMM yyyy', { locale: es })}</p>
+                </div>
+                <div className="p-2.5 rounded-md bg-[var(--color-app-surface-alt)]/60 border border-[var(--color-app-border)]">
+                  <p className="text-[10px] uppercase text-[var(--color-app-text-muted)]">Fin calculado</p>
+                  <p className="font-semibold mt-0.5">{format(calculatedEnd, 'EEE dd MMM yyyy', { locale: es })}</p>
+                </div>
+                <div className="p-2.5 rounded-md bg-[var(--color-app-surface-alt)]/60 border border-[var(--color-app-border)]">
+                  <p className="text-[10px] uppercase text-[var(--color-app-text-muted)]">Deadline cliente</p>
+                  <p className="font-semibold mt-0.5">{format(projectDeadline, 'EEE dd MMM yyyy', { locale: es })}</p>
+                </div>
+              </div>
+
+              {/* Inicio en el pasado (backward): el deadline no alcanza */}
+              {planningMode === 'backward' && startInPast && (
                 <div className="p-3 bg-[var(--color-app-danger-soft)] rounded-md flex gap-2 text-sm text-[var(--color-app-danger)]">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                   <div>
-                    El plan termina <strong>{Math.abs(slackDays)} días después</strong> del deadline del proyecto
-                    ({format(projectDeadline, 'dd MMM', { locale: es })}). Reduce duraciones o adelanta el inicio.
+                    Para entregar el <strong>{format(projectDeadline, 'dd MMM', { locale: es })}</strong>, el plan
+                    tendría que haber arrancado el <strong>{format(startParsed, 'dd MMM', { locale: es })}</strong>{' '}
+                    (hace {Math.abs(daysUntilStart)} días). El deadline <strong>no es alcanzable</strong> con esta
+                    cantidad y alcance: reduce piezas/actividades, suma turnos o máquinas, o negocia la fecha.
+                  </div>
+                </div>
+              )}
+
+              {/* Plan excede el deadline (forward) */}
+              {planningMode === 'forward' && slackDays < 0 && (
+                <div className="p-3 bg-[var(--color-app-danger-soft)] rounded-md flex gap-2 text-sm text-[var(--color-app-danger)]">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    El plan termina <strong>{Math.abs(slackDays)} días después</strong> del deadline
+                    ({format(projectDeadline, 'dd MMM', { locale: es })}). Adelanta el inicio, reduce la cantidad
+                    o cambia a modo <strong>Entrega fija</strong> para calcular el arranque automáticamente.
                   </div>
                 </div>
               )}
@@ -677,8 +801,9 @@ export function MasterPlanWizard({ project, open, onClose, onCreated }: MasterPl
                   <ReviewRow label="Proyecto"           value={`${project.name} (${project.id})`} />
                   <ReviewRow label="Cliente"            value={project.client_name} />
                   <ReviewRow label="Plantilla"          value={template.name} />
+                  <ReviewRow label="Cantidad"           value={`${quantity.toLocaleString('es-MX')} pzas a fabricar`} />
                   <ReviewRow label="Metodología"        value={methodology} />
-                  <ReviewRow label="Inicio"             value={format(parseISO(startDate), 'dd MMM yyyy', { locale: es })} />
+                  <ReviewRow label="Inicio"             value={format(parseISO(startDate), 'dd MMM yyyy', { locale: es })} tone={startInPast ? 'danger' : undefined} />
                   <ReviewRow label="Fin calculado"      value={format(calculatedEnd, 'dd MMM yyyy', { locale: es })} />
                   <ReviewRow label="Deadline cliente"   value={format(projectDeadline, 'dd MMM yyyy', { locale: es })} />
                   <ReviewRow label="Holgura"            value={`${slackDays} días`}              tone={slackDays >= 0 ? 'success' : 'danger'} />
@@ -903,7 +1028,7 @@ function EditableTaskList({ editableTasks, scheduled, onPatch, onRemove, onAdd }
                   <option value="Calidad">Calidad</option>
                   <option value="Embarque">Embarque</option>
                 </select>
-                {/* Duración */}
+                {/* Duración (base) + efectiva escalada */}
                 <div className="flex items-center gap-0.5">
                   <input
                     type="number"
@@ -913,8 +1038,17 @@ function EditableTaskList({ editableTasks, scheduled, onPatch, onRemove, onAdd }
                       onPatch(task.uid, { duration_days: Math.max(1, Number(e.target.value) || 1) })
                     }
                     className="w-12 h-7 px-1.5 rounded-md border border-[var(--color-app-border-strong)] bg-white text-[11px] text-right focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                    title={task.scales_with_quantity ? 'Duración base — escala con la cantidad' : 'Duración fija'}
                   />
                   <span className="text-[10px] text-[var(--color-app-text-muted)]">d</span>
+                  {sched && sched.duration_days !== task.duration_days && (
+                    <span
+                      className="text-[10px] text-[var(--color-app-primary)] font-medium ml-0.5"
+                      title="Duración efectiva escalada por la cantidad"
+                    >
+                      →{sched.duration_days}d
+                    </span>
+                  )}
                 </div>
                 {/* Hito */}
                 <label className="flex items-center gap-1 text-[11px] text-[var(--color-app-text-muted)] cursor-pointer">
