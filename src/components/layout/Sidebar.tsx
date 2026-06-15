@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { canAccessPath } from '@/lib/permissions';
 
 type NavItem = {
@@ -50,6 +51,9 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { user } = useAuth();
+  const { company } = useCompany();
+  const brandName = company.commercial_name || company.legal_name || 'Empresa';
+  const brandInitial = brandName.trim().charAt(0).toUpperCase() || 'E';
 
   // Para técnicos, "Técnicos" apunta a su portal exclusivo en lugar del
   // dashboard administrativo de /technicians.
@@ -85,13 +89,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Brand + close (mobile) */}
         <div className="h-16 flex items-center justify-between pl-5 pr-3 border-b border-[var(--color-app-sidebar-hover)] shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm">
-              K
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold text-white">Koji Code</span>
-              <span className="text-[10px] text-slate-400">ERP · Manufactura</span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            {company.logo_url ? (
+              <img
+                src={company.logo_url}
+                alt={brandName}
+                className="h-8 w-8 rounded-md object-cover bg-white"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm shrink-0">
+                {brandInitial}
+              </div>
+            )}
+            <div className="flex flex-col leading-tight min-w-0">
+              <span className="text-sm font-semibold text-white truncate">{brandName}</span>
+              <span className="text-[10px] text-slate-400 truncate">
+                {company.tagline || 'ERP · Manufactura'}
+              </span>
             </div>
           </div>
           <button

@@ -76,6 +76,36 @@ export type MessageType = 'USER' | 'SYSTEM' | 'PROJECT' | 'QUALITY' | 'PURCHASE'
 export type PmoReportType = 'Semanal' | 'Quincenal' | 'Mensual' | 'Cierre' | 'Ad-hoc';
 
 // ============================================================================
+// TABLA: company_settings
+// ============================================================================
+
+export interface CompanySettings {
+  id: string;
+  legal_name: string;
+  commercial_name: string;
+  tagline: string | null;
+  rfc: string | null;
+  tax_regime: string | null;
+  address_street: string | null;
+  address_ext: string | null;
+  address_int: string | null;
+  address_neighborhood: string | null;
+  address_zip: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_country: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  legal_rep: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  currency: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
 // TABLA: profiles
 // ============================================================================
 

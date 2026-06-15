@@ -43,7 +43,8 @@ import {
   useProjectNotes,
   useProjectMeetings,
 } from '@/lib/api';
-import type { ProjectNote, ProjectMeeting } from '@/types/database';
+import type { ProjectNote, ProjectMeeting, CompanySettings } from '@/types/database';
+import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 
 const fmtDate = (s: string | null | undefined) => {
@@ -92,6 +93,7 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
   const { data: projectTasks, refetch: refetchProjTasks } = useProjectTasks(project.id);
   const { data: notes, refetch: refetchNotes } = useProjectNotes(project.id);
   const { data: meetings, refetch: refetchMeetings } = useProjectMeetings(project.id);
+  const { company } = useCompany();
 
   // Al abrir el reporte, refresca TODO para que las cifras de avance,
   // hitos, juntas y notas sean las más recientes (el reporte queda montado
@@ -417,7 +419,7 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 1 — PORTADA
               ─────────────────────────────────────────────────────────────── */}
-          <PortadaPage project={project} masterPlan={masterPlan} stats={stats} />
+          <PortadaPage project={project} masterPlan={masterPlan} stats={stats} company={company} />
 
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 2 — RESUMEN EJECUTIVO
@@ -601,7 +603,7 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 8 — FIRMAS Y CIERRE
               ─────────────────────────────────────────────────────────────── */}
-          <SignaturePage project={project} />
+          <SignaturePage project={project} company={company} />
         </div>
       </div>
 
@@ -632,26 +634,34 @@ function PortadaPage({
   project,
   masterPlan,
   stats,
+  company,
 }: {
   project: ProjectReportProps['project'];
   masterPlan: ReturnType<typeof useMasterPlan>['data'];
   stats: { avgProgress: number; milestones: number; critical: number; total: number };
+  company: CompanySettings;
 }) {
+  const brandName = company.commercial_name || company.legal_name;
+  const brandInitial = brandName.trim().charAt(0).toUpperCase() || 'E';
   return (
     <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm relative overflow-hidden">
       {/* Banda superior */}
-      <div className="absolute top-0 left-0 right-0 h-2 bg-[#0369a1]" />
-      <div className="absolute top-2 left-0 right-0 h-1 bg-[#0ea5e9]" />
+      <div className="absolute top-0 left-0 right-0 h-2 bg-[var(--color-app-primary)]" />
+      <div className="absolute top-2 left-0 right-0 h-1 bg-[var(--color-app-primary-soft)]" />
 
       {/* Logo + ID */}
       <div className="flex items-start justify-between pt-12 mb-20">
         <div className="flex items-center gap-3">
-          <div className="h-14 w-14 rounded-md bg-[#0369a1] flex items-center justify-center text-white font-bold text-2xl shadow-sm">
-            K
-          </div>
+          {company.logo_url ? (
+            <img src={company.logo_url} alt={brandName} className="h-14 w-14 rounded-md object-cover shadow-sm bg-white" />
+          ) : (
+            <div className="h-14 w-14 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-2xl shadow-sm">
+              {brandInitial}
+            </div>
+          )}
           <div>
-            <p className="font-bold text-lg text-[#0f172a] leading-tight">Koji Code</p>
-            <p className="text-xs text-[#475569]">Manufactura CNC de precisión</p>
+            <p className="font-bold text-lg text-[#0f172a] leading-tight">{brandName}</p>
+            <p className="text-xs text-[#475569]">{company.tagline || ''}</p>
           </div>
         </div>
         <div className="text-right">
@@ -864,7 +874,14 @@ function ScoreboardPage({ tasks }: { tasks: ReturnType<typeof useMasterPlanTasks
   );
 }
 
-function SignaturePage({ project }: { project: ProjectReportProps['project'] }) {
+function SignaturePage({
+  project,
+  company,
+}: {
+  project: ProjectReportProps['project'];
+  company: CompanySettings;
+}) {
+  const brandName = company.commercial_name || company.legal_name;
   return (
     <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm">
       <PageHeader title="Cierre y firmas" subtitle="Validación del reporte" />
@@ -872,7 +889,7 @@ function SignaturePage({ project }: { project: ProjectReportProps['project'] }) 
       <div className="text-sm text-[#334155] mb-12 leading-relaxed">
         <p>
           Este documento es un reporte ejecutivo emitido por la oficina de gestión de proyectos (PMO)
-          de Koji Code para el proyecto <strong>{project.name}</strong> ({project.id}).
+          de {brandName} para el proyecto <strong>{project.name}</strong> ({project.id}).
         </p>
         <p className="mt-3">
           La información contenida es responsabilidad del manager del proyecto y del equipo de control
@@ -883,7 +900,7 @@ function SignaturePage({ project }: { project: ProjectReportProps['project'] }) 
 
       <div className="grid grid-cols-2 gap-12 mt-24 mb-16 pmi-keep">
         <Signature title="Responsable del proyecto" name={project.manager} />
-        <Signature title="Validación del PMI" name="Oficina PMO · Koji Code" />
+        <Signature title="Validación del PMI" name={`Oficina PMO · ${brandName}`} />
       </div>
 
       <div className="grid grid-cols-2 gap-12 pmi-keep">
@@ -893,8 +910,10 @@ function SignaturePage({ project }: { project: ProjectReportProps['project'] }) 
 
       <div className="absolute bottom-8 left-0 right-0 text-center text-xs text-[#94a3b8] mt-12">
         <p>
-          Koji Code ERP · Reporte PMI · {format(new Date(), 'yyyy', { locale: es })} ·
-          Documento emitido el {format(new Date(), 'dd/MM/yyyy HH:mm')}
+          {brandName}
+          {company.rfc ? ` · RFC ${company.rfc}` : ''} · Reporte PMI ·{' '}
+          {format(new Date(), 'yyyy', { locale: es })} · Documento emitido el{' '}
+          {format(new Date(), 'dd/MM/yyyy HH:mm')}
         </p>
       </div>
     </div>

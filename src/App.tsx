@@ -26,10 +26,8 @@ import { Pmo } from './pages/pmo/Pmo';
 import { Quotes } from './pages/quotes/Quotes';
 import { QuoteBuilder } from './pages/quotes/QuoteBuilder';
 import { Integrations } from './pages/settings/Integrations';
-import { 
-  Billing, 
-  Settings 
-} from './pages/Placeholders';
+import { CompanySettingsPage } from './pages/settings/CompanySettingsPage';
+import { Billing } from './pages/Placeholders';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
 import { TechnicianDashboard } from './pages/technicians/TechnicianDashboard';
@@ -121,7 +119,7 @@ export default function App() {
           <Route path="personnel" element={<ProtectedRoute><Personnel /></ProtectedRoute>} />
           <Route path="chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
-          <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="settings" element={<ProtectedRoute><CompanySettingsPage /></ProtectedRoute>} />
           
           {/* Universal Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />

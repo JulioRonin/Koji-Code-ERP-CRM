@@ -19,6 +19,39 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 1. CRM & PERFILES
 -- ---------------------------------------------------------------------------
 
+-- Configuración de la empresa (tenant). Hoy es un solo registro; a futuro,
+-- multi-tenant, se llavearía por organización. Guarda los datos fiscales
+-- (México) y las preferencias de marca/tema que la app muestra en lugar de
+-- "Koji Code" (nombre de la plataforma).
+CREATE TABLE IF NOT EXISTS public.company_settings (
+    id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legal_name         TEXT NOT NULL DEFAULT 'IMC Design',     -- Razón social
+    commercial_name    TEXT NOT NULL DEFAULT 'IMC Design',     -- Nombre comercial
+    tagline            TEXT DEFAULT 'Manufactura CNC de precisión',
+    rfc                TEXT,
+    tax_regime         TEXT,                                   -- Régimen fiscal SAT
+    -- Domicilio fiscal
+    address_street     TEXT,
+    address_ext        TEXT,
+    address_int        TEXT,
+    address_neighborhood TEXT,                                 -- Colonia
+    address_zip        TEXT,                                   -- Código postal
+    address_city       TEXT,                                   -- Municipio / alcaldía
+    address_state      TEXT,
+    address_country    TEXT DEFAULT 'México',
+    -- Contacto
+    phone              TEXT,
+    email              TEXT,
+    website            TEXT,
+    legal_rep          TEXT,                                   -- Representante legal
+    logo_url           TEXT,
+    -- Marca / tema
+    primary_color      TEXT DEFAULT '#0369a1',
+    currency           TEXT DEFAULT 'MXN',
+    created_at         TIMESTAMPTZ DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.profiles (
     id           UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name    TEXT NOT NULL,
@@ -745,6 +778,7 @@ END$$;
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE public.profiles                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.company_settings        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customers               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.suppliers               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.material_prices         ENABLE ROW LEVEL SECURITY;
@@ -950,6 +984,20 @@ CREATE POLICY "project-files delete" ON storage.objects
 -- ---------------------------------------------------------------------------
 -- 16. DATOS INICIALES
 -- ---------------------------------------------------------------------------
+
+-- company_settings: lectura para cualquiera (la marca se usa hasta en el
+-- login, antes de autenticar); escritura solo Administrador / PM.
+DROP POLICY IF EXISTS "company read" ON public.company_settings;
+CREATE POLICY "company read" ON public.company_settings
+    FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "company write" ON public.company_settings;
+CREATE POLICY "company write" ON public.company_settings
+    FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- Registro inicial de la empresa (solo si no existe ninguno).
+INSERT INTO public.company_settings (legal_name, commercial_name, tagline)
+SELECT 'IMC Design', 'IMC Design', 'Manufactura CNC de precisión'
+WHERE NOT EXISTS (SELECT 1 FROM public.company_settings);
 
 INSERT INTO public.chat_channels (name, description, category) VALUES
     ('general',     'Canal principal de comunicación',              'ADMIN'),
