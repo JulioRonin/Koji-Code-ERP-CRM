@@ -30,6 +30,7 @@ import {
   useUpdateManufacturingStatus,
   useTechnicians,
   useAssignTechnician,
+  useMachines,
 } from '@/lib/api';
 import type { BomItem, ManufacturingStatus } from '@/types/database';
 import { CheckCircle2, Circle, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
@@ -97,6 +98,7 @@ export function ProductionProjectView(props: Props = {}) {
   const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<BomItem | null>(null);
   const { data: technicians } = useTechnicians();
+  const { data: machines } = useMachines();
   // Sólo dispara la consulta interna si el padre NO está pasándonos datos.
   // Tener ambas (internal + props) causaba doble fetch y carreras entre
   // refetchs que dejaban la lista vacía durante una fracción de segundo.
@@ -522,10 +524,19 @@ export function ProductionProjectView(props: Props = {}) {
                     className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
                   >
                     <option value="">Selecciona equipo…</option>
-                    <option>CNC-001 (Fresadora 3 ejes)</option>
-                    <option>CNC-002 (Torno CNC)</option>
-                    <option>CNC-004 (Torno Suizo)</option>
+                    {machines.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.id}
+                        {m.type ? ` (${m.type})` : ''}
+                      </option>
+                    ))}
                   </select>
+                  {machines.length === 0 && (
+                    <p className="text-[10px] text-[var(--color-app-warning)] leading-snug">
+                      No hay máquinas registradas. Dalas de alta en Producción →
+                      Piso de fábrica → Nueva máquina.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Prioridad</label>
