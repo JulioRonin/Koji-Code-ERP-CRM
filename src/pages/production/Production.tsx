@@ -37,7 +37,7 @@ import { ProductionProjectView } from '@/components/production/ProductionProject
 import { MachineFormModal } from '@/components/production/MachineFormModal';
 import { cn } from '@/lib/utils';
 import { useMachines, useWorkOrders, useBomItems, useProjects } from '@/lib/api';
-import { useDeleteMachine } from '@/lib/api/production';
+import { useDeleteMachine, useUpdateMachine, useUpdateWorkOrder } from '@/lib/api/production';
 import type { Machine } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
 
@@ -47,6 +47,14 @@ const machineLeftColor: Record<string, string> = {
   Mantenimiento: 'border-l-[var(--color-app-danger)]',
   Disponible: 'border-l-[var(--color-app-border-strong)]',
   Fuera_Servicio: 'border-l-[var(--color-app-danger)]',
+};
+
+const machineStatusVariant: Record<string, 'success' | 'warning' | 'destructive' | 'secondary'> = {
+  Operando: 'success',
+  Disponible: 'secondary',
+  Setup: 'warning',
+  Mantenimiento: 'destructive',
+  Fuera_Servicio: 'destructive',
 };
 
 const statusBadgeVariant: Record<string, 'success' | 'default' | 'warning'> = {
@@ -78,9 +86,31 @@ export function Production() {
     }
   }, [projects, selectedProjectId]);
   const { data: machines, refetch: refetchMachines } = useMachines();
-  const { data: workOrders } = useWorkOrders();
+  const { data: workOrders, refetch: refetchWorkOrders } = useWorkOrders();
   const { remove: removeMachine } = useDeleteMachine();
+  const { update: updateMachineStatus } = useUpdateMachine();
+  const { update: updateWorkOrder } = useUpdateWorkOrder();
   const navigate = useNavigate();
+
+  // Tras asignar un plan, refresca piezas + máquinas + órdenes para que el
+  // piso muestre el estatus actualizado de cada equipo.
+  const refetchFloor = async () => {
+    await Promise.all([refetchBom(), refetchMachines(), refetchWorkOrders()]);
+  };
+
+  // Liberar una máquina: cierra su orden activa y la regresa a Disponible.
+  const releaseMachine = async (machineId: string) => {
+    const activeWO = workOrders.find(w => w.machine_id === machineId && w.status === 'En Proceso');
+    try {
+      if (activeWO) {
+        await updateWorkOrder(activeWO.id, { status: 'Completado', actual_end: new Date().toISOString() });
+      }
+      await updateMachineStatus(machineId, { status: 'Disponible' });
+      await Promise.all([refetchMachines(), refetchWorkOrders()]);
+    } catch (err) {
+      window.alert((err as Error).message);
+    }
+  };
 
   // Alta / edición de máquinas
   const [machineModalOpen, setMachineModalOpen] = useState(false);
@@ -223,23 +253,53 @@ export function Production() {
                   <CardContent className="space-y-3 pb-5">
                     <p className="text-xs text-[var(--color-app-text-muted)]">{m.type}</p>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-[var(--color-app-text-muted)]">Estado</span>
-                        <span className="font-medium">{m.status}</span>
+                        <Badge variant={machineStatusVariant[m.status] ?? 'secondary'}>
+                          {m.status === 'Fuera_Servicio' ? 'Fuera de servicio' : m.status}
+                        </Badge>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[var(--color-app-text-muted)]">Ubicación</span>
                         <span className="font-medium">{m.location ?? '—'}</span>
                       </div>
                     </div>
+
                     <div className="space-y-1.5 pt-3 border-t border-[var(--color-app-border)]">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-[var(--color-app-text-muted)] truncate max-w-[140px]">
-                          {activeWO ? activeWO.id : 'Sin orden activa'}
-                        </span>
-                        <span className="font-medium tabular-nums">{progress}%</span>
-                      </div>
-                      <Progress value={progress} className="h-1" />
+                      {activeWO ? (
+                        <>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[var(--color-app-text)] font-medium truncate max-w-[150px]">
+                              {bomItems.find(b => b.id === activeWO.bom_item_id)?.part_number ?? activeWO.id}
+                            </span>
+                            <span className="font-medium tabular-nums">{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-1" />
+                          <div className="flex justify-between items-center pt-1">
+                            <span className="text-[10px] text-[var(--color-app-text-muted)] font-mono truncate max-w-[130px]">
+                              {activeWO.project_id}
+                            </span>
+                            <button
+                              onClick={() => releaseMachine(m.id)}
+                              className="text-[10px] font-medium text-[var(--color-app-danger)] hover:underline"
+                            >
+                              Liberar
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-[var(--color-app-text-muted)]">Sin orden activa</span>
+                          {m.status === 'Operando' && (
+                            <button
+                              onClick={() => releaseMachine(m.id)}
+                              className="text-[10px] font-medium text-[var(--color-app-danger)] hover:underline"
+                            >
+                              Liberar
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -337,7 +397,7 @@ export function Production() {
           bomItems={bomItems}
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
-          onChanged={refetchBom}
+          onChanged={refetchFloor}
         />
       )}
 

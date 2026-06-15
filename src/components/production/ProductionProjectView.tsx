@@ -31,6 +31,8 @@ import {
   useTechnicians,
   useAssignTechnician,
   useMachines,
+  useCreateWorkOrder,
+  useUpdateMachine,
 } from '@/lib/api';
 import type { BomItem, ManufacturingStatus } from '@/types/database';
 import { CheckCircle2, Circle, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
@@ -114,6 +116,8 @@ export function ProductionProjectView(props: Props = {}) {
   };
   const { update: updateMfg, loading: updatingMfg } = useUpdateManufacturingStatus();
   const { assign: assignTech } = useAssignTechnician();
+  const { create: createWorkOrder } = useCreateWorkOrder();
+  const { update: updateMachine } = useUpdateMachine();
   const [busyToggleId, setBusyToggleId] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
@@ -160,6 +164,20 @@ export function ProductionProjectView(props: Props = {}) {
       await assignTech(selectedPart.id, planTechId);
       if (selectedPart.manufacturing_status === 'PENDIENTE') {
         await updateMfg(selectedPart.id, 'EN PROCESO');
+      }
+      // Si se eligió una máquina, generamos la orden de trabajo que la ocupa
+      // y la marcamos como Operando para que el piso refleje el estatus.
+      if (planMachineId) {
+        await createWorkOrder({
+          project_id: selectedPart.project_id,
+          bom_item_id: selectedPart.id,
+          machine_id: planMachineId,
+          assigned_technician_id: planTechId,
+          quantity: selectedPart.production_quantity ?? selectedPart.quantity ?? 1,
+          priority: planPriority,
+          status: 'En Proceso',
+        });
+        await updateMachine(planMachineId, { status: 'Operando' });
       }
       await refetchParts();
       setIsPlanningModalOpen(false);
@@ -459,6 +477,10 @@ export function ProductionProjectView(props: Props = {}) {
                         variant={item.assigned_technician_id ? 'outline' : 'default'}
                         onClick={() => {
                           setSelectedPart(item);
+                          setPlanTechId(item.assigned_technician_id ?? '');
+                          setPlanMachineId('');
+                          setPlanPriority('Normal');
+                          setPlanError(null);
                           setIsPlanningModalOpen(true);
                         }}
                       >

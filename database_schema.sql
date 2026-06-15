@@ -985,6 +985,33 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Producción (más Admin/PM) puede crear/actualizar órdenes de trabajo, sus
+-- etapas y el estatus de las máquinas (al asignar un plan de producción).
+CREATE OR REPLACE FUNCTION public.is_production()
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND department IN ('Producción','Administrador','Administración / PM')
+    );
+$$;
+
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN SELECT unnest(ARRAY['work_orders','work_order_stages','machines'])
+    LOOP
+        EXECUTE format(
+            'DROP POLICY IF EXISTS "production write %I" ON public.%I;
+             CREATE POLICY "production write %I" ON public.%I
+             FOR ALL TO authenticated USING (public.is_production()) WITH CHECK (public.is_production());',
+            t, t, t, t
+        );
+    END LOOP;
+END$$;
+
 -- Cualquier autenticado puede mandar mensajes y abrir time entries
 DROP POLICY IF EXISTS "send chat" ON public.chat_messages;
 CREATE POLICY "send chat" ON public.chat_messages
