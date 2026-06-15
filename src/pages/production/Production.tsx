@@ -8,6 +8,9 @@ import {
   ClipboardList,
   BarChart3,
   Plus,
+  MoreVertical,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,10 +25,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ProductionStatusHeader } from '@/components/production/ProductionStatusHeader';
 import { ProductionProjectView } from '@/components/production/ProductionProjectView';
+import { MachineFormModal } from '@/components/production/MachineFormModal';
 import { cn } from '@/lib/utils';
 import { useMachines, useWorkOrders, useBomItems, useProjects } from '@/lib/api';
+import { useDeleteMachine } from '@/lib/api/production';
+import type { Machine } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
 
 const machineLeftColor: Record<string, string> = {
@@ -64,9 +77,34 @@ export function Production() {
       setSelectedProjectId(inProd.id);
     }
   }, [projects, selectedProjectId]);
-  const { data: machines } = useMachines();
+  const { data: machines, refetch: refetchMachines } = useMachines();
   const { data: workOrders } = useWorkOrders();
+  const { remove: removeMachine } = useDeleteMachine();
   const navigate = useNavigate();
+
+  // Alta / edición de máquinas
+  const [machineModalOpen, setMachineModalOpen] = useState(false);
+  const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+
+  const openNewMachine = () => {
+    setEditingMachine(null);
+    setMachineModalOpen(true);
+  };
+  const openEditMachine = (m: Machine) => {
+    setEditingMachine(m);
+    setMachineModalOpen(true);
+  };
+  const handleDeleteMachine = async (m: Machine) => {
+    if (!window.confirm(`¿Eliminar la máquina "${m.id}" del catálogo? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    try {
+      await removeMachine(m.id);
+      refetchMachines();
+    } catch (err) {
+      window.alert((err as Error).message);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -110,10 +148,25 @@ export function Production() {
 
       {activeTab === 'floor' && (
         <>
+          {/* Catálogo de máquinas */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--color-app-text)]">
+                Parque de máquinas
+              </h2>
+              <p className="text-xs text-[var(--color-app-text-muted)]">
+                {machines.length} {machines.length === 1 ? 'equipo registrado' : 'equipos registrados'}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={openNewMachine}>
+              <Plus className="h-4 w-4 mr-1.5" /> Nueva máquina
+            </Button>
+          </div>
+
           {/* Machine cards */}
           {machines.length === 0 ? (
             <Card>
-              <CardContent className="py-10 text-center space-y-2">
+              <CardContent className="py-10 text-center space-y-3">
                 <Settings className="h-8 w-8 mx-auto text-[var(--color-app-text-subtle)]" />
                 <p className="text-sm font-medium">Sin máquinas registradas</p>
                 <p className="text-xs text-[var(--color-app-text-muted)] max-w-md mx-auto">
@@ -121,6 +174,9 @@ export function Production() {
                   parque de equipo aparecerán aquí con su estado en tiempo real (Operando,
                   Setup, Mantenimiento, etc.).
                 </p>
+                <Button size="sm" onClick={openNewMachine} className="mt-1">
+                  <Plus className="h-4 w-4 mr-1.5" /> Dar de alta la primera máquina
+                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -135,10 +191,34 @@ export function Production() {
                 >
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-base">{m.id}</CardTitle>
-                    {m.status === 'Operando' && <PlayCircle className="h-4 w-4 text-[var(--color-app-success)]" />}
-                    {m.status === 'Setup' && <Settings className="h-4 w-4 text-[var(--color-app-warning)]" />}
-                    {m.status === 'Mantenimiento' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
-                    {m.status === 'Fuera_Servicio' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
+                    <div className="flex items-center gap-1">
+                      {m.status === 'Operando' && <PlayCircle className="h-4 w-4 text-[var(--color-app-success)]" />}
+                      {m.status === 'Setup' && <Settings className="h-4 w-4 text-[var(--color-app-warning)]" />}
+                      {m.status === 'Mantenimiento' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
+                      {m.status === 'Fuera_Servicio' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="h-6 w-6 inline-flex items-center justify-center rounded-md text-[var(--color-app-text-subtle)] hover:bg-[var(--color-app-surface-alt)] hover:text-[var(--color-app-text)] transition-colors"
+                            aria-label="Acciones de máquina"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditMachine(m)}>
+                            <Pencil className="h-4 w-4 mr-2" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteMachine(m)}
+                            className="text-[var(--color-app-danger)] focus:text-[var(--color-app-danger)]"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-3 pb-5">
                     <p className="text-xs text-[var(--color-app-text-muted)]">{m.type}</p>
@@ -274,6 +354,13 @@ export function Production() {
           </CardContent>
         </Card>
       )}
+
+      <MachineFormModal
+        open={machineModalOpen}
+        onOpenChange={setMachineModalOpen}
+        machine={editingMachine}
+        onSaved={refetchMachines}
+      />
     </div>
   );
 }
