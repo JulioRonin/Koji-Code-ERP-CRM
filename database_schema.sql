@@ -966,10 +966,18 @@ END$$;
 CREATE OR REPLACE FUNCTION public.is_quality()
 RETURNS BOOLEAN
 LANGUAGE SQL STABLE SECURITY DEFINER AS $$
+    -- Revisamos role Y department porque, según cómo se dio de alta el usuario,
+    -- "Calidad" puede vivir en cualquiera de las dos columnas (p. ej. role
+    -- "Técnico de Calidad" con department por defecto). ILIKE cubre variantes.
     SELECT EXISTS (
         SELECT 1 FROM public.profiles
         WHERE id = auth.uid()
-        AND department IN ('Calidad','Administrador','Administración / PM')
+        AND (
+            role       IN ('Calidad','Administrador','Administración / PM')
+            OR department IN ('Calidad','Administrador','Administración / PM')
+            OR role       ILIKE '%calidad%'
+            OR department ILIKE '%calidad%'
+        )
     );
 $$;
 
@@ -996,7 +1004,12 @@ LANGUAGE SQL STABLE SECURITY DEFINER AS $$
     SELECT EXISTS (
         SELECT 1 FROM public.profiles
         WHERE id = auth.uid()
-        AND department IN ('Producción','Administrador','Administración / PM')
+        AND (
+            role       IN ('Producción','Administrador','Administración / PM')
+            OR department IN ('Producción','Administrador','Administración / PM')
+            OR role       ILIKE '%producci%'
+            OR department ILIKE '%producci%'
+        )
     );
 $$;
 
