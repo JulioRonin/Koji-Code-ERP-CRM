@@ -194,6 +194,7 @@ export function useCreateMeetings() {
         attendees: input.attendees ?? [],
         status: 'Programada' as MeetingStatus,
         notes: input.notes ?? null,
+        minutes: null,
         created_at: now,
         updated_at: now,
       }));
@@ -224,6 +225,8 @@ interface UpdateMeetingInput {
   duration_minutes?: number;
   attendees?: string[];
   notes?: string | null;
+  minutes?: import('@/types/database').MeetingMinute | null;
+  status?: MeetingStatus;
 }
 
 /**

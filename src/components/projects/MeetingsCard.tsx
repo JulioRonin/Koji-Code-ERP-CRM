@@ -10,6 +10,7 @@ import {
   ChevronDown,
   CalendarPlus,
   Save,
+  FileText,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import {
 import type { ProjectMeeting, MeetingStatus, Project } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { GenerateMeetingsModal } from './GenerateMeetingsModal';
+import { MeetingMinuteModal } from './MeetingMinuteModal';
 
 const typeColor: Record<string, string> = {
   'Kick-off':  '#0369a1',
@@ -44,6 +46,7 @@ export function MeetingsCard({ project }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [genOpen, setGenOpen] = useState(false);
+  const [minuteMeeting, setMinuteMeeting] = useState<ProjectMeeting | null>(null);
 
   // Reprograma fecha/hora de una junta existente.
   const handleReschedule = async (m: ProjectMeeting, date: string, time: string) => {
@@ -164,6 +167,7 @@ export function MeetingsCard({ project }: Props) {
                 onMarkRealized={() => handleSetStatus(m, 'Realizada')}
                 onMarkCancelled={() => handleSetStatus(m, 'Cancelada')}
                 onReschedule={(date, time) => handleReschedule(m, date, time)}
+                onOpenMinute={() => setMinuteMeeting(m)}
               />
             ))}
           </div>
@@ -187,12 +191,25 @@ export function MeetingsCard({ project }: Props) {
                   onMarkRealized={() => handleSetStatus(m, 'Realizada')}
                   onMarkCancelled={() => handleSetStatus(m, 'Cancelada')}
                   onReschedule={(date, time) => handleReschedule(m, date, time)}
+                  onOpenMinute={() => setMinuteMeeting(m)}
                 />
               ))}
             </div>
           </details>
         )}
       </CardContent>
+
+      {minuteMeeting && (
+        <MeetingMinuteModal
+          meeting={minuteMeeting}
+          project={project}
+          onClose={() => setMinuteMeeting(null)}
+          onSaved={async () => {
+            await refetch();
+            setMinuteMeeting(null);
+          }}
+        />
+      )}
     </Card>
   );
 }
@@ -207,6 +224,7 @@ function MeetingRow({
   onMarkRealized,
   onMarkCancelled,
   onReschedule,
+  onOpenMinute,
 }: {
   meeting: ProjectMeeting;
   isPast?: boolean;
@@ -217,6 +235,7 @@ function MeetingRow({
   onMarkRealized: () => void;
   onMarkCancelled: () => void;
   onReschedule: (date: string, time: string) => void;
+  onOpenMinute: () => void;
 }) {
   const d = parseISO(meeting.scheduled_at);
   const color = typeColor[meeting.meeting_type] ?? '#94a3b8';
@@ -291,6 +310,17 @@ function MeetingRow({
 
       {isExpanded && (
         <div className="px-3 pb-3 pt-1 border-t border-[var(--color-app-border)] space-y-2.5">
+          {/* Minuta de la junta (generar / editar / exportar PDF) */}
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="text-[10px] uppercase text-[var(--color-app-text-muted)] tracking-wide font-medium">
+              Minuta
+            </span>
+            <Button size="sm" variant={meeting.minutes ? 'default' : 'outline'} className="h-7 text-xs" onClick={onOpenMinute}>
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              {meeting.minutes ? 'Ver / editar minuta' : 'Generar minuta'}
+            </Button>
+          </div>
+
           {/* Reprogramar fecha/hora (juntas programadas) */}
           {meeting.status === 'Programada' && (
             <div>

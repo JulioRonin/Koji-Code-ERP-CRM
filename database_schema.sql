@@ -307,6 +307,9 @@ CREATE TABLE IF NOT EXISTS public.project_meetings (
     updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Minuta de la junta (documento editable + datos de origen) en JSONB.
+ALTER TABLE public.project_meetings ADD COLUMN IF NOT EXISTS minutes JSONB;
+
 CREATE INDEX IF NOT EXISTS idx_meetings_project ON public.project_meetings(project_id, scheduled_at);
 
 -- ---------------------------------------------------------------------------

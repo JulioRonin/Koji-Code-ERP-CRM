@@ -347,6 +347,32 @@ export interface MasterPlanTask {
 export type MeetingType = 'Kick-off' | 'Semanal' | 'Quincenal' | 'Mensual' | 'Hito' | 'Cierre';
 export type MeetingStatus = 'Programada' | 'Realizada' | 'Cancelada';
 
+/** Un compromiso / acción acordada en la junta. */
+export interface MinuteActionItem {
+  task: string;
+  owner?: string;
+  due?: string;
+}
+
+/** Minuta de junta: datos de origen ("prompt") + documento editable generado. */
+export interface MeetingMinute {
+  // Datos capturados por el usuario
+  purpose: string;
+  discussion: string;
+  attendees: string[];
+  agreements: string[];
+  actionItems: MinuteActionItem[];
+  location?: string;
+  // Documento profesional generado y editable
+  title: string;
+  intro: string;
+  topics: string;
+  closing: string;
+  // Metadatos
+  generatedAt: string;
+  updatedAt: string;
+}
+
 export interface ProjectMeeting {
   id: string;
   project_id: string;
@@ -358,6 +384,7 @@ export interface ProjectMeeting {
   attendees: string[];
   status: MeetingStatus;
   notes: string | null;
+  minutes: MeetingMinute | null;
   created_at: string;
   updated_at: string;
 }
