@@ -452,6 +452,8 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
                 <GanttChart
                   startDate={masterPlan?.baseline_start ?? project.startDate}
                   tasks={ganttTasks}
+                  endDate={project.deadline}
+                  noAnimation
                 />
               </div>
             </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { format, addDays } from 'date-fns';
+import { format, addDays, differenceInDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface GanttTask {
@@ -23,6 +23,13 @@ interface GanttChartProps {
    * contenedor para que quepa en una hoja (impresión / reporte).
    */
   scrollable?: boolean;
+  /**
+   * Fecha de entrega / deadline del proyecto. Extiende la línea de tiempo
+   * hasta esa fecha y dibuja un marcador "Entrega".
+   */
+  endDate?: string | null;
+  /** Desactiva las animaciones (necesario para imprimir/exportar). */
+  noAnimation?: boolean;
 }
 
 const DEPARTMENT_COLORS: Record<GanttTask['department'], string> = {
@@ -34,40 +41,68 @@ const DEPARTMENT_COLORS: Record<GanttTask['department'], string> = {
 
 const LABEL_COL = 192; // w-48
 const DAY_PX = 18;      // ancho por día en modo scrollable
+const NICE_STEPS = [1, 2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90, 120];
+const DEADLINE_COLOR = '#dc2626';
 
-export function GanttChart({ startDate, tasks, scrollable = false }: GanttChartProps) {
+export function GanttChart({
+  startDate,
+  tasks,
+  scrollable = false,
+  endDate,
+  noAnimation = false,
+}: GanttChartProps) {
   const projectStart = new Date(startDate);
-  const totalDays = Math.max(...tasks.map(t => t.startDay + t.duration)) + 5;
+  const lastTaskEnd = Math.max(...tasks.map(t => t.startDay + t.duration));
 
-  // Ancho real de la pista de tiempo (px) en modo scrollable.
+  // Día del deadline relativo al inicio (si se proporciona y es válido).
+  const deadlineDay = (() => {
+    if (!endDate) return null;
+    const d = parseISO(endDate);
+    if (isNaN(d.getTime())) return null;
+    return Math.max(0, differenceInDays(d, projectStart));
+  })();
+
+  // La línea de tiempo llega hasta la última actividad O el deadline, lo que
+  // ocurra después, con un pequeño margen para que no se corte la etiqueta.
+  const contentEnd = Math.max(lastTaskEnd, deadlineDay ?? 0);
+  const totalDays = contentEnd + (scrollable ? 3 : 2);
+
   const timelineWidth = Math.max(560, totalDays * DAY_PX);
   const effDayPx = timelineWidth / totalDays;
 
-  // Paso entre marcas de fecha: en scrollable elegimos un intervalo "bonito"
-  // que deje al menos ~64px entre etiquetas para que no se encimen.
+  // Paso entre marcas de fecha: en scrollable por px disponible; en modo
+  // ajustado limitamos el número total de etiquetas para que no se encimen.
   const stepDays = scrollable
-    ? [1, 2, 5, 7, 10, 14, 21, 30, 45, 60, 90].find(s => s * effDayPx >= 64) ?? 90
-    : 5;
+    ? NICE_STEPS.find(s => s * effDayPx >= 64) ?? 120
+    : NICE_STEPS.find(s => totalDays / s <= 14) ?? 120;
   const markerCount = Math.ceil(totalDays / stepDays);
   const dateMarkers = Array.from({ length: markerCount + 1 }, (_, i) => i * stepDays).filter(
     d => d <= totalDays
   );
 
-  // Posición / tamaño: px en scrollable, % en modo ajustado.
   const posLeft = (day: number) => (scrollable ? `${day * effDayPx}px` : `${(day / totalDays) * 100}%`);
   const sizeW = (dur: number) => (scrollable ? `${dur * effDayPx}px` : `${(dur / totalDays) * 100}%`);
 
-  // En scrollable fijamos el ancho total (col etiqueta + pista + holgura para
-  // que la última fecha no se corte). En ajustado, ancho mínimo flexible.
+  // Posición horizontal de la línea del deadline, relativa al contenedor
+  // completo (col etiqueta + pista).
+  const deadlineLeft =
+    deadlineDay == null
+      ? null
+      : scrollable
+      ? `${LABEL_COL + deadlineDay * effDayPx}px`
+      : `calc(${LABEL_COL}px + (100% - ${LABEL_COL}px) * ${deadlineDay / totalDays})`;
+
   const innerStyle: React.CSSProperties = scrollable
     ? { width: LABEL_COL + timelineWidth + 72 }
-    : { minWidth: 800 };
+    : { minWidth: 760 };
   const trackStyle: React.CSSProperties | undefined = scrollable
     ? { width: timelineWidth }
     : undefined;
 
+  const Bar = noAnimation ? ('div' as const) : motion.div;
+
   return (
-    <div className="w-full overflow-x-auto pb-4">
+    <div className={scrollable ? 'w-full overflow-x-auto pb-4' : 'w-full pb-4'}>
       <div className="relative" style={innerStyle}>
         {/* Header */}
         <div className="flex border-b border-[var(--color-app-border)] mb-4 pb-2">
@@ -87,6 +122,14 @@ export function GanttChart({ startDate, tasks, scrollable = false }: GanttChartP
                 {format(addDays(projectStart, day), 'dd MMM', { locale: es })}
               </div>
             ))}
+            {deadlineDay != null && (
+              <div
+                className="absolute text-[10px] font-semibold whitespace-nowrap -translate-x-1/2"
+                style={{ left: posLeft(deadlineDay), top: -2, color: DEADLINE_COLOR }}
+              >
+                ▾ Entrega {format(addDays(projectStart, deadlineDay), 'dd MMM', { locale: es })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -94,8 +137,18 @@ export function GanttChart({ startDate, tasks, scrollable = false }: GanttChartP
         <div className="space-y-3 relative z-10">
           {tasks.map((task, index) => {
             const color = DEPARTMENT_COLORS[task.department];
-            const taskEnd = addDays(projectStart, task.startDay + task.duration);
             const taskStartDate = addDays(projectStart, task.startDay);
+            const taskEnd = addDays(projectStart, task.startDay + task.duration);
+            const barAnim = noAnimation
+              ? {}
+              : {
+                  initial: { opacity: 0 },
+                  animate: { width: sizeW(task.duration), left: posLeft(task.startDay), opacity: 1 },
+                  transition: { delay: index * 0.04, duration: 0.5, ease: 'easeOut' as const },
+                };
+            const barStaticStyle: React.CSSProperties = noAnimation
+              ? { width: sizeW(task.duration), left: posLeft(task.startDay) }
+              : {};
             return (
               <div key={task.id} className="flex items-center group">
                 <div
@@ -118,26 +171,18 @@ export function GanttChart({ startDate, tasks, scrollable = false }: GanttChartP
                   }
                   style={trackStyle}
                 >
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{
-                      width: sizeW(task.duration),
-                      left: posLeft(task.startDay),
-                      opacity: 1,
-                    }}
-                    transition={{ delay: index * 0.05, duration: 0.5, ease: 'easeOut' }}
+                  <Bar
+                    {...barAnim}
                     className="absolute h-full flex items-center px-2 rounded-md overflow-hidden"
                     style={{
                       backgroundColor: `${color}22`,
                       borderLeft: `3px solid ${color}`,
+                      ...barStaticStyle,
                     }}
                   >
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${task.progress}%` }}
-                      transition={{ delay: index * 0.05 + 0.3, duration: 0.6 }}
+                    <div
                       className="absolute top-0 left-0 bottom-0 rounded-md opacity-50"
-                      style={{ backgroundColor: color }}
+                      style={{ backgroundColor: color, width: `${task.progress}%` }}
                     />
                     <div className="relative z-10 flex justify-between items-center w-full gap-2">
                       <span className="text-xs font-medium text-[var(--color-app-text)] whitespace-nowrap">
@@ -147,7 +192,7 @@ export function GanttChart({ startDate, tasks, scrollable = false }: GanttChartP
                         <div className="h-1.5 w-1.5 rounded-full bg-[var(--color-app-text)] animate-pulse shrink-0" />
                       )}
                     </div>
-                  </motion.div>
+                  </Bar>
 
                   {/* Fechas inicio–fin junto a la barra (solo en pantalla) */}
                   {scrollable && (
@@ -162,6 +207,14 @@ export function GanttChart({ startDate, tasks, scrollable = false }: GanttChartP
               </div>
             );
           })}
+
+          {/* Línea vertical del deadline a lo largo de todas las actividades */}
+          {deadlineLeft && (
+            <div
+              className="absolute top-0 bottom-0 pointer-events-none"
+              style={{ left: deadlineLeft, borderLeft: `2px dashed ${DEADLINE_COLOR}` }}
+            />
+          )}
         </div>
 
         {/* Legend */}
@@ -172,6 +225,12 @@ export function GanttChart({ startDate, tasks, scrollable = false }: GanttChartP
               {dept}
             </div>
           ))}
+          {deadlineDay != null && (
+            <div className="flex items-center gap-2">
+              <div className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: DEADLINE_COLOR }} />
+              Fecha de entrega
+            </div>
+          )}
         </div>
       </div>
     </div>

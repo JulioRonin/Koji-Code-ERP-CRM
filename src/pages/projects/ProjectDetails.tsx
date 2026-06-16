@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar,
+  Download,
   Clock,
   User,
   CheckCircle2,
@@ -45,6 +46,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { GanttChart } from '@/components/projects/GanttChart';
+import { GanttPrint } from '@/components/projects/GanttPrint';
 import { ProjectReport } from '@/components/projects/ProjectReport';
 import { MasterPlanWizard } from '@/components/projects/MasterPlanWizard';
 import { MasterPlanTaskList } from '@/components/projects/MasterPlanTaskList';
@@ -116,6 +118,7 @@ export function ProjectDetails() {
   const [newNote, setNewNote] = useState('');
   const [newTaskName, setNewTaskName] = useState('');
   const [isMasterPlanOpen, setIsMasterPlanOpen] = useState(false);
+  const [isGanttPrintOpen, setIsGanttPrintOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(searchParams.get('wizard') === '1');
@@ -189,7 +192,10 @@ export function ProjectDetails() {
         };
       });
 
-    return [...fromPlan, ...fromTasks];
+    // Ordenadas por fecha de inicio (y, a igualdad, por la que termina antes).
+    return [...fromPlan, ...fromTasks].sort(
+      (a, b) => a.startDay - b.startDay || a.startDay + a.duration - (b.startDay + b.duration)
+    );
   }, [masterPlan, masterPlanTasks, tasks, project?.start_date]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
@@ -630,17 +636,29 @@ export function ProjectDetails() {
       {/* Master Plan dialog (Gantt completo) */}
       <Dialog open={isMasterPlanOpen} onOpenChange={setIsMasterPlanOpen}>
         <DialogContent className="max-w-7xl w-[96vw] max-h-[92vh] p-0 overflow-hidden flex flex-col">
-          <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
-            <DialogTitle>Master Plan · Gantt</DialogTitle>
-            <DialogDescription>
-              {masterPlan
-                ? `${masterPlan.template_used} · ${masterPlan.methodology} · ${project.id}`
-                : 'Sin plan generado'}
-            </DialogDescription>
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0 flex flex-row items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Master Plan · Gantt</DialogTitle>
+              <DialogDescription>
+                {masterPlan
+                  ? `${masterPlan.template_used} · ${masterPlan.methodology} · ${project.id}`
+                  : 'Sin plan generado'}
+              </DialogDescription>
+            </div>
+            {ganttTasks.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setIsGanttPrintOpen(true)} className="shrink-0 mr-6">
+                <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
+              </Button>
+            )}
           </DialogHeader>
           <div className="flex-1 overflow-auto px-6 pb-6">
             {ganttTasks.length > 0 ? (
-              <GanttChart startDate={masterPlan?.baseline_start ?? project.start_date} tasks={ganttTasks} scrollable />
+              <GanttChart
+                startDate={masterPlan?.baseline_start ?? project.start_date}
+                tasks={ganttTasks}
+                endDate={project.deadline}
+                scrollable
+              />
             ) : (
               <p className="text-sm text-[var(--color-app-text-muted)] text-center py-8">
                 Aún no hay actividades en el Master Plan.
@@ -649,6 +667,19 @@ export function ProjectDetails() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {isGanttPrintOpen && ganttTasks.length > 0 && (
+        <GanttPrint
+          startDate={masterPlan?.baseline_start ?? project.start_date}
+          tasks={ganttTasks}
+          endDate={project.deadline}
+          title={`Cronograma · ${project.name}`}
+          subtitle={`${project.id}${masterPlan ? ` · ${masterPlan.methodology}` : ''} · Entrega ${
+            isValid(parseISO(project.deadline)) ? format(parseISO(project.deadline), 'dd MMM yyyy', { locale: es }) : '—'
+          }`}
+          onClose={() => setIsGanttPrintOpen(false)}
+        />
+      )}
 
       <ProjectReport
         isOpen={isReportOpen}
