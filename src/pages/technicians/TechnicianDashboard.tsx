@@ -547,23 +547,9 @@ function TechnicianPartCard({ item, busy, onSetStatus, onOpenChat }: PartCardPro
             </>
           )}
           {item.manufacturing_status === 'CALIDAD' && (
-            <>
-              <Button
-                onClick={() => onSetStatus('TERMINADO')}
-                disabled={busy}
-                className="flex-1"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Aprobada
-              </Button>
-              <Button
-                onClick={() => onSetStatus('EN PROCESO')}
-                disabled={busy}
-                variant="outline"
-                className="flex-1"
-              >
-                Reabrir
-              </Button>
-            </>
+            <div className="inline-flex items-center justify-center gap-1.5 text-[var(--color-app-warning)] text-sm font-medium px-3 py-2 rounded-md bg-[var(--color-app-warning-soft)] flex-1">
+              <ClipboardCheck className="h-4 w-4" /> En revisión de Calidad
+            </div>
           )}
           {done && (
             <div className="inline-flex items-center justify-center gap-1.5 text-[var(--color-app-success)] text-sm font-medium px-3 py-2 rounded-md bg-[var(--color-app-success-soft)]">

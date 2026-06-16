@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -37,7 +37,7 @@ import {
 import type { BomItem, ManufacturingStatus } from '@/types/database';
 import { CheckCircle2, Circle, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 import { TableControls } from '@/components/shared/TableControls';
-import { applyTableState, type TableState } from '@/lib/tableControls';
+import { applyTableState, type FieldDef, type TableState } from '@/lib/tableControls';
 import { PRODUCTION_FIELDS } from '@/lib/bomFields';
 import {
   DropdownMenu,
@@ -225,9 +225,40 @@ export function ProductionProjectView(props: Props = {}) {
   // consumibles, hardware y demás insumos viven en el módulo de Compras
   // pero no aparecen aquí.
   const productionParts = parts.filter(p => p.production_relevant !== false);
+
+  // Inyectamos un campo dinámico "Técnico" alimentado por los técnicos en uso
+  // en este proyecto (más "Sin asignar"), para poder filtrar y agrupar piezas
+  // por quien las tiene.
+  const productionFields = useMemo<FieldDef<BomItem>[]>(() => {
+    const namesInUse = new Set<string>();
+    productionParts.forEach(p => {
+      if (!p.assigned_technician_id) {
+        namesInUse.add('Sin asignar');
+        return;
+      }
+      const name = technicians.find(t => t.id === p.assigned_technician_id)?.full_name;
+      if (name) namesInUse.add(name);
+    });
+    const technicianField: FieldDef<BomItem> = {
+      key: 'technician',
+      label: 'Técnico',
+      type: 'select',
+      options: Array.from(namesInUse).sort((a, b) => {
+        if (a === 'Sin asignar') return 1;
+        if (b === 'Sin asignar') return -1;
+        return a.localeCompare(b);
+      }),
+      get: r =>
+        r.assigned_technician_id
+          ? technicians.find(t => t.id === r.assigned_technician_id)?.full_name ?? 'Sin asignar'
+          : 'Sin asignar',
+    };
+    return [...PRODUCTION_FIELDS, technicianField];
+  }, [productionParts, technicians]);
+
   const { filtered: filteredParts, groups } = applyTableState(
     productionParts,
-    PRODUCTION_FIELDS,
+    productionFields,
     tableState
   );
   if (!effectiveProjectId) {
@@ -317,7 +348,7 @@ export function ProductionProjectView(props: Props = {}) {
 
       {/* Controles configurables tipo Airtable */}
       <TableControls
-        fields={PRODUCTION_FIELDS}
+        fields={productionFields}
         state={tableState}
         onChange={setTableState}
         searchPlaceholder="Buscar parte, descripción o categoría…"
