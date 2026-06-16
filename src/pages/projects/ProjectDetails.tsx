@@ -629,7 +629,7 @@ export function ProjectDetails() {
 
       {/* Master Plan dialog (Gantt completo) */}
       <Dialog open={isMasterPlanOpen} onOpenChange={setIsMasterPlanOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
+        <DialogContent className="max-w-7xl w-[96vw] max-h-[92vh] p-0 overflow-hidden flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
             <DialogTitle>Master Plan · Gantt</DialogTitle>
             <DialogDescription>
@@ -640,7 +640,7 @@ export function ProjectDetails() {
           </DialogHeader>
           <div className="flex-1 overflow-auto px-6 pb-6">
             {ganttTasks.length > 0 ? (
-              <GanttChart startDate={masterPlan?.baseline_start ?? project.start_date} tasks={ganttTasks} />
+              <GanttChart startDate={masterPlan?.baseline_start ?? project.start_date} tasks={ganttTasks} scrollable />
             ) : (
               <p className="text-sm text-[var(--color-app-text-muted)] text-center py-8">
                 Aún no hay actividades en el Master Plan.
