@@ -151,23 +151,64 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
     setChars(prev => prev.map(c => (c.n === n ? { ...c, ...patch } : c)));
   };
 
-  const updateReading = (n: number, idx: number, value: string) => {
-    const num = value.trim() === '' ? null : Number(value);
+  const updateReading = (n: number, idx: number, raw: string) => {
+    const text = sanitizeDecimal(raw);
+    setDrafts(d => ({ ...d, [readingKey(n, idx)]: text }));
+    const num = parseDecimal(text);
     setChars(prev =>
       prev.map(c => {
         if (c.n !== n) return c;
         const readings = [...c.readings];
-        readings[idx] = num != null && Number.isNaN(num) ? null : num;
+        readings[idx] = num;
         return { ...c, readings };
       })
     );
   };
 
-  const numField = (v: number | null): string => (v == null ? '' : String(v));
-  const parseNum = (s: string): number | null => {
-    if (s.trim() === '') return null;
-    const n = Number(s);
+  // ── Entrada numérica: aceptamos coma o punto, hasta 5 decimales, y
+  //    conservamos el texto crudo mientras el usuario escribe (si parseamos
+  //    a número y volvemos a string perdemos el punto al teclear "10.").
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const nominalKey = (n: number) => `${n}-n`;
+  const plusKey = (n: number) => `${n}-p`;
+  const minusKey = (n: number) => `${n}-m`;
+  const readingKey = (n: number, idx: number) => `${n}-r-${idx}`;
+
+  const sanitizeDecimal = (s: string): string => {
+    let v = s.replace(/,/g, '.').replace(/[^0-9.\-]/g, '');
+    // Solo un punto
+    const firstDot = v.indexOf('.');
+    if (firstDot !== -1) {
+      v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '');
+    }
+    // Signo "-" solo al inicio
+    v = v[0] === '-' ? '-' + v.slice(1).replace(/-/g, '') : v.replace(/-/g, '');
+    // Hasta 5 decimales
+    if (v.includes('.')) {
+      const [whole, dec] = v.split('.');
+      v = whole + '.' + dec.slice(0, 5);
+    }
+    return v;
+  };
+  const parseDecimal = (s: string): number | null => {
+    const t = s.trim();
+    if (t === '' || t === '-' || t === '.' || t === '-.') return null;
+    const n = Number(t);
     return Number.isNaN(n) ? null : n;
+  };
+  const cellText = (key: string, num: number | null): string => {
+    if (key in drafts) return drafts[key];
+    return num == null ? '' : String(num);
+  };
+  const updateCharNumber = (
+    n: number,
+    field: 'nominal' | 'tolPlus' | 'tolMinus',
+    key: string,
+    raw: string
+  ) => {
+    const text = sanitizeDecimal(raw);
+    setDrafts(d => ({ ...d, [key]: text }));
+    updateChar(n, { [field]: parseDecimal(text) });
   };
 
   // ── Subir imagen base (foto/plano) ──
@@ -407,16 +448,16 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
                         </td>
                         <td className="p-0 border border-[var(--color-app-border)]">
                           <input
-                            value={numField(c.nominal)}
-                            onChange={e => updateChar(c.n, { nominal: parseNum(e.target.value) })}
+                            value={cellText(nominalKey(c.n), c.nominal)}
+                            onChange={e => updateCharNumber(c.n, 'nominal', nominalKey(c.n), e.target.value)}
                             inputMode="decimal"
                             className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
                           />
                         </td>
                         <td className="p-0 border border-[var(--color-app-border)]">
                           <input
-                            value={numField(c.tolPlus)}
-                            onChange={e => updateChar(c.n, { tolPlus: parseNum(e.target.value) })}
+                            value={cellText(plusKey(c.n), c.tolPlus)}
+                            onChange={e => updateCharNumber(c.n, 'tolPlus', plusKey(c.n), e.target.value)}
                             inputMode="decimal"
                             placeholder="+"
                             className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
@@ -424,8 +465,8 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
                         </td>
                         <td className="p-0 border border-[var(--color-app-border)]">
                           <input
-                            value={numField(c.tolMinus)}
-                            onChange={e => updateChar(c.n, { tolMinus: parseNum(e.target.value) })}
+                            value={cellText(minusKey(c.n), c.tolMinus)}
+                            onChange={e => updateCharNumber(c.n, 'tolMinus', minusKey(c.n), e.target.value)}
                             inputMode="decimal"
                             placeholder="−"
                             className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
@@ -448,7 +489,7 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
                           return (
                             <td key={j} className="p-0 border border-[var(--color-app-border)]">
                               <input
-                                value={numField(r)}
+                                value={cellText(readingKey(c.n, j), r)}
                                 onChange={e => updateReading(c.n, j, e.target.value)}
                                 inputMode="decimal"
                                 className={`w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums ${
