@@ -76,6 +76,36 @@ export type MessageType = 'USER' | 'SYSTEM' | 'PROJECT' | 'QUALITY' | 'PURCHASE'
 export type PmoReportType = 'Semanal' | 'Quincenal' | 'Mensual' | 'Cierre' | 'Ad-hoc';
 
 // ============================================================================
+// TABLA: company_settings
+// ============================================================================
+
+export interface CompanySettings {
+  id: string;
+  legal_name: string;
+  commercial_name: string;
+  tagline: string | null;
+  rfc: string | null;
+  tax_regime: string | null;
+  address_street: string | null;
+  address_ext: string | null;
+  address_int: string | null;
+  address_neighborhood: string | null;
+  address_zip: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_country: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  legal_rep: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  currency: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
 // TABLA: profiles
 // ============================================================================
 
@@ -317,6 +347,36 @@ export interface MasterPlanTask {
 export type MeetingType = 'Kick-off' | 'Semanal' | 'Quincenal' | 'Mensual' | 'Hito' | 'Cierre';
 export type MeetingStatus = 'Programada' | 'Realizada' | 'Cancelada';
 
+/** Un compromiso / acción acordada en la junta. */
+export interface MinuteActionItem {
+  task: string;
+  owner?: string;
+  due?: string;
+}
+
+/** Minuta de junta: datos de origen ("prompt") + documento editable generado. */
+export interface MeetingMinute {
+  // Datos capturados por el usuario
+  purpose: string;
+  discussion: string;
+  attendees: string[];
+  agreements: string[];
+  actionItems: MinuteActionItem[];
+  location?: string;
+  // Documento profesional generado y editable
+  title: string;
+  intro: string;
+  topics: string;
+  closing: string;
+  /** Cuerpo enriquecido (HTML) editable: negritas, listas, tablas, imágenes.
+   *  Es la fuente de verdad del documento; intro/topics/closing quedan como
+   *  semillas/legado para regenerar. */
+  bodyHtml?: string;
+  // Metadatos
+  generatedAt: string;
+  updatedAt: string;
+}
+
 export interface ProjectMeeting {
   id: string;
   project_id: string;
@@ -328,6 +388,7 @@ export interface ProjectMeeting {
   attendees: string[];
   status: MeetingStatus;
   notes: string | null;
+  minutes: MeetingMinute | null;
   created_at: string;
   updated_at: string;
 }
@@ -363,12 +424,23 @@ export interface BomItem {
   category: string;
   material: string | null;
   quantity: number;
+  production_quantity: number | null;
   uom: string;
   bom_status: BomStatus;
   manufacturing_status: ManufacturingStatus;
   drawing_url: string | null;
   model_url: string | null;
   assigned_technician_id: string | null;
+  unit_price: number | null;
+  currency: string | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  requisition_date: string | null;
+  delivery_date: string | null;
+  actual_delivery_date: string | null;
+  notes: string | null;
+  production_relevant: boolean;
+  image_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -537,6 +609,65 @@ export interface MeasurementInstrument {
   next_calibration: string | null;
   status: InstrumentStatus;
   notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// TABLA: dimensional_reports (FAIR / inspección dimensional ISO 9001)
+// ============================================================================
+
+export type DimensionalStatus = 'Borrador' | 'Aprobado' | 'Rechazado';
+
+/** Una burbuja ("globo") colocada sobre el plano. x/y en % (0–100) relativo
+ *  al tamaño renderizado de la imagen, para que escale con el zoom. */
+export interface DimensionalBalloon {
+  n: number;
+  x: number;
+  y: number;
+}
+
+/** Una característica a inspeccionar (un renglón del reporte), ligada a la
+ *  burbuja con el mismo número. `readings` tiene una lectura por pieza de la
+ *  muestra (longitud = sample_size); null = sin capturar. */
+export interface DimensionalCharacteristic {
+  n: number;
+  label: string;
+  /** Cota nominal */
+  nominal: number | null;
+  /** Tolerancias como magnitudes positivas. USL = nominal + tolPlus,
+   *  LSL = nominal - tolMinus. */
+  tolPlus: number | null;
+  tolMinus: number | null;
+  unit: string;
+  /** Instrumento de medición usado (opcional, trazabilidad ISO) */
+  instrument?: string | null;
+  readings: (number | null)[];
+}
+
+export interface DimensionalPayload {
+  balloons: DimensionalBalloon[];
+  characteristics: DimensionalCharacteristic[];
+  /** Relación de aspecto de la imagen base (alto/ancho) para reconstruir el
+   *  lienzo al reabrir el reporte. */
+  imageAspect?: number;
+}
+
+export interface DimensionalReport {
+  id: string;
+  project_id: string;
+  bom_item_id: string;
+  part_number: string | null;
+  title: string | null;
+  inspector_id: string | null;
+  inspector_name: string | null;
+  sample_size: number;
+  status: DimensionalStatus;
+  drawing_image: string | null;
+  report_url: string | null;
+  payload: DimensionalPayload;
+  notes: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }

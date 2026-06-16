@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useChannels, useMessages, useSendMessage, useProfiles } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
 export function Chat() {
@@ -32,6 +33,28 @@ export function Chat() {
       setActiveChannelId(channels[0].id);
     }
   }, [channels, activeChannelId]);
+
+  // Pre-llenado desde URL (ej. el botón "Chat de la pieza" del portal
+  // de técnicos manda ?prefill=...&channel=ch-produccion). Se consume
+  // una sola vez y luego limpia el query string.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const prefill = searchParams.get('prefill');
+    const preferredChannel = searchParams.get('channel');
+    if (preferredChannel && channels.some(c => c.id === preferredChannel)) {
+      setActiveChannelId(preferredChannel);
+    }
+    if (prefill) {
+      setNewMessage(decodeURIComponent(prefill));
+    }
+    if (prefill || preferredChannel) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('prefill');
+      next.delete('channel');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channels.length]);
 
   const { data: currentMessages, refetch: refetchMessages } = useMessages(activeChannelId);
   const { send: sendMessage } = useSendMessage();

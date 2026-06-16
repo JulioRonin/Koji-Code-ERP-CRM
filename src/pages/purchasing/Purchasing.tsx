@@ -44,8 +44,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BOMManager } from '@/components/purchasing/BOMManager';
+import { ProjectPurchaseTracker } from '@/components/purchasing/ProjectPurchaseTracker';
 import { cn } from '@/lib/utils';
-import { useRequisitions } from '@/lib/api';
+import { useRequisitions, useBomItems, summarizePurchasing } from '@/lib/api';
 import type { Requisition, Priority, RequisitionStatus } from '@/types/database';
 
 const priorityVariant: Record<Priority, 'destructive' | 'warning' | 'secondary'> = {
@@ -66,6 +67,7 @@ const statusVariant: Record<RequisitionStatus, 'secondary' | 'warning' | 'succes
 const columnHelper = createColumnHelper<Requisition>();
 
 const tabs = [
+  { id: 'by-project',   label: 'Por proyecto' },
   { id: 'requisitions', label: 'Requisiciones' },
   { id: 'bom',          label: 'BOM / Listas' },
   { id: 'pos',          label: 'Órdenes de compra' },
@@ -76,8 +78,28 @@ type Tab = (typeof tabs)[number]['id'];
 export function Purchasing() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
-  const [activeTab, setActiveTab] = useState<Tab>('requisitions');
+  const [activeTab, setActiveTab] = useState<Tab>('by-project');
   const { data: requisitions } = useRequisitions();
+  const { data: bomItems } = useBomItems();
+
+  // KPIs reales derivados de bom_items — desglose por estatus de compra
+  const kpis = React.useMemo(() => {
+    const summary = summarizePurchasing(bomItems);
+    const pendingReqs = requisitions.filter(r => r.status === 'Pendiente' || r.status === 'Cotizando').length;
+    const activeOrders = requisitions.filter(r => r.status === 'Aprobada' || r.status === 'Ordenada').length;
+    const suppliers = new Set(bomItems.map(b => b.supplier_name).filter(Boolean)).size;
+    return {
+      pendingReqs,
+      activeOrders,
+      pending: summary.pending_items,
+      requested: summary.requested_items,
+      inTransit: summary.in_transit_items,
+      received: summary.received_items,
+      progress: summary.progress_pct,
+      late: summary.late_items,
+      suppliers,
+    };
+  }, [bomItems, requisitions]);
 
   const columns = [
     columnHelper.accessor('id', {
@@ -178,13 +200,24 @@ export function Purchasing() {
         </Button>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* KPI cards — desglose por estatus de compra del BOM activo */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: 'Req. pendientes', value: '12', sub: 'Requieren cotización', icon: AlertCircle },
-          { label: 'Órdenes activas',  value: '8',  sub: 'En tránsito o espera', icon: ShoppingCart },
-          { label: 'Gasto mensual',    value: '$45,230', sub: '+12% vs mes anterior', icon: DollarSign },
-          { label: 'Proveedores',      value: '34', sub: 'Evaluados este año', icon: FileText },
+          {
+            label: 'Avance global',
+            value: `${kpis.progress}%`,
+            sub: `${kpis.received} recibidos`,
+            icon: ShoppingCart,
+          },
+          { label: 'Pendientes',  value: String(kpis.pending),   sub: 'Sin solicitar',     icon: AlertCircle },
+          { label: 'Solicitados', value: String(kpis.requested), sub: 'Cotización / PO',   icon: FileText },
+          { label: 'En tránsito', value: String(kpis.inTransit), sub: 'Camino al taller',  icon: ShoppingCart },
+          {
+            label: 'Atrasadas',
+            value: String(kpis.late),
+            sub: kpis.late > 0 ? 'Requieren seguimiento' : 'Todo al día',
+            icon: AlertCircle,
+          },
         ].map(k => (
           <Card key={k.label} className="p-0">
             <CardContent className="p-5">
@@ -222,6 +255,8 @@ export function Purchasing() {
       </div>
 
       {/* Content */}
+      {activeTab === 'by-project' && <ProjectPurchaseTracker />}
+
       {activeTab === 'requisitions' && (
         <div className="space-y-4">
           <div className="relative w-72">

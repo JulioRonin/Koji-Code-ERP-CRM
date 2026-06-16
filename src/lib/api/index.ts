@@ -27,3 +27,6 @@ export * from './projectsExtras';
 export * from './projectMeetings';
 export * from './automations';
 export * from './chat';
+export * from './pdfThumbnail';
+export * from './companySettings';
+export * from './dimensionalReports';

@@ -19,28 +19,29 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
+import { canAccessPath } from '@/lib/permissions';
 
 type NavItem = {
   name: string;
   path: string;
   icon: React.ComponentType<{ className?: string }>;
-  departments: string[];
 };
 
 const navItems: NavItem[] = [
-  { name: 'Dashboard',  path: '/',            icon: LayoutDashboard,  departments: ['ALL'] },
-  { name: 'Cotizaciones', path: '/quotes',    icon: Calculator,       departments: ['Administrador', 'Administración / PM', 'Compras'] },
-  { name: 'Proyectos',  path: '/projects',    icon: FolderKanban,     departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción', 'Diseño'] },
-  { name: 'Diseño',     path: '/design',      icon: Ruler,            departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción', 'Diseño'] },
-  { name: 'Compras',    path: '/purchasing',  icon: ShoppingCart,     departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción'] },
-  { name: 'Producción', path: '/production',  icon: Factory,          departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción'] },
-  { name: 'Calidad',    path: '/quality',     icon: ShieldCheck,      departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción', 'Calidad'] },
-  { name: 'Embarques',  path: '/shipping',    icon: Truck,            departments: ['Administrador', 'Administración / PM', 'Producción'] },
-  { name: 'PMO',        path: '/pmo',         icon: FileBarChart,     departments: ['Administrador', 'Administración / PM', 'Producción'] },
-  { name: 'Técnicos',   path: '/technicians', icon: HardHat,          departments: ['Administrador', 'Administración / PM', 'Compras', 'Producción'] },
-  { name: 'Personal',   path: '/personnel',   icon: Users,            departments: ['Administrador', 'Administración / PM', 'Compras'] },
-  { name: 'Chat',       path: '/chat',        icon: MessageSquare,    departments: ['ALL'] },
-  { name: 'Facturación', path: '/billing',    icon: FileText,         departments: ['Administrador', 'Administración / PM', 'Compras'] },
+  { name: 'Dashboard',    path: '/',            icon: LayoutDashboard },
+  { name: 'Cotizaciones', path: '/quotes',      icon: Calculator },
+  { name: 'Proyectos',    path: '/projects',    icon: FolderKanban },
+  { name: 'Diseño',       path: '/design',      icon: Ruler },
+  { name: 'Compras',      path: '/purchasing',  icon: ShoppingCart },
+  { name: 'Producción',   path: '/production',  icon: Factory },
+  { name: 'Calidad',      path: '/quality',     icon: ShieldCheck },
+  { name: 'Embarques',    path: '/shipping',    icon: Truck },
+  { name: 'PMO',          path: '/pmo',         icon: FileBarChart },
+  { name: 'Técnicos',     path: '/technicians', icon: HardHat },
+  { name: 'Personal',     path: '/personnel',   icon: Users },
+  { name: 'Chat',         path: '/chat',        icon: MessageSquare },
+  { name: 'Facturación',  path: '/billing',     icon: FileText },
 ];
 
 interface SidebarProps {
@@ -50,10 +51,20 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { user } = useAuth();
+  const { company } = useCompany();
+  const brandName = company.commercial_name || company.legal_name || 'Empresa';
+  const brandInitial = brandName.trim().charAt(0).toUpperCase() || 'E';
 
-  const filteredNavItems = navItems.filter(item =>
-    item.departments.includes('ALL') || (user && item.departments.includes(user.department))
-  );
+  // Para técnicos, "Técnicos" apunta a su portal exclusivo en lugar del
+  // dashboard administrativo de /technicians.
+  const filteredNavItems = navItems
+    .filter(item => canAccessPath(user?.role, item.path))
+    .map(item =>
+      user?.role === 'Técnico' && item.path === '/technicians'
+        ? { ...item, name: 'Mi portal', path: '/technician-portal' }
+        : item
+    );
+  const canSeeSettings = user?.role === 'Administrador' || user?.role === 'Administración / PM';
 
   return (
     <>
@@ -78,13 +89,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Brand + close (mobile) */}
         <div className="h-16 flex items-center justify-between pl-5 pr-3 border-b border-[var(--color-app-sidebar-hover)] shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm">
-              K
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold text-white">Koji Code</span>
-              <span className="text-[10px] text-slate-400">ERP · Manufactura</span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            {company.logo_url ? (
+              <img
+                src={company.logo_url}
+                alt={brandName}
+                className="h-8 w-8 rounded-md object-cover bg-white"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm shrink-0">
+                {brandInitial}
+              </div>
+            )}
+            <div className="flex flex-col leading-tight min-w-0">
+              <span className="text-sm font-semibold text-white truncate">{brandName}</span>
+              <span className="text-[10px] text-slate-400 truncate">
+                {company.tagline || 'ERP · Manufactura'}
+              </span>
             </div>
           </div>
           <button
@@ -129,22 +150,24 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="px-2 py-3 border-t border-[var(--color-app-sidebar-hover)] shrink-0">
-          <NavLink
-            to="/settings"
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors',
-                isActive
-                  ? 'bg-white/10 text-white'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              )
-            }
-          >
-            <Settings className="h-4 w-4 text-slate-400" />
-            <span>Configuración</span>
-          </NavLink>
-        </div>
+        {canSeeSettings && (
+          <div className="px-2 py-3 border-t border-[var(--color-app-sidebar-hover)] shrink-0">
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors',
+                  isActive
+                    ? 'bg-white/10 text-white'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                )
+              }
+            >
+              <Settings className="h-4 w-4 text-slate-400" />
+              <span>Configuración</span>
+            </NavLink>
+          </div>
+        )}
       </aside>
     </>
   );

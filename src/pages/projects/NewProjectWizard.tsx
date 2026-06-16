@@ -36,6 +36,8 @@ interface BomDraft {
   description: string;
   category: string;
   quantity: number;
+  /** Cantidad a fabricar (columna "Qty for Production"). null si no viene. */
+  productionQuantity: number | null;
   uom: string;
   material?: string;
 }
@@ -98,14 +100,64 @@ export function NewProjectWizard() {
         const wb = XLSX.read(data, { type: 'array' });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-        const parsed: BomDraft[] = rows.map(row => ({
-          partNumber: String(row.Name ?? row['Part Number'] ?? row['Part Description'] ?? 'N/A'),
-          description: String(row['Part Description'] ?? row.Description ?? row.Notes ?? 'Sin descripción'),
-          category: String(row.Type ?? row.Category ?? 'General'),
-          quantity: Number(row.Qty ?? row.Quantity ?? 1),
-          uom: String(row.UOM ?? 'Pzas'),
-          material: row.Material ? String(row.Material) : undefined,
-        }));
+
+        // Helper: convierte a número saneando NaN y vacíos. null si no se puede.
+        // Acepta strings con comas / espacios / $ (algunos templates los traen).
+        const toNum = (v: unknown): number | null => {
+          if (v == null || v === '') return null;
+          const n = Number(String(v).replace(/[,$\s]/g, ''));
+          return Number.isFinite(n) ? n : null;
+        };
+        // Lookup case-insensitive por nombre de columna; soporta varios alias.
+        const pick = (row: Record<string, unknown>, ...keys: string[]): unknown => {
+          for (const k of keys) {
+            const found = Object.keys(row).find(
+              rk => rk.toLowerCase().trim() === k.toLowerCase()
+            );
+            if (found && row[found] != null && row[found] !== '') return row[found];
+          }
+          return undefined;
+        };
+
+        const parsed: BomDraft[] = rows
+          .map(row => {
+            const part =
+              pick(row, 'Name', 'Part Number', 'part_number', 'No parte', 'SKU') ??
+              pick(row, 'Part Description');
+            // Qty = lo que Compras adquiere. Si falta o es inválido, default 1
+            // (no podemos meter null porque la columna es NOT NULL).
+            const qty = toNum(pick(row, 'Qty', 'Quantity', 'Cantidad', 'cant'));
+            // Qty for Production = piezas a fabricar (la nueva columna del template).
+            const prodQty = toNum(
+              pick(
+                row,
+                'Qty for Production',
+                'Qty for Prodcution', // typo del template original
+                'Qty Production',
+                'Production Qty',
+                'Cantidad a producir',
+                'Cantidad producción',
+                'production_quantity'
+              )
+            );
+            return {
+              partNumber: String(part ?? 'N/A'),
+              description: String(
+                pick(row, 'Part Description', 'Description', 'Descripción', 'Notes') ??
+                  'Sin descripción'
+              ),
+              category: String(pick(row, 'Type', 'Category', 'Categoría') ?? 'General'),
+              quantity: qty ?? 1,
+              productionQuantity: prodQty,
+              uom: String(pick(row, 'UOM', 'Unidad', 'UM') ?? 'Pzas'),
+              material: ((): string | undefined => {
+                const m = pick(row, 'Material');
+                return m != null ? String(m) : undefined;
+              })(),
+            };
+          })
+          // Descarta filas vacías que xlsx a veces deja al final de la hoja.
+          .filter(b => b.partNumber && b.partNumber !== 'N/A');
         setBomDraft(parsed);
       } catch (err) {
         console.error(err);
@@ -155,7 +207,10 @@ export function NewProjectWizard() {
             part_number: b.partNumber,
             description: b.description,
             category: b.category,
-            quantity: b.quantity,
+            // Qty alimenta Compras; Qty for Production alimenta Producción,
+            // Diseño y Calidad (los módulos hacen production_quantity ?? quantity).
+            quantity: Number.isFinite(b.quantity) ? b.quantity : 1,
+            production_quantity: b.productionQuantity,
             uom: b.uom,
             material: b.material ?? null,
           }))
@@ -396,7 +451,8 @@ export function NewProjectWizard() {
                         <th className="text-left px-3 py-2 font-medium text-[var(--color-app-text-muted)]">Part #</th>
                         <th className="text-left px-3 py-2 font-medium text-[var(--color-app-text-muted)]">Descripción</th>
                         <th className="text-left px-3 py-2 font-medium text-[var(--color-app-text-muted)]">Categoría</th>
-                        <th className="text-right px-3 py-2 font-medium text-[var(--color-app-text-muted)]">Cantidad</th>
+                        <th className="text-right px-3 py-2 font-medium text-[var(--color-app-text-muted)]" title="Lo que Compras adquiere">Qty (compra)</th>
+                        <th className="text-right px-3 py-2 font-medium text-[var(--color-app-primary)]" title="Piezas a fabricar — alimenta Producción/Diseño/Calidad">Qty producción</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -409,6 +465,9 @@ export function NewProjectWizard() {
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums">
                             {b.quantity} {b.uom}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums font-medium text-[var(--color-app-primary)]">
+                            {b.productionQuantity != null ? `${b.productionQuantity} ${b.uom}` : '—'}
                           </td>
                         </tr>
                       ))}

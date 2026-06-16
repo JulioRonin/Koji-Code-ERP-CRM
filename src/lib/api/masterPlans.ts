@@ -40,6 +40,12 @@ export interface TemplateTask {
   is_milestone?: boolean;
   /** wbs codes que esta tarea depende */
   depends_on?: string[];
+  /**
+   * Si true, la duración escala con la cantidad de piezas a fabricar
+   * (maquinado, tratamientos, inspección de lote, empaque...). Las tareas
+   * fijas (kick-off, emisión de PO, diseño, hitos) NO se marcan.
+   */
+  scales_with_quantity?: boolean;
 }
 
 export interface MasterPlanTemplate {
@@ -47,6 +53,11 @@ export interface MasterPlanTemplate {
   name: string;
   description: string;
   defaultRiskSummary: string;
+  /**
+   * Cantidad de piezas a la que corresponden las duraciones por defecto.
+   * El scheduler escala las tareas marcadas usando quantity / base_quantity.
+   */
+  base_quantity: number;
   tasks: TemplateTask[];
 }
 
@@ -63,7 +74,8 @@ export interface MasterPlanTemplate {
 export const TEMPLATE_CNC: MasterPlanTemplate = {
   id: 'CNC-Estándar',
   name: 'CNC estándar',
-  description: 'Lotes 50-500 pzas, aceros / Al / Inox comunes. Ciclo completo de ~22 días.',
+  description: 'Lotes de maquinado CNC. Las duraciones de fabricación escalan con la cantidad real.',
+  base_quantity: 100,
   defaultRiskSummary:
     'Riesgos típicos del proyecto:\n' +
     '· Retrasos en recepción de materia prima por escasez o cambios de proveedor (+3-5 días)\n' +
@@ -71,32 +83,32 @@ export const TEMPLATE_CNC: MasterPlanTemplate = {
     '· Variabilidad en tiempos de tratamiento térmico (±2 días)\n' +
     '· Cambios de ingeniería tardíos del cliente que invalidan programa CAM',
   tasks: [
-    // Fase 1 — Iniciación (1 día)
+    // Fase 1 — Iniciación
     { wbs: '1.1', name: 'Revisión de OC y arranque administrativo',  department: 'Compras',    duration_days: 1, is_milestone: true },
     { wbs: '1.2', name: 'Kick-off técnico interno',                  department: 'Producción', duration_days: 1, depends_on: ['1.1'] },
 
-    // Fase 2 — Procura (5 días total: solicitar 1 + comprar/recibir 3 + inspección 1)
+    // Fase 2 — Procura (lead time, fijo)
     { wbs: '2.1', name: 'Solicitud y emisión de PO',                 department: 'Compras',    duration_days: 1, depends_on: ['1.2'] },
-    { wbs: '2.2', name: 'Recepción de materia prima en almacén',     department: 'Compras',    duration_days: 3, depends_on: ['2.1'] },
+    { wbs: '2.2', name: 'Recepción de materia prima en almacén',     department: 'Compras',    duration_days: 5, depends_on: ['2.1'] },
     { wbs: '2.3', name: 'Verificación dimensional y certificados',    department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['2.2'] },
 
-    // Fase 3 — Ingeniería (4 días, en paralelo con procura — arranca en 1.2)
-    { wbs: '3.1', name: 'Revisión técnica de planos 2D/3D',          department: 'Diseño',     duration_days: 1, depends_on: ['1.2'] },
-    { wbs: '3.2', name: 'Programación CAM y simulación',             department: 'Diseño',     duration_days: 2, depends_on: ['3.1'] },
+    // Fase 3 — Ingeniería (en paralelo con procura — arranca en 1.2)
+    { wbs: '3.1', name: 'Revisión técnica de planos 2D/3D',          department: 'Diseño',     duration_days: 2, depends_on: ['1.2'] },
+    { wbs: '3.2', name: 'Programación CAM y simulación',             department: 'Diseño',     duration_days: 3, depends_on: ['3.1'], scales_with_quantity: true },
     { wbs: '3.3', name: 'Aprobación interna del programa',            department: 'Producción', duration_days: 1, is_milestone: true, depends_on: ['3.2'] },
 
-    // Fase 4 — Manufactura (depende de 2.3 Y 3.3 — el más tardío)
+    // Fase 4 — Manufactura (depende de 2.3 Y 3.3 — el más tardío). Escala con cantidad.
     { wbs: '4.1', name: 'Setup de máquina y herramental',            department: 'Producción', duration_days: 1, depends_on: ['2.3', '3.3'] },
-    { wbs: '4.2', name: 'Maquinado del lote completo',               department: 'Producción', duration_days: 5, depends_on: ['4.1'] },
-    { wbs: '4.3', name: 'Tratamientos térmicos / acabados',           department: 'Producción', duration_days: 3, depends_on: ['4.2'] },
+    { wbs: '4.2', name: 'Maquinado del lote completo',               department: 'Producción', duration_days: 5, depends_on: ['4.1'], scales_with_quantity: true },
+    { wbs: '4.3', name: 'Tratamientos térmicos / acabados',           department: 'Producción', duration_days: 3, depends_on: ['4.2'], scales_with_quantity: true },
 
-    // Fase 5 — Calidad (en paralelo con 4.3 donde aplique)
+    // Fase 5 — Calidad
     { wbs: '5.1', name: 'Inspección de primera pieza (PPAP)',        department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['4.1'] },
-    { wbs: '5.2', name: 'Inspección dimensional final del lote',     department: 'Calidad',    duration_days: 2, depends_on: ['4.3'] },
+    { wbs: '5.2', name: 'Inspección dimensional final del lote',     department: 'Calidad',    duration_days: 2, depends_on: ['4.3'], scales_with_quantity: true },
     { wbs: '5.3', name: 'Liberación formal de calidad',               department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['5.2'] },
 
-    // Fase 6 — Embarque (2 días)
-    { wbs: '6.1', name: 'Empaque, etiquetado y packing list',         department: 'Embarque',   duration_days: 1, depends_on: ['5.3'] },
+    // Fase 6 — Embarque
+    { wbs: '6.1', name: 'Empaque, etiquetado y packing list',         department: 'Embarque',   duration_days: 1, depends_on: ['5.3'], scales_with_quantity: true },
     { wbs: '6.2', name: 'Embarque y entrega al cliente',             department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['6.1'] },
   ],
 };
@@ -111,6 +123,7 @@ export const TEMPLATE_MOLDES: MasterPlanTemplate = {
   id: 'Moldes',
   name: 'Moldes de inyección',
   description: 'Cavidad simple-doble, complejidad media. Ciclo ~80 días incluyendo T0 y ajustes.',
+  base_quantity: 1,
   defaultRiskSummary:
     'Riesgos típicos del proyecto:\n' +
     '· Cambios de geometría tardíos del cliente que invalidan trabajo en cavidad\n' +
@@ -131,12 +144,12 @@ export const TEMPLATE_MOLDES: MasterPlanTemplate = {
     { wbs: '3.2', name: 'Recepción y verificación de materiales',     department: 'Calidad',    duration_days: 2, depends_on: ['3.1'] },
     { wbs: '3.3', name: 'Programación CAM (placas + cavidad)',       department: 'Diseño',     duration_days: 3, depends_on: ['2.2'] },
 
-    // Fase 4 — Manufactura (~30 días)
-    { wbs: '4.1', name: 'Maquinado de placas (porta-molde)',         department: 'Producción', duration_days: 6, depends_on: ['3.2', '3.3'] },
-    { wbs: '4.2', name: 'Maquinado de cavidad y núcleo',             department: 'Producción', duration_days: 10, depends_on: ['4.1'] },
-    { wbs: '4.3', name: 'EDM (chispa / hilo)',                        department: 'Producción', duration_days: 5, depends_on: ['4.2'] },
+    // Fase 4 — Manufactura (~30 días). Escala con el número de moldes/cavidades.
+    { wbs: '4.1', name: 'Maquinado de placas (porta-molde)',         department: 'Producción', duration_days: 6, depends_on: ['3.2', '3.3'], scales_with_quantity: true },
+    { wbs: '4.2', name: 'Maquinado de cavidad y núcleo',             department: 'Producción', duration_days: 10, depends_on: ['4.1'], scales_with_quantity: true },
+    { wbs: '4.3', name: 'EDM (chispa / hilo)',                        department: 'Producción', duration_days: 5, depends_on: ['4.2'], scales_with_quantity: true },
     { wbs: '4.4', name: 'Tratamiento térmico (templado + revenido)',  department: 'Producción', duration_days: 4, depends_on: ['4.3'] },
-    { wbs: '4.5', name: 'Rectificado y pulido espejo',                department: 'Producción', duration_days: 5, depends_on: ['4.4'] },
+    { wbs: '4.5', name: 'Rectificado y pulido espejo',                department: 'Producción', duration_days: 5, depends_on: ['4.4'], scales_with_quantity: true },
 
     // Fase 5 — Try-out y validación (10 días)
     { wbs: '5.1', name: 'Ensamble del molde',                        department: 'Producción', duration_days: 2, depends_on: ['4.5'] },
@@ -156,6 +169,7 @@ export const TEMPLATE_HERRAMENTALES: MasterPlanTemplate = {
   id: 'Herramentales',
   name: 'Herramentales',
   description: 'Fixtures, jigs y dispositivos de manufactura. Ciclo ~13 días.',
+  base_quantity: 1,
   defaultRiskSummary:
     'Riesgos típicos del proyecto:\n' +
     '· Cambios en geometría de la pieza objetivo durante manufactura\n' +
@@ -165,7 +179,7 @@ export const TEMPLATE_HERRAMENTALES: MasterPlanTemplate = {
     { wbs: '1.1', name: 'Revisión de OC y kickoff',           department: 'Compras',    duration_days: 1, is_milestone: true },
     { wbs: '2.1', name: 'Diseño y programación CAM',          department: 'Diseño',     duration_days: 2, depends_on: ['1.1'] },
     { wbs: '3.1', name: 'Compra y recepción de materiales',   department: 'Compras',    duration_days: 3, depends_on: ['1.1'] },
-    { wbs: '4.1', name: 'Maquinado del herramental',          department: 'Producción', duration_days: 4, depends_on: ['2.1', '3.1'] },
+    { wbs: '4.1', name: 'Maquinado del herramental',          department: 'Producción', duration_days: 4, depends_on: ['2.1', '3.1'], scales_with_quantity: true },
     { wbs: '4.2', name: 'Ensamble y ajustes',                 department: 'Producción', duration_days: 1, depends_on: ['4.1'] },
     { wbs: '5.1', name: 'Inspección dimensional y validación', department: 'Calidad',   duration_days: 1, is_milestone: true, depends_on: ['4.2'] },
     { wbs: '6.1', name: 'Embarque o entrega',                 department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['5.1'] },
@@ -179,6 +193,7 @@ export const TEMPLATE_PROTOTIPO: MasterPlanTemplate = {
   id: 'Prototipo',
   name: 'Prototipo rápido',
   description: 'Pieza única o lote piloto (1-10 pzas) para validación. Ciclo ~7 días.',
+  base_quantity: 5,
   defaultRiskSummary:
     'Riesgos típicos del proyecto:\n' +
     '· Cambios iterativos del cliente durante el ciclo (típico en prototipos)\n' +
@@ -188,7 +203,7 @@ export const TEMPLATE_PROTOTIPO: MasterPlanTemplate = {
     { wbs: '1.1', name: 'Kick-off técnico y revisión de plano',  department: 'Diseño',     duration_days: 1, is_milestone: true },
     { wbs: '2.1', name: 'Materia prima (stock o compra urgente)', department: 'Compras',    duration_days: 2, depends_on: ['1.1'] },
     { wbs: '2.2', name: 'Programación CAM y simulación',          department: 'Diseño',     duration_days: 1, depends_on: ['1.1'] },
-    { wbs: '3.1', name: 'Setup y maquinado',                      department: 'Producción', duration_days: 2, depends_on: ['2.1', '2.2'] },
+    { wbs: '3.1', name: 'Setup y maquinado',                      department: 'Producción', duration_days: 2, depends_on: ['2.1', '2.2'], scales_with_quantity: true },
     { wbs: '4.1', name: 'Validación dimensional del prototipo',   department: 'Calidad',    duration_days: 1, is_milestone: true, depends_on: ['3.1'] },
     { wbs: '5.1', name: 'Entrega al cliente',                     department: 'Embarque',   duration_days: 1, is_milestone: true, depends_on: ['4.1'] },
   ],
@@ -209,6 +224,7 @@ interface ScheduledTaskDraft {
   wbs: string;
   name: string;
   department: Department;
+  /** Duración EFECTIVA en días hábiles (ya escalada por cantidad). */
   duration_days: number;
   is_milestone: boolean;
   depends_on: string[];
@@ -221,74 +237,162 @@ interface ScheduledTaskDraft {
   is_critical?: boolean;
 }
 
-function addBusinessDays(date: Date, days: number): Date {
+/** Días de la semana laborables por defecto: Lun(1)…Vie(5). */
+const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
+
+export interface ScheduleOptions {
+  /** Días hábiles (0=Dom … 6=Sáb). Default Lun-Vie. */
+  workingDays?: number[];
+  /** Cantidad real de piezas a fabricar. Escala las tareas marcadas. */
+  quantity?: number;
+  /** Cantidad base de la plantilla (sobre la que se calibraron las
+   *  duraciones). Default: template.base_quantity. */
+  baseQuantity?: number;
+  /** Exponente de escalado (0–1). 1 = lineal, <1 = sublineal (lotes grandes
+   *  se procesan más eficientemente). Default 0.75. */
+  scaleExponent?: number;
+}
+
+function isWorkingDay(d: Date, working: number[]): boolean {
+  return working.includes(d.getDay());
+}
+
+/** Mueve la fecha al día hábil más cercano en la dirección indicada. */
+function snapToWorkingDay(date: Date, working: number[], dir: 'forward' | 'backward'): Date {
   const result = new Date(date);
-  result.setDate(result.getDate() + days);
+  const step = dir === 'forward' ? 1 : -1;
+  let guard = 0;
+  while (!isWorkingDay(result, working) && guard++ < 14) {
+    result.setDate(result.getDate() + step);
+  }
   return result;
 }
 
 /**
+ * Suma (o resta, si n<0) n días HÁBILES a la fecha, saltando fines de semana.
+ * Si la fecha de partida no es hábil, primero la deja en sí misma y cuenta
+ * los saltos hábiles desde ahí.
+ */
+function addWorkingDays(start: Date, n: number, working: number[]): Date {
+  const result = new Date(start);
+  let remaining = Math.abs(Math.round(n));
+  const step = n >= 0 ? 1 : -1;
+  while (remaining > 0) {
+    result.setDate(result.getDate() + step);
+    if (isWorkingDay(result, working)) remaining--;
+  }
+  return result;
+}
+
+/** Cuenta cuántos días hábiles hay entre a (exclusivo) y b (inclusivo). */
+function workingDaysBetween(a: Date, b: Date, working: number[]): number {
+  if (b <= a) return 0;
+  let count = 0;
+  const cur = new Date(a);
+  let guard = 0;
+  while (cur < b && guard++ < 100000) {
+    cur.setDate(cur.getDate() + 1);
+    if (isWorkingDay(cur, working)) count++;
+  }
+  return count;
+}
+
+/**
+ * Escala una duración base según la cantidad real vs la cantidad base.
+ * Sublineal por defecto: producir 4× piezas no toma 4× tiempo porque hay
+ * eficiencias de setup, procesamiento por tandas y varias estaciones.
+ * Tope de seguridad para que un solo paso no domine el plan (max 90 días).
+ */
+function scaleDuration(base: number, qty: number, baseQty: number, exp: number): number {
+  const safeBase = Math.max(1, base);
+  if (!qty || !baseQty || qty <= 0 || baseQty <= 0) return safeBase;
+  const ratio = qty / baseQty;
+  const scaled = safeBase * Math.pow(ratio, exp);
+  return Math.min(90, Math.max(1, Math.round(scaled)));
+}
+
+/** Devuelve la duración efectiva (escalada) de una tarea de plantilla. */
+function effectiveDuration(t: TemplateTask, opts: Required<Pick<ScheduleOptions, 'quantity' | 'baseQuantity' | 'scaleExponent'>>): number {
+  const base = Math.max(1, t.duration_days);
+  // Los hitos y las tareas no marcadas NO escalan.
+  if (t.is_milestone || !t.scales_with_quantity) return base;
+  return scaleDuration(base, opts.quantity, opts.baseQuantity, opts.scaleExponent);
+}
+
+/**
  * Programa un plan a partir de las tareas de plantilla y una fecha de inicio.
- * Usa forward pass para earliest_start/finish, backward pass para latest,
- * y marca como critical aquellas con slack = 0.
+ *
+ * Mejoras vs versión previa:
+ *  · Días HÁBILES reales (Lun-Vie) — las tareas ya no caen en fines de semana.
+ *  · Duraciones que ESCALAN con la cantidad de piezas (maquinado, inspección,
+ *    empaque…), usando un modelo sublineal calibrado por plantilla.
+ *  · CPM forward/backward para marcar la ruta crítica.
  */
 export function scheduleTasks(
   template: MasterPlanTemplate,
-  startDate: Date
+  startDate: Date,
+  options: ScheduleOptions = {}
 ): ScheduledTaskDraft[] {
-  const taskMap = new Map<string, ScheduledTaskDraft>();
+  const working = options.workingDays ?? DEFAULT_WORKING_DAYS;
+  const baseQuantity = options.baseQuantity ?? template.base_quantity ?? 1;
+  const quantity = options.quantity ?? baseQuantity;
+  const scaleExponent = options.scaleExponent ?? 0.75;
+  const durOpts = { quantity, baseQuantity, scaleExponent };
 
-  // Inicializar
+  // El arranque siempre cae en día hábil.
+  const anchor = snapToWorkingDay(new Date(startDate), working, 'forward');
+
+  const taskMap = new Map<string, ScheduledTaskDraft>();
   template.tasks.forEach(t => {
     taskMap.set(t.wbs, {
       wbs: t.wbs,
       name: t.name,
       department: t.department,
-      duration_days: t.duration_days,
+      duration_days: effectiveDuration(t, durOpts),
       is_milestone: t.is_milestone ?? false,
       depends_on: t.depends_on ?? [],
-      start_date: new Date(startDate),
-      end_date: new Date(startDate),
-      earliest_start: new Date(startDate),
-      earliest_finish: new Date(startDate),
+      start_date: new Date(anchor),
+      end_date: new Date(anchor),
+      earliest_start: new Date(anchor),
+      earliest_finish: new Date(anchor),
     });
   });
 
-  // Forward pass — calcular earliest start/finish
+  // Forward pass — earliest start/finish en días hábiles
   const computeForward = (wbs: string, visiting: Set<string>): ScheduledTaskDraft => {
     const task = taskMap.get(wbs)!;
-    if (visiting.has(wbs)) return task; // evita ciclos
+    if (visiting.has(wbs)) return task;
     visiting.add(wbs);
 
     if (task.depends_on.length === 0) {
-      task.earliest_start = new Date(startDate);
+      task.earliest_start = new Date(anchor);
     } else {
-      let maxFinish = new Date(startDate);
+      let maxFinish = new Date(anchor);
       for (const dep of task.depends_on) {
         const depTask = taskMap.get(dep);
         if (!depTask) continue;
         const computed = computeForward(dep, new Set(visiting));
         if (computed.earliest_finish > maxFinish) maxFinish = computed.earliest_finish;
       }
-      task.earliest_start = maxFinish;
+      // El sucesor arranca en el siguiente día hábil disponible.
+      task.earliest_start = snapToWorkingDay(maxFinish, working, 'forward');
     }
 
-    task.earliest_finish = addBusinessDays(task.earliest_start, task.duration_days);
+    task.earliest_finish = addWorkingDays(task.earliest_start, task.duration_days, working);
     task.start_date = new Date(task.earliest_start);
     task.end_date = new Date(task.earliest_finish);
-
     return task;
   };
 
   template.tasks.forEach(t => computeForward(t.wbs, new Set()));
 
-  // Backward pass — encontrar el final del proyecto y propagar latest_start
+  // Fin del proyecto = máximo earliest_finish
   const projectEnd = Array.from(taskMap.values()).reduce(
     (max, t) => (t.earliest_finish > max ? t.earliest_finish : max),
-    new Date(startDate)
+    new Date(anchor)
   );
 
-  // Inicializar latest = earliest para las hojas (tareas sin sucesoras)
+  // Backward pass para ruta crítica
   const successors = new Map<string, string[]>();
   template.tasks.forEach(t => {
     (t.depends_on ?? []).forEach(dep => {
@@ -313,21 +417,23 @@ export function scheduleTasks(
       }
       task.latest_finish = minStart;
     }
-    task.latest_start = addBusinessDays(task.latest_finish, -task.duration_days);
+    task.latest_start = addWorkingDays(task.latest_finish, -task.duration_days, working);
     return task;
   };
 
   template.tasks.forEach(t => computeBackward(t.wbs, new Set()));
 
-  // Marcar critical path — slack === 0
+  // Ruta crítica = slack ≈ 0
   taskMap.forEach(task => {
     const slack = task.latest_start
       ? (task.latest_start.getTime() - task.earliest_start.getTime()) / (1000 * 60 * 60 * 24)
       : 0;
-    task.is_critical = Math.abs(slack) < 0.5;
+    task.is_critical = Math.abs(slack) < 0.75;
   });
 
-  return Array.from(taskMap.values()).sort((a, b) => a.wbs.localeCompare(b.wbs, undefined, { numeric: true }));
+  return Array.from(taskMap.values()).sort((a, b) =>
+    a.wbs.localeCompare(b.wbs, undefined, { numeric: true })
+  );
 }
 
 export function projectEndDate(scheduled: ScheduledTaskDraft[]): Date {
@@ -336,6 +442,34 @@ export function projectEndDate(scheduled: ScheduledTaskDraft[]): Date {
     (max, t) => (t.end_date > max ? t.end_date : max),
     scheduled[0].end_date
   );
+}
+
+/**
+ * Calcula la fecha de INICIO necesaria para que el plan termine exactamente
+ * en el deadline (planeación hacia atrás, días hábiles).
+ *
+ * Programa con un ancla cualquiera, mide el lapso total en días hábiles, y
+ * resta ese lapso al deadline (ajustado al día hábil previo). El resultado,
+ * usado como inicio en scheduleTasks, hace que el fin del proyecto aterrice
+ * sobre el deadline.
+ */
+export function backwardStartForDeadline(
+  template: MasterPlanTemplate,
+  deadline: Date,
+  options: ScheduleOptions = {}
+): Date {
+  const working = options.workingDays ?? DEFAULT_WORKING_DAYS;
+  const placeholder = snapToWorkingDay(new Date(2035, 0, 1), working, 'forward');
+  const sched = scheduleTasks(template, placeholder, options);
+  if (sched.length === 0) return snapToWorkingDay(deadline, working, 'backward');
+  const start = sched.reduce(
+    (min, t) => (t.start_date < min ? t.start_date : min),
+    sched[0].start_date
+  );
+  const end = projectEndDate(sched);
+  const span = workingDaysBetween(start, end, working);
+  const anchor = snapToWorkingDay(deadline, working, 'backward');
+  return addWorkingDays(anchor, -span, working);
 }
 
 // ============================================================================
@@ -498,18 +632,19 @@ export function cascadeDates(
   changed.end_date = newEnd;
   const changedWbs = changed.wbs_code;
 
-  // Forward pass ASAP — itera hasta estabilidad
+  const working = DEFAULT_WORKING_DAYS;
+
+  // Forward pass ASAP en días HÁBILES — itera hasta estabilidad.
+  // Cada dependiente arranca el siguiente día hábil tras su predecesora y
+  // conserva su duración en días hábiles (no caen en fin de semana).
   let mutating = true;
   let safety = 100;
   while (mutating && safety-- > 0) {
     mutating = false;
     for (const task of updated) {
-      // No tocar la tarea que el usuario movió manualmente
       if (task.wbs_code === changedWbs) continue;
-      // Tareas sin dependencias quedan donde están (son anclas)
       if (!task.dependencies || task.dependencies.length === 0) continue;
 
-      // Max end_date entre dependencias = inicio "ideal" de esta tarea
       let maxDepEnd: Date | null = null;
       for (const depWbs of task.dependencies) {
         const dep = byWbs.get(depWbs);
@@ -521,13 +656,17 @@ export function cascadeDates(
 
       const currentStart = new Date(task.start_date);
       const currentEnd = new Date(task.end_date);
-      const durationMs = currentEnd.getTime() - currentStart.getTime();
+      // Duración en días hábiles (preserva el "tamaño" de la tarea).
+      const workDur = Math.max(1, workingDaysBetween(currentStart, currentEnd, working));
 
-      // Re-alinear si hay gap (anterior o posterior). Tolerancia de 0.5 día.
-      const diffMs = maxDepEnd.getTime() - currentStart.getTime();
+      // Inicio ideal = siguiente día hábil tras el fin de la última dependencia.
+      const idealStart = snapToWorkingDay(maxDepEnd, working, 'forward');
+
+      // Re-alinear si hay gap apreciable (≥ 1 día).
+      const diffMs = idealStart.getTime() - currentStart.getTime();
       if (Math.abs(diffMs) > 12 * 60 * 60 * 1000) {
-        task.start_date = maxDepEnd.toISOString().slice(0, 10);
-        const newEndDate = new Date(maxDepEnd.getTime() + durationMs);
+        const newEndDate = addWorkingDays(idealStart, workDur, working);
+        task.start_date = idealStart.toISOString().slice(0, 10);
         task.end_date = newEndDate.toISOString().slice(0, 10);
         mutating = true;
       }
@@ -607,6 +746,57 @@ export function useUpdateMasterPlanTaskDates() {
 
         setState({ loading: false, error: null });
         return recalculated;
+      } catch (err) {
+        const e = err as Error;
+        setState({ loading: false, error: e });
+        throw e;
+      }
+    },
+    []
+  );
+
+  return { update, ...state };
+}
+
+/**
+ * Actualiza la lista de dependencias (wbs codes) de una tarea del master plan.
+ * Se usa para quitar (o reordenar) las dependencias de una actividad ya
+ * publicada. No mueve fechas: quitar una dependencia simplemente libera la
+ * tarea; el usuario puede luego ajustar las fechas a mano si lo desea.
+ */
+export function useUpdateMasterPlanTaskDependencies() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const update = useCallback(
+    async (taskId: string, dependencies: string[]): Promise<void> => {
+      setState({ loading: true, error: null });
+      try {
+        const now = new Date().toISOString();
+
+        if (!supabase) {
+          const all = readDemo<MasterPlanTask>(DEMO_TASKS_KEY);
+          const idx = all.findIndex(t => t.id === taskId);
+          if (idx >= 0) {
+            all[idx] = { ...all[idx], dependencies, updated_at: now };
+            writeDemo(DEMO_TASKS_KEY, all);
+          }
+          setState({ loading: false, error: null });
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('master_plan_tasks')
+          .update({ dependencies, updated_at: now })
+          .eq('id', taskId)
+          .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error(
+            'No se actualizaron las dependencias. Verifica que tu profiles.role sea ' +
+              '"Administrador" o "Administración / PM" en Supabase.'
+          );
+        }
+        setState({ loading: false, error: null });
       } catch (err) {
         const e = err as Error;
         setState({ loading: false, error: e });

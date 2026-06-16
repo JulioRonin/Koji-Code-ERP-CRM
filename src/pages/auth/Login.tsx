@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { DEPARTMENTS } from '@/data/crmData';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -26,6 +27,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const { login, isLoading } = useAuth();
+  const { company } = useCompany();
   const navigate = useNavigate();
 
   const handleDepartmentSelect = (dept: string) => {
@@ -38,16 +40,16 @@ export function Login() {
     e.preventDefault();
     setError('');
 
-    const success = await login(selectedDept, email, password);
+    const result = await login(selectedDept, email, password);
 
-    if (success) {
+    if (result.ok) {
       if (selectedDept === 'Técnico') {
         navigate('/technician-portal');
       } else {
         navigate('/');
       }
     } else {
-      setError('Credenciales inválidas para este departamento.');
+      setError(result.error || 'No se pudo iniciar sesión.');
     }
   };
 
@@ -69,11 +71,19 @@ export function Login() {
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="h-12 w-12 rounded-xl bg-[var(--color-app-primary)] flex items-center justify-center mb-4 shadow-sm">
-            <Factory className="h-6 w-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-semibold text-[var(--color-app-text)]">Koji Code ERP</h1>
-          <p className="text-sm text-[var(--color-app-text-muted)] mt-1">Plataforma de manufactura CNC</p>
+          {company.logo_url ? (
+            <img src={company.logo_url} alt={company.commercial_name} className="h-12 w-12 rounded-xl object-cover mb-4 shadow-sm bg-white" />
+          ) : (
+            <div className="h-12 w-12 rounded-xl bg-[var(--color-app-primary)] flex items-center justify-center mb-4 shadow-sm">
+              <Factory className="h-6 w-6 text-white" />
+            </div>
+          )}
+          <h1 className="text-2xl font-semibold text-[var(--color-app-text)]">
+            {company.commercial_name || company.legal_name}
+          </h1>
+          <p className="text-sm text-[var(--color-app-text-muted)] mt-1">
+            {company.tagline || 'Plataforma de manufactura'}
+          </p>
         </div>
 
         <AnimatePresence mode="wait">
@@ -170,6 +180,13 @@ export function Login() {
                     <Button type="submit" disabled={isLoading} className="w-full">
                       {isLoading ? 'Verificando...' : 'Iniciar sesión'}
                     </Button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/forgot-password')}
+                      className="text-xs text-center text-[var(--color-app-primary)] hover:underline"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
                     <p className="text-xs text-center text-[var(--color-app-text-muted)]">
                       ¿Problemas para acceder? Contacta a tu administrador.
                     </p>
@@ -181,7 +198,7 @@ export function Login() {
         </AnimatePresence>
 
         <p className="text-center text-xs text-[var(--color-app-text-subtle)] mt-6">
-          Koji Code ERP · v2.0
+          {company.legal_name} · powered by Koji Code
         </p>
       </div>
     </div>

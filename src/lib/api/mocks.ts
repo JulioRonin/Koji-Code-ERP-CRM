@@ -89,9 +89,16 @@ export const MOCK_PROFILES: Profile[] = [
   },
   {
     id: 'profile-005', full_name: 'Técnico Senior', email: 'tecnico@imcdesign.com', avatar_url: null,
-    role: 'Técnico Especialista', department: 'Técnico', phone: '+52 555 222 3333',
+    role: 'Técnico', department: 'Producción', phone: '+52 555 222 3333',
     status: 'Activo', join_date: '2024-01-01', bio: null, salary: 20000, pin_code: '1234',
     metadata: { bonus: 1000, efficiency: 87, shift: 'Matutino · 07:00 – 16:00' },
+    created_at: now, updated_at: now,
+  },
+  {
+    id: 'profile-007', full_name: 'Carlos Méndez', email: 'cmendez@imcdesign.com', avatar_url: null,
+    role: 'Técnico', department: 'Producción', phone: '+52 555 333 4444',
+    status: 'Activo', join_date: '2024-03-01', bio: 'Tornero CNC con 8 años de experiencia.', salary: 22000, pin_code: '5678',
+    metadata: { bonus: 1500, efficiency: 91, shift: 'Matutino · 07:00 – 16:00' },
     created_at: now, updated_at: now,
   },
   {
@@ -125,12 +132,26 @@ export const MOCK_PROJECTS: Project[] = [
 // ---------------------------------------------------------------------------
 // BOM items
 // ---------------------------------------------------------------------------
+const baseBom = {
+  unit_price: null,
+  currency: 'MXN',
+  supplier_id: null,
+  supplier_name: null,
+  requisition_date: null,
+  delivery_date: null,
+  actual_delivery_date: null,
+  notes: null,
+  production_relevant: true,
+  image_url: null,
+  production_quantity: null,
+};
+
 export const MOCK_BOM_ITEMS: BomItem[] = [
-  { id: 'bom-item-1', project_id: 'IMC-2026-042', part_number: 'MS-A-4140-01', description: 'Acero 4140 2" x 12"',           category: 'Materia Prima',     material: 'Acero 4140',    quantity: 20,  uom: 'Barras', bom_status: 'Solicitado', manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, created_at: now, updated_at: now },
-  { id: 'bom-item-2', project_id: 'IMC-2026-042', part_number: 'CN-T-1250-05', description: 'Insertos de carburo (fresa)',    category: 'Herramental',       material: 'Carburo',        quantity: 15,  uom: 'Cajas',  bom_status: 'Stock',      manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, created_at: now, updated_at: now },
-  { id: 'bom-item-3', project_id: 'IMC-2026-042', part_number: 'HD-B-0820-10', description: 'Tornillo Allen M8x20mm',         category: 'Hardware',          material: 'Acero negro',    quantity: 200, uom: 'Pzas',   bom_status: 'Recibido',   manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, created_at: now, updated_at: now },
-  { id: 'bom-item-4', project_id: 'IMC-2026-045', part_number: 'AL-M-6061-02', description: 'Aluminio 6061-T6 block',         category: 'Materia Prima',     material: 'Aluminio 6061', quantity: 4,   uom: 'Pzas',   bom_status: 'Pendiente',  manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, created_at: now, updated_at: now },
-  { id: 'bom-item-5', project_id: 'IMC-2026-045', part_number: 'SP-R-200-15',  description: 'Resortes de expulsión 2"',       category: 'Componentes Moldes', material: 'Acero',          quantity: 12,  uom: 'Pzas',   bom_status: 'Tránsito',   manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, created_at: now, updated_at: now },
+  { id: 'bom-item-1', project_id: 'IMC-2026-042', part_number: 'MS-A-4140-01', description: 'Acero 4140 2" x 12"',           category: 'Materia Prima',     material: 'Acero 4140',    quantity: 20,  uom: 'Barras', bom_status: 'Solicitado', manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, ...baseBom, unit_price: 4200, supplier_name: 'Aceros del Bajío', requisition_date: '2026-03-12', delivery_date: '2026-03-22', created_at: now, updated_at: now },
+  { id: 'bom-item-2', project_id: 'IMC-2026-042', part_number: 'CN-T-1250-05', description: 'Insertos de carburo (fresa)',    category: 'Herramental',       material: 'Carburo',        quantity: 15,  uom: 'Cajas',  bom_status: 'Stock',      manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, ...baseBom, unit_price: 1850, supplier_name: 'Sandvik MX', created_at: now, updated_at: now },
+  { id: 'bom-item-3', project_id: 'IMC-2026-042', part_number: 'HD-B-0820-10', description: 'Tornillo Allen M8x20mm',         category: 'Hardware',          material: 'Acero negro',    quantity: 200, uom: 'Pzas',   bom_status: 'Recibido',   manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, ...baseBom, production_relevant: false, unit_price: 4.5, supplier_name: 'Tornillos Mexicanos', requisition_date: '2026-03-10', delivery_date: '2026-03-18', actual_delivery_date: '2026-03-17', created_at: now, updated_at: now },
+  { id: 'bom-item-4', project_id: 'IMC-2026-045', part_number: 'AL-M-6061-02', description: 'Aluminio 6061-T6 block',         category: 'Materia Prima',     material: 'Aluminio 6061', quantity: 4,   uom: 'Pzas',   bom_status: 'Pendiente',  manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, ...baseBom, created_at: now, updated_at: now },
+  { id: 'bom-item-5', project_id: 'IMC-2026-045', part_number: 'SP-R-200-15',  description: 'Resortes de expulsión 2"',       category: 'Componentes Moldes', material: 'Acero',          quantity: 12,  uom: 'Pzas',   bom_status: 'Tránsito',   manufacturing_status: 'PENDIENTE', drawing_url: null, model_url: null, assigned_technician_id: null, ...baseBom, unit_price: 320, supplier_name: 'DME México', requisition_date: '2026-03-08', delivery_date: '2026-03-20', created_at: now, updated_at: now },
 ];
 
 // ---------------------------------------------------------------------------

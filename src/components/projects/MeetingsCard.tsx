@@ -8,7 +8,9 @@ import {
   Clock,
   Users,
   ChevronDown,
-  MessageSquare,
+  CalendarPlus,
+  Save,
+  FileText,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,9 +18,12 @@ import { Button } from '@/components/ui/button';
 import {
   useProjectMeetings,
   useUpdateMeetingStatus,
+  useUpdateMeeting,
 } from '@/lib/api';
-import type { ProjectMeeting, MeetingStatus } from '@/types/database';
+import type { ProjectMeeting, MeetingStatus, Project } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { GenerateMeetingsModal } from './GenerateMeetingsModal';
+import { MeetingMinuteModal } from './MeetingMinuteModal';
 
 const typeColor: Record<string, string> = {
   'Kick-off':  '#0369a1',
@@ -30,14 +35,29 @@ const typeColor: Record<string, string> = {
 };
 
 interface Props {
-  projectId: string;
+  project: Project;
 }
 
-export function MeetingsCard({ projectId }: Props) {
+export function MeetingsCard({ project }: Props) {
+  const projectId = project.id;
   const { data: meetings, refetch } = useProjectMeetings(projectId);
   const { update } = useUpdateMeetingStatus();
+  const { update: updateMeeting } = useUpdateMeeting();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [genOpen, setGenOpen] = useState(false);
+  const [minuteMeeting, setMinuteMeeting] = useState<ProjectMeeting | null>(null);
+
+  // Reprograma fecha/hora de una junta existente.
+  const handleReschedule = async (m: ProjectMeeting, date: string, time: string) => {
+    const dt = new Date(`${date}T${time || '10:00'}:00`);
+    try {
+      await updateMeeting(m.id, { scheduled_at: dt.toISOString() });
+      await refetch();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  };
 
   const { upcoming, past } = useMemo(() => {
     const upcoming: ProjectMeeting[] = [];
@@ -73,26 +93,70 @@ export function MeetingsCard({ projectId }: Props) {
   };
 
   if (meetings.length === 0) {
-    return null;
+    return (
+      <>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Juntas de seguimiento
+            </CardTitle>
+            <CardDescription>
+              Aún no hay juntas programadas para este proyecto.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 rounded-md border border-dashed border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)]/40 text-center space-y-3">
+              <CalendarClock className="h-6 w-6 text-[var(--color-app-text-subtle)] mx-auto" />
+              <p className="text-sm text-[var(--color-app-text)]">Sin calendario de juntas</p>
+              <p className="text-xs text-[var(--color-app-text-muted)]">
+                Genera el calendario de juntas de seguimiento PMI (Kick-off, semanales,
+                quincenales con cliente, cierre). Podrás editar los días y horas de cada
+                sesión antes de crearlas.
+              </p>
+              <Button size="sm" onClick={() => setGenOpen(true)}>
+                <CalendarPlus className="h-4 w-4 mr-1.5" /> Generar calendario de juntas
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <GenerateMeetingsModal
+          project={project}
+          open={genOpen}
+          onClose={() => setGenOpen(false)}
+          onCreated={refetch}
+        />
+      </>
+    );
   }
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Juntas de seguimiento
-        </CardTitle>
-        <CardDescription>
-          {upcoming.length} próximas · {past.length} pasadas
-        </CardDescription>
+      <CardHeader className="pb-3 flex flex-row items-start justify-between gap-2">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Juntas de seguimiento
+          </CardTitle>
+          <CardDescription>
+            {upcoming.length} próximas · {past.length} pasadas
+          </CardDescription>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setGenOpen(true)} className="shrink-0">
+          <CalendarPlus className="h-3.5 w-3.5 mr-1.5" /> Agregar juntas
+        </Button>
       </CardHeader>
+      <GenerateMeetingsModal
+        project={project}
+        open={genOpen}
+        onClose={() => setGenOpen(false)}
+        onCreated={refetch}
+      />
       <CardContent className="space-y-4">
         {upcoming.length > 0 && (
           <div className="space-y-1.5">
             <p className="text-[10px] uppercase text-[var(--color-app-text-muted)] tracking-wide font-medium">
               Próximas
             </p>
-            {upcoming.slice(0, 8).map(m => (
+            {upcoming.slice(0, 12).map(m => (
               <MeetingRow
                 key={m.id}
                 meeting={m}
@@ -102,6 +166,8 @@ export function MeetingsCard({ projectId }: Props) {
                 onChangeDraft={v => setNotesDraft(prev => ({ ...prev, [m.id]: v }))}
                 onMarkRealized={() => handleSetStatus(m, 'Realizada')}
                 onMarkCancelled={() => handleSetStatus(m, 'Cancelada')}
+                onReschedule={(date, time) => handleReschedule(m, date, time)}
+                onOpenMinute={() => setMinuteMeeting(m)}
               />
             ))}
           </div>
@@ -124,12 +190,26 @@ export function MeetingsCard({ projectId }: Props) {
                   onChangeDraft={v => setNotesDraft(prev => ({ ...prev, [m.id]: v }))}
                   onMarkRealized={() => handleSetStatus(m, 'Realizada')}
                   onMarkCancelled={() => handleSetStatus(m, 'Cancelada')}
+                  onReschedule={(date, time) => handleReschedule(m, date, time)}
+                  onOpenMinute={() => setMinuteMeeting(m)}
                 />
               ))}
             </div>
           </details>
         )}
       </CardContent>
+
+      {minuteMeeting && (
+        <MeetingMinuteModal
+          meeting={minuteMeeting}
+          project={project}
+          onClose={() => setMinuteMeeting(null)}
+          onSaved={async () => {
+            await refetch();
+            setMinuteMeeting(null);
+          }}
+        />
+      )}
     </Card>
   );
 }
@@ -143,6 +223,8 @@ function MeetingRow({
   onChangeDraft,
   onMarkRealized,
   onMarkCancelled,
+  onReschedule,
+  onOpenMinute,
 }: {
   meeting: ProjectMeeting;
   isPast?: boolean;
@@ -152,10 +234,15 @@ function MeetingRow({
   onChangeDraft: (v: string) => void;
   onMarkRealized: () => void;
   onMarkCancelled: () => void;
+  onReschedule: (date: string, time: string) => void;
+  onOpenMinute: () => void;
 }) {
   const d = parseISO(meeting.scheduled_at);
   const color = typeColor[meeting.meeting_type] ?? '#94a3b8';
   const isOverdue = meeting.status === 'Programada' && isPast === undefined && new Date() > d;
+  const [editDate, setEditDate] = useState(format(d, 'yyyy-MM-dd'));
+  const [editTime, setEditTime] = useState(format(d, 'HH:mm'));
+  const rescheduleDirty = editDate !== format(d, 'yyyy-MM-dd') || editTime !== format(d, 'HH:mm');
 
   return (
     <div
@@ -223,6 +310,49 @@ function MeetingRow({
 
       {isExpanded && (
         <div className="px-3 pb-3 pt-1 border-t border-[var(--color-app-border)] space-y-2.5">
+          {/* Minuta de la junta (generar / editar / exportar PDF) */}
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="text-[10px] uppercase text-[var(--color-app-text-muted)] tracking-wide font-medium">
+              Minuta
+            </span>
+            <Button size="sm" variant={meeting.minutes ? 'default' : 'outline'} className="h-7 text-xs" onClick={onOpenMinute}>
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              {meeting.minutes ? 'Ver / editar minuta' : 'Generar minuta'}
+            </Button>
+          </div>
+
+          {/* Reprogramar fecha/hora (juntas programadas) */}
+          {meeting.status === 'Programada' && (
+            <div>
+              <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
+                Reprogramar
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={e => setEditDate(e.target.value)}
+                  className="h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                />
+                <input
+                  type="time"
+                  value={editTime}
+                  onChange={e => setEditTime(e.target.value)}
+                  className="h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!rescheduleDirty}
+                  onClick={() => onReschedule(editDate, editTime)}
+                  className="h-8"
+                >
+                  <Save className="h-3.5 w-3.5 mr-1" /> Guardar
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Existing notes */}
           {meeting.notes && (
             <div className="p-2.5 rounded-md bg-[var(--color-app-surface-alt)]/60 text-xs whitespace-pre-wrap">

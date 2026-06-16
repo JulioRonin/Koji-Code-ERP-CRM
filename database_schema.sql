@@ -19,6 +19,39 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 1. CRM & PERFILES
 -- ---------------------------------------------------------------------------
 
+-- Configuración de la empresa (tenant). Hoy es un solo registro; a futuro,
+-- multi-tenant, se llavearía por organización. Guarda los datos fiscales
+-- (México) y las preferencias de marca/tema que la app muestra en lugar de
+-- "Koji Code" (nombre de la plataforma).
+CREATE TABLE IF NOT EXISTS public.company_settings (
+    id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legal_name         TEXT NOT NULL DEFAULT 'IMC Design',     -- Razón social
+    commercial_name    TEXT NOT NULL DEFAULT 'IMC Design',     -- Nombre comercial
+    tagline            TEXT DEFAULT 'Manufactura CNC de precisión',
+    rfc                TEXT,
+    tax_regime         TEXT,                                   -- Régimen fiscal SAT
+    -- Domicilio fiscal
+    address_street     TEXT,
+    address_ext        TEXT,
+    address_int        TEXT,
+    address_neighborhood TEXT,                                 -- Colonia
+    address_zip        TEXT,                                   -- Código postal
+    address_city       TEXT,                                   -- Municipio / alcaldía
+    address_state      TEXT,
+    address_country    TEXT DEFAULT 'México',
+    -- Contacto
+    phone              TEXT,
+    email              TEXT,
+    website            TEXT,
+    legal_rep          TEXT,                                   -- Representante legal
+    logo_url           TEXT,
+    -- Marca / tema
+    primary_color      TEXT DEFAULT '#0369a1',
+    currency           TEXT DEFAULT 'MXN',
+    created_at         TIMESTAMPTZ DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.profiles (
     id           UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name    TEXT NOT NULL,
@@ -274,6 +307,9 @@ CREATE TABLE IF NOT EXISTS public.project_meetings (
     updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Minuta de la junta (documento editable + datos de origen) en JSONB.
+ALTER TABLE public.project_meetings ADD COLUMN IF NOT EXISTS minutes JSONB;
+
 CREATE INDEX IF NOT EXISTS idx_meetings_project ON public.project_meetings(project_id, scheduled_at);
 
 -- ---------------------------------------------------------------------------
@@ -359,6 +395,29 @@ CREATE TABLE IF NOT EXISTS public.bom_items (
 
 CREATE INDEX IF NOT EXISTS idx_bom_items_project ON public.bom_items(project_id);
 CREATE INDEX IF NOT EXISTS idx_bom_items_mfg_status ON public.bom_items(manufacturing_status);
+
+-- Columnas de seguimiento de compra (precio, proveedor, fechas, notas).
+-- Se agregan via ALTER para ser idempotente con bases existentes.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS unit_price            NUMERIC;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS currency              TEXT DEFAULT 'MXN';
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS supplier_id           UUID REFERENCES public.suppliers(id) ON DELETE SET NULL;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS supplier_name         TEXT;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS requisition_date      DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS delivery_date         DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS actual_delivery_date  DATE;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS notes                 TEXT;
+-- Marca si el item es pieza a fabricar (true) o consumible/hardware/insumo
+-- que sólo se compra pero no entra al plan de producción (false).
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_relevant   BOOLEAN NOT NULL DEFAULT TRUE;
+-- Thumbnail / foto del checklist de producción (PNG / JPG). Distinto al
+-- drawing_url (PDF del plano técnico) — se imprime en la hoja de orden
+-- de trabajo y se muestra en el checklist visual.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS image_url            TEXT;
+-- quantity         = cantidad que COMPRAS adquiere (columna "Qty" del template).
+-- production_quantity = piezas a FABRICAR (columna "Qty for Production").
+-- Esta última es la que se muestra en Producción, Diseño y Calidad.
+-- Si es NULL, esos módulos hacen fallback a quantity.
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_quantity  NUMERIC;
 
 -- ---------------------------------------------------------------------------
 -- 7. COMPRAS — Requisiciones y POs
@@ -550,6 +609,35 @@ CREATE TABLE IF NOT EXISTS public.measurement_instruments (
     updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Reportes dimensionales / First Article Inspection (FAIR ISO 9001).
+-- El plano "globalizado" (ballooned) y las lecturas por pieza viven en
+-- `payload` (JSONB) para flexibilidad; las columnas sueltas son para
+-- listar/filtrar y trazabilidad. `drawing_image` es el storage path de la
+-- imagen base (render del PDF o foto subida) sobre la que se dibujan las
+-- burbujas; `report_url` es un PDF/foto adjunto opcional.
+CREATE TABLE IF NOT EXISTS public.dimensional_reports (
+    id                TEXT PRIMARY KEY,            -- DIM-2026-001
+    project_id        TEXT REFERENCES public.projects(id) ON DELETE CASCADE,
+    bom_item_id       UUID REFERENCES public.bom_items(id) ON DELETE CASCADE,
+    part_number       TEXT,
+    title             TEXT,
+    inspector_id      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    inspector_name    TEXT,
+    sample_size       INTEGER NOT NULL DEFAULT 1,
+    status            TEXT NOT NULL DEFAULT 'Borrador'
+                      CHECK (status IN ('Borrador','Aprobado','Rechazado')),
+    drawing_image     TEXT,                        -- storage path de la imagen base
+    report_url        TEXT,                        -- PDF/foto adjunto opcional
+    payload           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    notes             TEXT,
+    created_by        UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at        TIMESTAMPTZ DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dim_project ON public.dimensional_reports(project_id);
+CREATE INDEX IF NOT EXISTS idx_dim_bom     ON public.dimensional_reports(bom_item_id);
+
 -- ---------------------------------------------------------------------------
 -- 10. EMBARQUE — Packing lists + etiquetas de caja
 -- ---------------------------------------------------------------------------
@@ -722,6 +810,7 @@ END$$;
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE public.profiles                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.company_settings        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customers               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.suppliers               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.material_prices         ENABLE ROW LEVEL SECURITY;
@@ -745,6 +834,7 @@ ALTER TABLE public.time_entries            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quality_inspections     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ncrs                    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.measurement_instruments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dimensional_reports     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipments               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipping_labels         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipping_label_items    ENABLE ROW LEVEL SECURITY;
@@ -778,6 +868,7 @@ BEGIN
             'bom_items','requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages','time_entries',
             'quality_inspections','ncrs','measurement_instruments',
+            'dimensional_reports',
             'shipments','shipping_labels','shipping_label_items',
             'pmo_reports','chat_channels','chat_messages'
         ])
@@ -804,6 +895,7 @@ BEGIN
             'requisitions','purchase_orders','purchase_order_items',
             'machines','work_orders','work_order_stages',
             'quality_inspections','ncrs','measurement_instruments',
+            'dimensional_reports',
             'shipments','shipping_labels','shipping_label_items',
             'pmo_reports','chat_channels'
         ])
@@ -816,6 +908,15 @@ BEGIN
         );
     END LOOP;
 END$$;
+
+-- Técnicos pueden actualizar bom_items DONDE están asignados (cambia
+-- manufacturing_status durante la fabricación). USING acota a sus piezas
+-- propias; WITH CHECK evita que se reasignen el item a otro técnico.
+DROP POLICY IF EXISTS "tech update own assignments" ON public.bom_items;
+CREATE POLICY "tech update own assignments" ON public.bom_items
+    FOR UPDATE TO authenticated
+    USING (assigned_technician_id = auth.uid())
+    WITH CHECK (assigned_technician_id = auth.uid());
 
 -- Admins pueden actualizar perfiles del personal (sólo UPDATE; INSERT lo hace
 -- el trigger handle_new_user al registrar un auth.user). Sin política dedicada
@@ -859,6 +960,74 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Calidad (más Admin/PM) puede escribir inspecciones, NCRs y reportes
+-- dimensionales. Sin esto, un usuario del departamento de Calidad no podría
+-- guardar un reporte de inspección (la política sólo dejaba a is_admin()).
+CREATE OR REPLACE FUNCTION public.is_quality()
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER AS $$
+    -- Revisamos role Y department porque, según cómo se dio de alta el usuario,
+    -- "Calidad" puede vivir en cualquiera de las dos columnas (p. ej. role
+    -- "Técnico de Calidad" con department por defecto). ILIKE cubre variantes.
+    SELECT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND (
+            role       IN ('Calidad','Administrador','Administración / PM')
+            OR department IN ('Calidad','Administrador','Administración / PM')
+            OR role       ILIKE '%calidad%'
+            OR department ILIKE '%calidad%'
+        )
+    );
+$$;
+
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN SELECT unnest(ARRAY['quality_inspections','ncrs','dimensional_reports'])
+    LOOP
+        EXECUTE format(
+            'DROP POLICY IF EXISTS "quality write %I" ON public.%I;
+             CREATE POLICY "quality write %I" ON public.%I
+             FOR ALL TO authenticated USING (public.is_quality()) WITH CHECK (public.is_quality());',
+            t, t, t, t
+        );
+    END LOOP;
+END$$;
+
+-- Producción (más Admin/PM) puede crear/actualizar órdenes de trabajo, sus
+-- etapas y el estatus de las máquinas (al asignar un plan de producción).
+CREATE OR REPLACE FUNCTION public.is_production()
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND (
+            role       IN ('Producción','Administrador','Administración / PM')
+            OR department IN ('Producción','Administrador','Administración / PM')
+            OR role       ILIKE '%producci%'
+            OR department ILIKE '%producci%'
+        )
+    );
+$$;
+
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN SELECT unnest(ARRAY['work_orders','work_order_stages','machines'])
+    LOOP
+        EXECUTE format(
+            'DROP POLICY IF EXISTS "production write %I" ON public.%I;
+             CREATE POLICY "production write %I" ON public.%I
+             FOR ALL TO authenticated USING (public.is_production()) WITH CHECK (public.is_production());',
+            t, t, t, t
+        );
+    END LOOP;
+END$$;
+
 -- Cualquier autenticado puede mandar mensajes y abrir time entries
 DROP POLICY IF EXISTS "send chat" ON public.chat_messages;
 CREATE POLICY "send chat" ON public.chat_messages
@@ -877,8 +1046,62 @@ CREATE POLICY "log time" ON public.time_entries
     WITH CHECK (operator_id = auth.uid() OR public.is_admin());
 
 -- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- 15b. SUPABASE STORAGE — bucket de planos / modelos / archivos del proyecto
+-- ---------------------------------------------------------------------------
+-- El bucket "project-files" almacena los PDFs de planos 2D, modelos 3D
+-- (STEP/IGS/…) y demás documentos del proyecto. El nombre tiene que ser
+-- EXACTAMENTE "project-files" porque el código frontend lo cablea así.
+--
+-- 1. Crea el bucket desde Supabase → Storage → New bucket:
+--      Name: project-files
+--      Public bucket: OFF (se accede vía signed URLs)
+--
+-- 2. Aplica las policies de abajo en el SQL editor. Sin estas, Supabase
+--    rechaza los INSERT/SELECT contra storage.objects con
+--    "new row violates row-level security policy".
+
+-- Lectura: cualquier usuario autenticado puede generar signed URLs
+DROP POLICY IF EXISTS "project-files read" ON storage.objects;
+CREATE POLICY "project-files read" ON storage.objects
+    FOR SELECT TO authenticated
+    USING (bucket_id = 'project-files');
+
+-- Escritura: Administrador / PM (planos, modelos) y además Calidad para
+-- subir imágenes/fotos de los reportes dimensionales.
+DROP POLICY IF EXISTS "project-files write" ON storage.objects;
+CREATE POLICY "project-files write" ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()));
+
+DROP POLICY IF EXISTS "project-files update" ON storage.objects;
+CREATE POLICY "project-files update" ON storage.objects
+    FOR UPDATE TO authenticated
+    USING (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()))
+    WITH CHECK (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()));
+
+DROP POLICY IF EXISTS "project-files delete" ON storage.objects;
+CREATE POLICY "project-files delete" ON storage.objects
+    FOR DELETE TO authenticated
+    USING (bucket_id = 'project-files' AND public.is_admin());
+
+-- ---------------------------------------------------------------------------
 -- 16. DATOS INICIALES
 -- ---------------------------------------------------------------------------
+
+-- company_settings: lectura para cualquiera (la marca se usa hasta en el
+-- login, antes de autenticar); escritura solo Administrador / PM.
+DROP POLICY IF EXISTS "company read" ON public.company_settings;
+CREATE POLICY "company read" ON public.company_settings
+    FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "company write" ON public.company_settings;
+CREATE POLICY "company write" ON public.company_settings
+    FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- Registro inicial de la empresa (solo si no existe ninguno).
+INSERT INTO public.company_settings (legal_name, commercial_name, tagline)
+SELECT 'IMC Design', 'IMC Design', 'Manufactura CNC de precisión'
+WHERE NOT EXISTS (SELECT 1 FROM public.company_settings);
 
 INSERT INTO public.chat_channels (name, description, category) VALUES
     ('general',     'Canal principal de comunicación',              'ADMIN'),

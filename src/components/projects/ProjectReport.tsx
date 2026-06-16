@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BarChart,
   Bar,
@@ -24,14 +25,14 @@ import {
   MessageSquare,
   CalendarClock,
   XCircle,
+  Presentation,
+  Rows,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { format, parseISO, isValid, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-import {
-  Dialog,
-  DialogContent,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { GanttChart } from './GanttChart';
@@ -42,7 +43,8 @@ import {
   useProjectNotes,
   useProjectMeetings,
 } from '@/lib/api';
-import type { ProjectNote } from '@/types/database';
+import type { ProjectNote, ProjectMeeting, CompanySettings } from '@/types/database';
+import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 
 const fmtDate = (s: string | null | undefined) => {
@@ -86,10 +88,35 @@ interface ProjectReportProps {
  * lista para imprimir o "Guardar como PDF" desde el navegador.
  */
 export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectReportProps) {
-  const { data: masterPlan } = useMasterPlan(project.id);
-  const { data: masterPlanTasks } = useMasterPlanTasks(masterPlan?.id);
-  const { data: projectTasks } = useProjectTasks(project.id);
-  const { data: notes } = useProjectNotes(project.id);
+  const { data: masterPlan, refetch: refetchPlan } = useMasterPlan(project.id);
+  const { data: masterPlanTasks, refetch: refetchTasks } = useMasterPlanTasks(masterPlan?.id);
+  const { data: projectTasks, refetch: refetchProjTasks } = useProjectTasks(project.id);
+  const { data: notes, refetch: refetchNotes } = useProjectNotes(project.id);
+  const { data: meetings, refetch: refetchMeetings } = useProjectMeetings(project.id);
+  const { company } = useCompany();
+
+  // Al abrir el reporte, refresca TODO para que las cifras de avance,
+  // hitos, juntas y notas sean las más recientes (el reporte queda montado
+  // en el árbol, así que sin esto mostraría datos del primer render).
+  useEffect(() => {
+    if (!isOpen) return;
+    refetchPlan();
+    refetchTasks();
+    refetchProjTasks();
+    refetchNotes();
+    refetchMeetings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Bloquea el scroll de fondo mientras el reporte está abierto.
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
 
   const today = new Date();
   const deadlineDate = (() => {
@@ -171,55 +198,215 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
     [projectTasks]
   );
 
-  const handlePrint = () => {
-    // Pequeño delay para que la UI se asiente antes del print
-    setTimeout(() => window.print(), 50);
+  // ── Modo de visualización: documento (scroll) o presentación (slides) ──
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const reportRef = React.useRef<HTMLDivElement>(null);
+  const [mode, setMode] = React.useState<'document' | 'slides'>('document');
+  const [slideIndex, setSlideIndex] = React.useState(0);
+  const [slideCount, setSlideCount] = React.useState(0);
+
+  // Enumera las páginas (.pmi-page) y muestra/oculta según el modo.
+  // En presentación se ve una a la vez; en documento todas (scrolleable).
+  React.useLayoutEffect(() => {
+    if (!isOpen) return;
+    const root = reportRef.current;
+    if (!root) return;
+    const pages = Array.from(root.querySelectorAll<HTMLElement>('.pmi-page'));
+    setSlideCount(pages.length);
+    pages.forEach((p, i) => {
+      p.style.display = mode === 'slides' && i !== slideIndex ? 'none' : '';
+    });
+  }, [isOpen, mode, slideIndex, masterPlanTasks, ganttTasks, deptPerformanceData, progressTimelineData, notes, meetings]);
+
+  // Mantiene slideIndex dentro de rango
+  React.useEffect(() => {
+    if (slideCount > 0 && slideIndex >= slideCount) setSlideIndex(slideCount - 1);
+  }, [slideCount, slideIndex]);
+
+  const goPrev = React.useCallback(() => setSlideIndex(i => Math.max(0, i - 1)), []);
+  const goNext = React.useCallback(
+    () => setSlideIndex(i => Math.min(Math.max(0, slideCount - 1), i + 1)),
+    [slideCount]
+  );
+
+  // Navegación con teclado en modo presentación
+  React.useEffect(() => {
+    if (!isOpen || mode !== 'slides') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault();
+        goNext();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        goPrev();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, mode, goNext, goPrev]);
+
+  const enterPresent = async () => {
+    setSlideIndex(0);
+    setMode('slides');
+    try {
+      await rootRef.current?.requestFullscreen?.();
+    } catch {
+      /* fullscreen opcional */
+    }
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[95vh] p-0 overflow-hidden flex flex-col">
-        <style>{`
-          @media print {
-            @page { size: letter portrait; margin: 0; }
-            html, body { background: white !important; }
-            body * { visibility: hidden !important; }
-            #pmi-report, #pmi-report * { visibility: visible !important; }
-            #pmi-report {
-              position: absolute !important;
-              left: 0 !important; top: 0 !important;
-              width: 100% !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              background: white !important;
-              color: black !important;
-            }
-            .no-print-pmi { display: none !important; }
-            .pmi-page {
-              page-break-after: always;
-              break-after: page;
-              min-height: 100vh;
-              padding: 18mm 16mm !important;
-              box-sizing: border-box;
-            }
-            .pmi-page:last-child { page-break-after: auto; }
-            .pmi-keep { page-break-inside: avoid; break-inside: avoid; }
-          }
-          #pmi-report .pmi-page {
-            min-height: auto;
-            padding: 36px 40px;
-          }
-        `}</style>
+  const exitPresent = React.useCallback(async () => {
+    setMode('document');
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
+  // Escape contextual: en presentación vuelve a documento; en documento cierra.
+  // Y si el usuario sale de pantalla completa (Esc nativo), vuelve a documento.
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (mode === 'slides') {
+        e.preventDefault();
+        exitPresent();
+      } else {
+        onClose();
+      }
+    };
+    const onFsChange = () => {
+      if (!document.fullscreenElement && mode === 'slides') setMode('document');
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('fullscreenchange', onFsChange);
+    };
+  }, [isOpen, mode, onClose, exitPresent]);
+
+  const handlePrint = () => {
+    // Pequeño delay para que recharts y el layout se asienten antes del print
+    setTimeout(() => window.print(), 120);
+  };
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div id="koji-report-root" ref={rootRef} className={mode === 'slides' ? 'mode-slides' : 'mode-doc'}>
+      <style>{`
+        /* ── PANTALLA ── overlay scrolleable robusto ── */
+        @media screen {
+          #koji-report-root {
+            position: fixed; inset: 0; z-index: 60;
+            background: rgba(15, 23, 42, 0.55);
+            overflow-y: auto; overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+          }
+          .report-stage {
+            max-width: 960px; margin: 0 auto;
+            padding: 14px 12px 80px;
+          }
+          .report-toolbar {
+            position: sticky; top: 8px; z-index: 5;
+          }
+          #pmi-report {
+            width: 100%; background: #f1f5f9;
+            border-radius: 10px; overflow: hidden;
+          }
+          #pmi-report .pmi-page { min-height: auto; padding: 36px 40px; }
+
+          /* ── Modo presentación (PowerPoint) ── */
+          #koji-report-root.mode-slides { background: #0b1220; }
+          #koji-report-root.mode-slides .report-stage {
+            max-width: 1200px; padding: 12px 16px 96px;
+            min-height: 100%; display: flex; flex-direction: column; justify-content: center;
+          }
+          #koji-report-root.mode-slides #pmi-report { background: transparent; overflow: visible; }
+          #koji-report-root.mode-slides .pmi-page {
+            background: white; border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.5);
+            max-width: 1120px; margin: 0 auto; width: 100%;
+            min-height: 66vh; padding: 44px 56px;
+          }
+          .report-nav {
+            position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+            z-index: 70;
+          }
+        }
+        /* ── IMPRESIÓN ── oculta la app y deja fluir TODAS las páginas ── */
+        @media print {
+          @page { size: letter portrait; margin: 12mm; }
+          html, body {
+            background: white !important;
+            height: auto !important; min-height: 0 !important;
+            overflow: visible !important;
+            margin: 0 !important; padding: 0 !important;
+          }
+          body > #root { display: none !important; }
+          body > #koji-report-root {
+            position: static !important; inset: auto !important;
+            background: white !important; overflow: visible !important;
+            display: block !important; padding: 0 !important; margin: 0 !important;
+          }
+          .report-stage { max-width: none !important; padding: 0 !important; margin: 0 !important; display: block !important; }
+          .report-toolbar, .report-nav, .no-print-pmi { display: none !important; }
+          #pmi-report {
+            max-width: none !important; width: 100% !important;
+            background: white !important; color: black !important;
+            border-radius: 0 !important; overflow: visible !important; height: auto !important;
+          }
+          /* CLAVE: aunque en presentación las demás páginas estén ocultas
+             por JS (display:none inline), en impresión SE FUERZAN todas. */
+          .pmi-page {
+            display: block !important;
+            page-break-after: always; break-after: page;
+            page-break-inside: avoid;
+            padding: 4mm 2mm !important; margin: 0 auto !important;
+            max-width: none !important; min-height: 0 !important;
+            box-shadow: none !important; background: white !important;
+            border-radius: 0 !important;
+          }
+          .pmi-page:last-child { page-break-after: auto; break-after: auto; }
+          .pmi-keep { page-break-inside: avoid; break-inside: avoid; }
+          #pmi-report svg { max-width: 100% !important; }
+          #pmi-report img { max-width: 100% !important; }
+          #pmi-report thead { display: table-header-group; }
+          #pmi-report tr { page-break-inside: avoid; break-inside: avoid; }
+        }
+      `}</style>
+
+      {/* Backdrop para cerrar (solo pantalla, solo en modo documento) */}
+      {mode === 'document' && (
+        <div
+          className="no-print-pmi"
+          onClick={onClose}
+          style={{ position: 'fixed', inset: 0, zIndex: -1 }}
+        />
+      )}
+
+      <div className="report-stage">
         {/* Toolbar (oculta al imprimir) */}
-        <div className="no-print-pmi flex items-center justify-between px-5 py-3 border-b border-[var(--color-app-border)] bg-white shrink-0">
-          <div className="text-sm">
-            <span className="font-medium">Reporte ejecutivo</span>
+        <div className="report-toolbar no-print-pmi flex items-center justify-between gap-3 mb-3 px-4 py-2.5 rounded-lg border border-[var(--color-app-border)] bg-white shadow-sm">
+          <div className="text-sm min-w-0 truncate">
+            <span className="font-medium">{mode === 'slides' ? 'Presentación' : 'Reporte ejecutivo'}</span>
             <span className="text-[var(--color-app-text-muted)] ml-2">· {project.id}</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            {mode === 'document' ? (
+              <Button variant="outline" size="sm" onClick={enterPresent}>
+                <Presentation className="h-3.5 w-3.5 mr-1.5" /> Presentar
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={exitPresent}>
+                <Rows className="h-3.5 w-3.5 mr-1.5" /> Ver documento
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="h-3.5 w-3.5 mr-1.5" /> Descargar / Imprimir
+              <Printer className="h-3.5 w-3.5 mr-1.5" /> Descargar PDF
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
               <X className="h-4 w-4" />
@@ -227,12 +414,12 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
           </div>
         </div>
 
-        {/* Documento */}
-        <div id="pmi-report" className="flex-1 overflow-y-auto bg-[#f1f5f9]">
+        {/* Documento / Slides */}
+        <div id="pmi-report" ref={reportRef}>
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 1 — PORTADA
               ─────────────────────────────────────────────────────────────── */}
-          <PortadaPage project={project} masterPlan={masterPlan} stats={stats} />
+          <PortadaPage project={project} masterPlan={masterPlan} stats={stats} company={company} />
 
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 2 — RESUMEN EJECUTIVO
@@ -265,6 +452,8 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
                 <GanttChart
                   startDate={masterPlan?.baseline_start ?? project.startDate}
                   tasks={ganttTasks}
+                  endDate={project.deadline}
+                  noAnimation
                 />
               </div>
             </div>
@@ -411,15 +600,31 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 7 — NOTAS Y HALLAZGOS + JUNTAS
               ─────────────────────────────────────────────────────────────── */}
-          <NotesAndMeetingsPage projectId={project.id} notes={notes} />
+          <NotesAndMeetingsPage notes={notes} meetings={meetings} />
 
           {/* ───────────────────────────────────────────────────────────────
               PÁGINA 8 — FIRMAS Y CIERRE
               ─────────────────────────────────────────────────────────────── */}
-          <SignaturePage project={project} />
+          <SignaturePage project={project} company={company} />
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+
+      {/* Barra de navegación de presentación */}
+      {mode === 'slides' && (
+        <div className="report-nav no-print-pmi flex items-center gap-2 px-2 py-1.5 rounded-full bg-white/95 shadow-lg border border-[var(--color-app-border)]">
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={goPrev} disabled={slideIndex === 0}>
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <span className="text-sm font-medium tabular-nums min-w-[60px] text-center">
+            {slideCount === 0 ? '–' : `${slideIndex + 1} / ${slideCount}`}
+          </span>
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={goNext} disabled={slideIndex >= slideCount - 1}>
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
+    </div>,
+    document.body
   );
 }
 
@@ -431,26 +636,34 @@ function PortadaPage({
   project,
   masterPlan,
   stats,
+  company,
 }: {
   project: ProjectReportProps['project'];
   masterPlan: ReturnType<typeof useMasterPlan>['data'];
   stats: { avgProgress: number; milestones: number; critical: number; total: number };
+  company: CompanySettings;
 }) {
+  const brandName = company.commercial_name || company.legal_name;
+  const brandInitial = brandName.trim().charAt(0).toUpperCase() || 'E';
   return (
     <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm relative overflow-hidden">
       {/* Banda superior */}
-      <div className="absolute top-0 left-0 right-0 h-2 bg-[#0369a1]" />
-      <div className="absolute top-2 left-0 right-0 h-1 bg-[#0ea5e9]" />
+      <div className="absolute top-0 left-0 right-0 h-2 bg-[var(--color-app-primary)]" />
+      <div className="absolute top-2 left-0 right-0 h-1 bg-[var(--color-app-primary-soft)]" />
 
       {/* Logo + ID */}
       <div className="flex items-start justify-between pt-12 mb-20">
         <div className="flex items-center gap-3">
-          <div className="h-14 w-14 rounded-md bg-[#0369a1] flex items-center justify-center text-white font-bold text-2xl shadow-sm">
-            K
-          </div>
+          {company.logo_url ? (
+            <img src={company.logo_url} alt={brandName} className="h-14 w-14 rounded-md object-cover shadow-sm bg-white" />
+          ) : (
+            <div className="h-14 w-14 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-2xl shadow-sm">
+              {brandInitial}
+            </div>
+          )}
           <div>
-            <p className="font-bold text-lg text-[#0f172a] leading-tight">Koji Code</p>
-            <p className="text-xs text-[#475569]">Manufactura CNC de precisión</p>
+            <p className="font-bold text-lg text-[#0f172a] leading-tight">{brandName}</p>
+            <p className="text-xs text-[#475569]">{company.tagline || ''}</p>
           </div>
         </div>
         <div className="text-right">
@@ -593,7 +806,9 @@ function ScoreboardPage({ tasks }: { tasks: ReturnType<typeof useMasterPlanTasks
     <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm">
       <PageHeader title="Scoreboard de etapas" subtitle="Estado detallado por actividad" />
 
-      <div className="border border-[#e2e8f0] rounded-lg overflow-hidden pmi-keep">
+      {/* Sin break-inside:avoid — si hay muchas actividades, la tabla pagina
+          fila por fila en lugar de cortarse o dejar una página en blanco. */}
+      <div className="border border-[#e2e8f0] rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-[#f8fafc]">
             <tr className="text-left text-xs text-[#475569]">
@@ -661,7 +876,14 @@ function ScoreboardPage({ tasks }: { tasks: ReturnType<typeof useMasterPlanTasks
   );
 }
 
-function SignaturePage({ project }: { project: ProjectReportProps['project'] }) {
+function SignaturePage({
+  project,
+  company,
+}: {
+  project: ProjectReportProps['project'];
+  company: CompanySettings;
+}) {
+  const brandName = company.commercial_name || company.legal_name;
   return (
     <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm">
       <PageHeader title="Cierre y firmas" subtitle="Validación del reporte" />
@@ -669,7 +891,7 @@ function SignaturePage({ project }: { project: ProjectReportProps['project'] }) 
       <div className="text-sm text-[#334155] mb-12 leading-relaxed">
         <p>
           Este documento es un reporte ejecutivo emitido por la oficina de gestión de proyectos (PMO)
-          de Koji Code para el proyecto <strong>{project.name}</strong> ({project.id}).
+          de {brandName} para el proyecto <strong>{project.name}</strong> ({project.id}).
         </p>
         <p className="mt-3">
           La información contenida es responsabilidad del manager del proyecto y del equipo de control
@@ -680,7 +902,7 @@ function SignaturePage({ project }: { project: ProjectReportProps['project'] }) 
 
       <div className="grid grid-cols-2 gap-12 mt-24 mb-16 pmi-keep">
         <Signature title="Responsable del proyecto" name={project.manager} />
-        <Signature title="Validación del PMI" name="Oficina PMO · Koji Code" />
+        <Signature title="Validación del PMI" name={`Oficina PMO · ${brandName}`} />
       </div>
 
       <div className="grid grid-cols-2 gap-12 pmi-keep">
@@ -690,8 +912,10 @@ function SignaturePage({ project }: { project: ProjectReportProps['project'] }) 
 
       <div className="absolute bottom-8 left-0 right-0 text-center text-xs text-[#94a3b8] mt-12">
         <p>
-          Koji Code ERP · Reporte PMI · {format(new Date(), 'yyyy', { locale: es })} ·
-          Documento emitido el {format(new Date(), 'dd/MM/yyyy HH:mm')}
+          {brandName}
+          {company.rfc ? ` · RFC ${company.rfc}` : ''} · Reporte PMI ·{' '}
+          {format(new Date(), 'yyyy', { locale: es })} · Documento emitido el{' '}
+          {format(new Date(), 'dd/MM/yyyy HH:mm')}
         </p>
       </div>
     </div>
@@ -791,14 +1015,12 @@ function Signature({ title, name }: { title: string; name: string }) {
 // ============================================================================
 
 function NotesAndMeetingsPage({
-  projectId,
   notes,
+  meetings,
 }: {
-  projectId: string;
   notes: ProjectNote[];
+  meetings: ProjectMeeting[];
 }) {
-  const { data: meetings } = useProjectMeetings(projectId);
-
   const noteTypeLabel: Record<string, string> = {
     note: 'Nota del equipo',
     system: 'Sistema',

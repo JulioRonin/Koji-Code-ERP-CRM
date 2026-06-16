@@ -7,12 +7,17 @@ import {
   Loader2,
   AlertTriangle,
   Info,
+  X,
 } from 'lucide-react';
 import { format, parseISO, addDays, differenceInCalendarDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useUpdateMasterPlanTaskProgress, useUpdateMasterPlanTaskDates } from '@/lib/api';
+import {
+  useUpdateMasterPlanTaskProgress,
+  useUpdateMasterPlanTaskDates,
+  useUpdateMasterPlanTaskDependencies,
+} from '@/lib/api';
 import type { MasterPlanTask } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -43,10 +48,44 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
   const [savedFlash, setSavedFlash] = useState<string | null>(null); // task.id que acaba de guardarse
   const { update } = useUpdateMasterPlanTaskProgress();
   const { update: updateDates, loading: savingDates } = useUpdateMasterPlanTaskDates();
+  const { update: updateDeps } = useUpdateMasterPlanTaskDependencies();
 
   // Optimistic UI: progreso local mientras llega la respuesta
   const [localProgress, setLocalProgress] = useState<Record<string, number>>({});
   const [editingDates, setEditingDates] = useState<Record<string, { start: string; end: string }>>({});
+  const [depBusyId, setDepBusyId] = useState<string | null>(null);
+
+  // Quita una dependencia de una tarea y persiste.
+  const handleRemoveDependency = async (task: MasterPlanTask, depWbs: string) => {
+    setDepBusyId(task.id);
+    setError(null);
+    try {
+      const next = (task.dependencies ?? []).filter(d => d !== depWbs);
+      await updateDeps(task.id, next);
+      await onUpdated?.();
+    } catch (err) {
+      setError((err as Error).message || 'No se pudo quitar la dependencia.');
+    } finally {
+      setDepBusyId(null);
+    }
+  };
+
+  // Agrega una dependencia (otra actividad del plan) y persiste.
+  const handleAddDependency = async (task: MasterPlanTask, depWbs: string) => {
+    if (!depWbs) return;
+    const current = task.dependencies ?? [];
+    if (current.includes(depWbs)) return;
+    setDepBusyId(task.id);
+    setError(null);
+    try {
+      await updateDeps(task.id, [...current, depWbs]);
+      await onUpdated?.();
+    } catch (err) {
+      setError((err as Error).message || 'No se pudo agregar la dependencia.');
+    } finally {
+      setDepBusyId(null);
+    }
+  };
 
   /** Duración en días entre dos fechas YYYY-MM-DD (inclusive). */
   const durationDays = (start: string, end: string): number => {
@@ -437,20 +476,72 @@ export function MasterPlanTaskList({ tasks, onUpdated }: Props) {
                   );
                 })()}
 
-                {task.dependencies && task.dependencies.length > 0 && (
-                  <div className="pt-1">
-                    <span className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
-                      Depende de
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                      {task.dependencies.map(d => (
-                        <Badge key={d} variant="outline" className="font-mono text-[10px]">
-                          {d}
-                        </Badge>
-                      ))}
-                    </div>
+                {/* Dependencias — editables: quitar con la X, agregar con el selector */}
+                <div className="pt-2 border-t border-[var(--color-app-border)]">
+                  <span className="flex items-center justify-between text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
+                    Depende de
+                    {depBusyId === task.id && (
+                      <Loader2 className="h-3 w-3 animate-spin text-[var(--color-app-primary)]" />
+                    )}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {(task.dependencies ?? []).length === 0 && (
+                      <span className="text-[10px] text-[var(--color-app-text-subtle)] italic">
+                        Sin dependencias
+                      </span>
+                    )}
+                    {(task.dependencies ?? []).map(d => (
+                      <span
+                        key={d}
+                        className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md border border-[var(--color-app-border)] bg-white font-mono text-[10px]"
+                      >
+                        {d}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDependency(task, d)}
+                          disabled={depBusyId === task.id}
+                          title={`Quitar dependencia ${d}`}
+                          className="p-0.5 rounded hover:bg-[var(--color-app-danger-soft)] text-[var(--color-app-text-muted)] hover:text-[var(--color-app-danger)] disabled:opacity-50"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </span>
+                    ))}
+
+                    {/* Agregar dependencia: actividades del plan que aún no son dependencia
+                        y que no son la propia tarea */}
+                    {(() => {
+                      const candidates = tasks.filter(
+                        t =>
+                          t.wbs_code !== task.wbs_code &&
+                          !(task.dependencies ?? []).includes(t.wbs_code)
+                      );
+                      if (candidates.length === 0) return null;
+                      return (
+                        <select
+                          value=""
+                          onChange={e => {
+                            handleAddDependency(task, e.target.value);
+                            e.target.value = '';
+                          }}
+                          disabled={depBusyId === task.id}
+                          className="h-6 px-1.5 rounded-md border border-dashed border-[var(--color-app-border-strong)] bg-white text-[10px] text-[var(--color-app-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 disabled:opacity-50"
+                          title="Agregar dependencia"
+                        >
+                          <option value="">+ dependencia</option>
+                          {candidates.map(c => (
+                            <option key={c.id} value={c.wbs_code}>
+                              {c.wbs_code} · {c.name.slice(0, 28)}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
                   </div>
-                )}
+                  <p className="text-[10px] text-[var(--color-app-text-subtle)] mt-1 leading-snug">
+                    Quitar una dependencia libera la actividad; ajusta las fechas si lo necesitas.
+                  </p>
+                </div>
               </div>
             )}
           </div>

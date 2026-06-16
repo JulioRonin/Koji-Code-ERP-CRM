@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar,
+  Download,
   Clock,
   User,
   CheckCircle2,
@@ -18,6 +19,7 @@ import {
   Loader2,
   Flag,
   AlertTriangle,
+  ShoppingCart,
 } from 'lucide-react';
 import { format, isValid, parseISO, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -44,6 +46,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { GanttChart } from '@/components/projects/GanttChart';
+import { GanttPrint } from '@/components/projects/GanttPrint';
 import { ProjectReport } from '@/components/projects/ProjectReport';
 import { MasterPlanWizard } from '@/components/projects/MasterPlanWizard';
 import { MasterPlanTaskList } from '@/components/projects/MasterPlanTaskList';
@@ -61,6 +64,7 @@ import {
   useMasterPlan,
   useMasterPlanTasks,
   useBomItems,
+  summarizePurchasing,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { ProjectStatus, MasterPlanTask, ProjectTask } from '@/types/database';
@@ -109,11 +113,12 @@ export function ProjectDetails() {
   const { add: addNote } = useAddProjectNote();
 
   const { data: masterPlan, refetch: refetchMasterPlan } = useMasterPlan(id);
-  const { data: masterPlanTasks } = useMasterPlanTasks(masterPlan?.id);
+  const { data: masterPlanTasks, refetch: refetchMasterPlanTasks } = useMasterPlanTasks(masterPlan?.id);
 
   const [newNote, setNewNote] = useState('');
   const [newTaskName, setNewTaskName] = useState('');
   const [isMasterPlanOpen, setIsMasterPlanOpen] = useState(false);
+  const [isGanttPrintOpen, setIsGanttPrintOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(searchParams.get('wizard') === '1');
@@ -132,6 +137,7 @@ export function ProjectDetails() {
 
   // ── Cálculos derivados ──────────────────────────────────────────────────
   const completedTasks = useMemo(() => tasks.filter(t => t.status === 'completed').length, [tasks]);
+  const purchasingSummary = useMemo(() => summarizePurchasing(bomItems), [bomItems]);
 
   const ganttTasks = useMemo(() => {
     if (!masterPlan && tasks.filter(t => t.start_date && t.end_date).length === 0) return [];
@@ -186,7 +192,10 @@ export function ProjectDetails() {
         };
       });
 
-    return [...fromPlan, ...fromTasks];
+    // Ordenadas por fecha de inicio (y, a igualdad, por la que termina antes).
+    return [...fromPlan, ...fromTasks].sort(
+      (a, b) => a.startDay - b.startDay || a.startDay + a.duration - (b.startDay + b.duration)
+    );
   }, [masterPlan, masterPlanTasks, tasks, project?.start_date]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
@@ -382,6 +391,39 @@ export function ProjectDetails() {
                 <Progress value={project.progress} className="h-2" />
               </div>
 
+              {bomItems.length > 0 && (
+                <div className="p-3 rounded-md border border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)]/40 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1.5 text-[var(--color-app-text-muted)]">
+                      <ShoppingCart className="h-3.5 w-3.5" /> Avance de compras
+                    </span>
+                    <span className="font-medium">
+                      {purchasingSummary.progress_pct}%{' '}
+                      <span className="text-xs text-[var(--color-app-text-muted)] font-normal">
+                        ({purchasingSummary.received_items}/{purchasingSummary.total_items})
+                      </span>
+                    </span>
+                  </div>
+                  <Progress value={purchasingSummary.progress_pct} className="h-1.5" />
+                  <div className="flex items-center justify-between text-xs text-[var(--color-app-text-muted)] flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-2 flex-wrap">
+                      <span><strong>{purchasingSummary.pending_items}</strong> pendientes</span>
+                      <span>·</span>
+                      <span><strong>{purchasingSummary.requested_items}</strong> solicitados</span>
+                      <span>·</span>
+                      <span><strong>{purchasingSummary.in_transit_items}</strong> en tránsito</span>
+                    </span>
+                    {purchasingSummary.late_items > 0 ? (
+                      <span className="text-[var(--color-app-warning)] flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> {purchasingSummary.late_items} atrasadas
+                      </span>
+                    ) : (
+                      <span>Sin atrasos</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {project.description && (
                 <div className="p-4 rounded-md bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)]">
                   <p className="text-xs text-[var(--color-app-text-muted)] flex items-center gap-1.5 mb-1.5">
@@ -433,8 +475,8 @@ export function ProjectDetails() {
             </Card>
           )}
 
-          {/* Calendario de juntas (si existen) */}
-          <MeetingsCard projectId={project.id} />
+          {/* Calendario de juntas (generar / editar) */}
+          <MeetingsCard project={project} />
 
           {/* Plan de trabajo — si hay master plan, muestra sus activities editables;
               si no, las tareas ad-hoc del proyecto. */}
@@ -454,8 +496,13 @@ export function ProjectDetails() {
                 <MasterPlanTaskList
                   tasks={masterPlanTasks}
                   onUpdated={async () => {
-                    // Refresca el proyecto para reflejar el nuevo % global
-                    await Promise.all([refetchProject(), refetchMasterPlan()]);
+                    // Refresca tareas (fechas / avance), el plan (baseline_end)
+                    // y el proyecto (% global recalculado).
+                    await Promise.all([
+                      refetchMasterPlanTasks(),
+                      refetchMasterPlan(),
+                      refetchProject(),
+                    ]);
                   }}
                 />
               </CardContent>
@@ -588,18 +635,30 @@ export function ProjectDetails() {
 
       {/* Master Plan dialog (Gantt completo) */}
       <Dialog open={isMasterPlanOpen} onOpenChange={setIsMasterPlanOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
-          <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
-            <DialogTitle>Master Plan · Gantt</DialogTitle>
-            <DialogDescription>
-              {masterPlan
-                ? `${masterPlan.template_used} · ${masterPlan.methodology} · ${project.id}`
-                : 'Sin plan generado'}
-            </DialogDescription>
+        <DialogContent className="max-w-7xl w-[96vw] max-h-[92vh] p-0 overflow-hidden flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0 flex flex-row items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Master Plan · Gantt</DialogTitle>
+              <DialogDescription>
+                {masterPlan
+                  ? `${masterPlan.template_used} · ${masterPlan.methodology} · ${project.id}`
+                  : 'Sin plan generado'}
+              </DialogDescription>
+            </div>
+            {ganttTasks.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setIsGanttPrintOpen(true)} className="shrink-0 mr-6">
+                <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
+              </Button>
+            )}
           </DialogHeader>
           <div className="flex-1 overflow-auto px-6 pb-6">
             {ganttTasks.length > 0 ? (
-              <GanttChart startDate={masterPlan?.baseline_start ?? project.start_date} tasks={ganttTasks} />
+              <GanttChart
+                startDate={masterPlan?.baseline_start ?? project.start_date}
+                tasks={ganttTasks}
+                endDate={project.deadline}
+                scrollable
+              />
             ) : (
               <p className="text-sm text-[var(--color-app-text-muted)] text-center py-8">
                 Aún no hay actividades en el Master Plan.
@@ -608,6 +667,19 @@ export function ProjectDetails() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {isGanttPrintOpen && ganttTasks.length > 0 && (
+        <GanttPrint
+          startDate={masterPlan?.baseline_start ?? project.start_date}
+          tasks={ganttTasks}
+          endDate={project.deadline}
+          title={`Cronograma · ${project.name}`}
+          subtitle={`${project.id}${masterPlan ? ` · ${masterPlan.methodology}` : ''} · Entrega ${
+            isValid(parseISO(project.deadline)) ? format(parseISO(project.deadline), 'dd MMM yyyy', { locale: es }) : '—'
+          }`}
+          onClose={() => setIsGanttPrintOpen(false)}
+        />
+      )}
 
       <ProjectReport
         isOpen={isReportOpen}
