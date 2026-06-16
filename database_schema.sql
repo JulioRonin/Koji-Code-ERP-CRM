@@ -1028,6 +1028,22 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Calidad y Producción pueden actualizar bom_items (cambian
+-- manufacturing_status durante el flujo: enviar a calidad, aprobar/liberar
+-- TERMINADO, rechazar). Sin esto, un usuario de Calidad daba click en
+-- "Aprobar" y la pieza no cambiaba de estatus (RLS bloqueaba el UPDATE).
+DROP POLICY IF EXISTS "quality update bom" ON public.bom_items;
+CREATE POLICY "quality update bom" ON public.bom_items
+    FOR UPDATE TO authenticated
+    USING (public.is_quality())
+    WITH CHECK (public.is_quality());
+
+DROP POLICY IF EXISTS "production update bom" ON public.bom_items;
+CREATE POLICY "production update bom" ON public.bom_items
+    FOR UPDATE TO authenticated
+    USING (public.is_production())
+    WITH CHECK (public.is_production());
+
 -- Cualquier autenticado puede mandar mensajes y abrir time entries
 DROP POLICY IF EXISTS "send chat" ON public.chat_messages;
 CREATE POLICY "send chat" ON public.chat_messages
