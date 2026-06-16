@@ -256,7 +256,17 @@ export function useUpdateMeeting() {
           .update({ ...patch, updated_at: now })
           .eq('id', meetingId)
           .select('id');
-        if (error) throw error;
+        if (error) {
+          const m = (error.message || '').toLowerCase();
+          if (m.includes('minutes') && (m.includes('column') || m.includes('schema cache'))) {
+            throw new Error(
+              'Falta la columna "minutes" en la tabla project_meetings. Corre en Supabase: ' +
+                'ALTER TABLE public.project_meetings ADD COLUMN IF NOT EXISTS minutes JSONB; ' +
+                "y luego NOTIFY pgrst, 'reload schema';"
+            );
+          }
+          throw error;
+        }
         if (!data || data.length === 0) {
           throw new Error('No se pudo actualizar la junta. Verifica tu profiles.role en Supabase.');
         }

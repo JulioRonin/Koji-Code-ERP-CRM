@@ -368,6 +368,10 @@ export interface MeetingMinute {
   intro: string;
   topics: string;
   closing: string;
+  /** Cuerpo enriquecido (HTML) editable: negritas, listas, tablas, imágenes.
+   *  Es la fuente de verdad del documento; intro/topics/closing quedan como
+   *  semillas/legado para regenerar. */
+  bodyHtml?: string;
   // Metadatos
   generatedAt: string;
   updatedAt: string;

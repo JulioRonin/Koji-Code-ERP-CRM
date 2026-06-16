@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
+import { RICH_CONTENT_CSS } from '@/components/ui/RichTextEditor';
+import { legacyToBodyHtml } from '@/lib/meetingMinutes';
 import type { MeetingMinute, Project, ProjectMeeting } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -26,8 +28,8 @@ export function MeetingMinutePrint({ minute, meeting, project, onClose }: Props)
     };
   }, []);
 
-  const paragraphs = (text: string) =>
-    text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  // Cuerpo enriquecido: usa bodyHtml; si es una minuta vieja, lo reconstruye.
+  const bodyHtml = minute.bodyHtml || legacyToBodyHtml(minute);
 
   return createPortal(
     <div id="minute-report-root">
@@ -45,7 +47,9 @@ export function MeetingMinutePrint({ minute, meeting, project, onClose }: Props)
         @media print {
           @page { size: letter portrait; margin: 16mm; }
           html, body { background: white !important; height: auto !important; min-height: 0 !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; }
-          body > #root { display: none !important; }
+          /* Oculta TODO lo que cuelga de body (incluido el modal de edición,
+             que es otro portal) y deja solo el documento a imprimir. */
+          body > * { display: none !important; }
           body > #minute-report-root { position: static !important; inset: auto !important; background: white !important; overflow: visible !important; display: block !important; }
           .min-toolbar { display: none !important; }
           .min-stage { max-width: none !important; padding: 0 !important; margin: 0 !important; }
@@ -53,10 +57,7 @@ export function MeetingMinutePrint({ minute, meeting, project, onClose }: Props)
           .min-keep { page-break-inside: avoid; break-inside: avoid; }
           tr { page-break-inside: avoid; }
         }
-        #minute-report-root p { line-height: 1.6; }
-        #minute-report-root table { border-collapse: collapse; width: 100%; }
-        #minute-report-root th, #minute-report-root td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 12px; text-align: left; vertical-align: top; }
-        #minute-report-root th { background: #f1f5f9; font-weight: 600; }
+        ${RICH_CONTENT_CSS}
       `}</style>
 
       <div className="min-stage">
@@ -101,63 +102,8 @@ export function MeetingMinutePrint({ minute, meeting, project, onClose }: Props)
             <Field label="Participantes" value={minute.attendees.length ? minute.attendees.join(', ') : '—'} />
           </div>
 
-          {/* Introducción */}
-          <Section title="Introducción">
-            {paragraphs(minute.intro).map((p, i) => (
-              <p key={i} style={paraStyle}>{p}</p>
-            ))}
-          </Section>
-
-          {/* Temas tratados */}
-          <Section title="Temas tratados">
-            {paragraphs(minute.topics).map((p, i) => (
-              <p key={i} style={paraStyle}>{p}</p>
-            ))}
-          </Section>
-
-          {/* Acuerdos */}
-          {minute.agreements.length > 0 && (
-            <Section title="Acuerdos">
-              <ol style={{ margin: 0, paddingLeft: 20 }}>
-                {minute.agreements.map((a, i) => (
-                  <li key={i} style={{ fontSize: 12, color: '#1e293b', marginBottom: 5, lineHeight: 1.5 }}>{a}</li>
-                ))}
-              </ol>
-            </Section>
-          )}
-
-          {/* Compromisos / próximos pasos */}
-          {minute.actionItems.length > 0 && (
-            <Section title="Compromisos y próximos pasos">
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ width: '8%', textAlign: 'center' }}>#</th>
-                    <th>Compromiso</th>
-                    <th style={{ width: '24%' }}>Responsable</th>
-                    <th style={{ width: '20%' }}>Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {minute.actionItems.map((it, i) => (
-                    <tr key={i}>
-                      <td style={{ textAlign: 'center' }}>{i + 1}</td>
-                      <td>{it.task}</td>
-                      <td>{it.owner || '—'}</td>
-                      <td>{it.due || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Section>
-          )}
-
-          {/* Cierre */}
-          <Section title="Conclusión">
-            {paragraphs(minute.closing).map((p, i) => (
-              <p key={i} style={paraStyle}>{p}</p>
-            ))}
-          </Section>
+          {/* Cuerpo enriquecido (editable: negritas, listas, tablas, imágenes) */}
+          <div className="rte-content" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
 
           {/* Firmas */}
           <div className="min-keep" style={{ marginTop: 40, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
@@ -175,20 +121,8 @@ export function MeetingMinutePrint({ minute, meeting, project, onClose }: Props)
   );
 }
 
-const paraStyle: React.CSSProperties = { fontSize: 12, color: '#1e293b', marginBottom: 10 };
 const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, background: '#2563eb', color: 'white', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600 };
 const btnGhost: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'white', color: '#0f172a', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600 };
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="min-keep" style={{ marginBottom: 18 }}>
-      <h2 style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
-}
 
 function Field({ label, value }: { label: string; value: string }) {
   return (

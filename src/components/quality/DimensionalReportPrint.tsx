@@ -54,7 +54,7 @@ export function DimensionalReportPrint({ report, item, projectName, baseImage, o
         @media print {
           @page { size: letter portrait; margin: 12mm; }
           html, body { background: white !important; height: auto !important; min-height: 0 !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; }
-          body > #root { display: none !important; }
+          body > * { display: none !important; }
           body > #dim-report-root { position: static !important; inset: auto !important; background: white !important; overflow: visible !important; display: block !important; }
           .dim-toolbar { display: none !important; }
           .dim-stage { max-width: none !important; padding: 0 !important; margin: 0 !important; }

@@ -2,21 +2,12 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import {
-  X,
-  Sparkles,
-  Save,
-  Printer,
-  Plus,
-  Trash2,
-  ArrowLeft,
-  Loader2,
-  Wand2,
-} from 'lucide-react';
+import { X, Sparkles, Save, Printer, ArrowLeft, Loader2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUpdateMeeting } from '@/lib/api';
-import { composeMinute, splitLines, parseActionItem } from '@/lib/meetingMinutes';
+import { composeBodyHtml, legacyToBodyHtml, splitLines, parseActionItem } from '@/lib/meetingMinutes';
 import type { MinuteContext } from '@/lib/meetingMinutes';
 import type { MeetingMinute, MinuteActionItem, Project, ProjectMeeting } from '@/types/database';
 import { MeetingMinutePrint } from './MeetingMinutePrint';
@@ -52,7 +43,7 @@ export function MeetingMinuteModal({ meeting, project, onClose, onSaved }: Props
   const [error, setError] = useState<string | null>(null);
   const [markRealized, setMarkRealized] = useState(meeting.status === 'Programada');
 
-  // ── Datos de entrada ("prompt") ──
+  // Datos de entrada ("prompt") / semillas para (re)generar
   const [purpose, setPurpose] = useState(existing?.purpose ?? '');
   const [discussion, setDiscussion] = useState(existing?.discussion ?? '');
   const [attendeesText, setAttendeesText] = useState(
@@ -66,44 +57,39 @@ export function MeetingMinuteModal({ meeting, project, onClose, onSaved }: Props
   );
   const [location, setLocation] = useState(existing?.location ?? '');
 
-  // ── Documento generado / editable ──
-  const [title, setTitle] = useState(existing?.title ?? '');
-  const [intro, setIntro] = useState(existing?.intro ?? '');
-  const [topics, setTopics] = useState(existing?.topics ?? '');
-  const [closing, setClosing] = useState(existing?.closing ?? '');
+  // Documento (metadatos estructurados + cuerpo enriquecido)
+  const [title, setTitle] = useState(existing?.title ?? `Minuta — ${meeting.title}`);
+  const [attendees, setAttendees] = useState<string[]>(existing?.attendees ?? meeting.attendees ?? []);
   const [agreements, setAgreements] = useState<string[]>(existing?.agreements ?? []);
   const [actionItems, setActionItems] = useState<MinuteActionItem[]>(existing?.actionItems ?? []);
-  const [attendees, setAttendees] = useState<string[]>(existing?.attendees ?? meeting.attendees ?? []);
+  const [bodyHtml, setBodyHtml] = useState<string>(
+    existing?.bodyHtml ?? (existing ? legacyToBodyHtml(existing) : '')
+  );
+  const [bodyKey, setBodyKey] = useState(0);
 
-  const parseAttendees = (s: string) =>
-    s.split(/[\n,]/).map(a => a.trim()).filter(Boolean);
+  const parseAttendees = (s: string) => s.split(/[\n,]/).map(a => a.trim()).filter(Boolean);
 
   const handleGenerate = () => {
     const att = parseAttendees(attendeesText);
     const agr = splitLines(agreementsText);
     const acts = splitLines(actionsText).map(parseActionItem);
-    const doc = composeMinute(
-      { purpose, discussion, attendees: att, agreements: agr, actionItems: acts, location },
-      ctx
-    );
-    setTitle(doc.title);
-    setIntro(doc.intro);
-    setTopics(doc.topics);
-    setClosing(doc.closing);
+    setAttendees(att);
     setAgreements(agr);
     setActionItems(acts);
-    setAttendees(att);
+    setBodyHtml(composeBodyHtml({ purpose, discussion, attendees: att, agreements: agr, actionItems: acts, location }, ctx));
+    setBodyKey(k => k + 1);
     setPhase('edit');
   };
 
   const handleRegenerate = () => {
-    const doc = composeMinute(
-      { purpose, discussion, attendees, agreements, actionItems, location },
-      ctx
-    );
-    setIntro(doc.intro);
-    setTopics(doc.topics);
-    setClosing(doc.closing);
+    if (
+      bodyHtml.trim() &&
+      !window.confirm('Esto reemplazará el cuerpo actual con una redacción nueva basada en los datos capturados. ¿Continuar?')
+    ) {
+      return;
+    }
+    setBodyHtml(composeBodyHtml({ purpose, discussion, attendees, agreements, actionItems, location }, ctx));
+    setBodyKey(k => k + 1);
   };
 
   const currentMinute = (): MeetingMinute => ({
@@ -114,9 +100,10 @@ export function MeetingMinuteModal({ meeting, project, onClose, onSaved }: Props
     actionItems,
     location: location || undefined,
     title,
-    intro,
-    topics,
-    closing,
+    intro: '',
+    topics: '',
+    closing: '',
+    bodyHtml,
     generatedAt: existing?.generatedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
@@ -134,18 +121,12 @@ export function MeetingMinuteModal({ meeting, project, onClose, onSaved }: Props
     }
   };
 
-  // ── Editores de listas ──
-  const setAgreement = (i: number, v: string) =>
-    setAgreements(prev => prev.map((a, idx) => (idx === i ? v : a)));
-  const setAction = (i: number, patch: Partial<MinuteActionItem>) =>
-    setActionItems(prev => prev.map((a, idx) => (idx === i ? { ...a, ...patch } : a)));
-
   return createPortal(
     <div className="fixed inset-0 z-[70] bg-[rgba(15,23,42,0.6)] overflow-y-auto">
       <div className="min-h-full flex items-start justify-center p-4">
         <div className="w-full max-w-3xl bg-white rounded-xl shadow-2xl my-4">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-app-border)] sticky top-0 bg-white rounded-t-xl z-10">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-app-border)] sticky top-0 bg-white rounded-t-xl z-20">
             <div className="min-w-0">
               <h2 className="text-base font-semibold text-[var(--color-app-text)] flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[var(--color-app-primary)]" />
@@ -169,67 +150,45 @@ export function MeetingMinuteModal({ meeting, project, onClose, onSaved }: Props
           {phase === 'input' ? (
             <div className="p-6 space-y-4">
               <p className="text-sm text-[var(--color-app-text-muted)]">
-                Describe la junta como si se lo contaras a un colega. Con esos datos generamos una
-                minuta profesional y empática que podrás <strong>editar</strong> antes de exportar a PDF.
+                Describe la junta como si se lo contaras a un colega. Generamos un borrador
+                profesional y empático que luego podrás <strong>dar formato</strong> (negritas, listas,
+                tablas, imágenes) antes de exportar a PDF.
               </p>
 
               <Field label="Propósito de la junta">
-                <textarea
-                  value={purpose}
-                  onChange={e => setPurpose(e.target.value)}
-                  rows={2}
+                <textarea value={purpose} onChange={e => setPurpose(e.target.value)} rows={2}
                   placeholder="Ej. revisar el avance de fabricación del lote IBA-02 y definir la fecha de entrega."
-                  className={inputCls}
-                />
+                  className={inputCls} />
               </Field>
 
               <Field label="¿Qué se discutió? (contexto y detalles)">
-                <textarea
-                  value={discussion}
-                  onChange={e => setDiscussion(e.target.value)}
-                  rows={5}
-                  placeholder={'Escribe libremente o una idea por línea:\n- Se presentó el avance del 60% en producción\n- El cliente solicitó adelantar la inspección dimensional\n- Se revisaron los planos rev. C'}
-                  className={inputCls}
-                />
+                <textarea value={discussion} onChange={e => setDiscussion(e.target.value)} rows={5}
+                  placeholder={'Escribe libremente o una idea por línea:\n- Se presentó el avance del 60% en producción\n- El cliente solicitó adelantar la inspección dimensional'}
+                  className={inputCls} />
               </Field>
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <Field label="Acuerdos (uno por línea)">
-                  <textarea
-                    value={agreementsText}
-                    onChange={e => setAgreementsText(e.target.value)}
-                    rows={4}
+                  <textarea value={agreementsText} onChange={e => setAgreementsText(e.target.value)} rows={4}
                     placeholder={'Entregar reporte dimensional el viernes\nCongelar cambios de ingeniería'}
-                    className={inputCls}
-                  />
+                    className={inputCls} />
                 </Field>
                 <Field label="Compromisos / próximos pasos">
-                  <textarea
-                    value={actionsText}
-                    onChange={e => setActionsText(e.target.value)}
-                    rows={4}
+                  <textarea value={actionsText} onChange={e => setActionsText(e.target.value)} rows={4}
                     placeholder={'tarea — responsable — fecha\nEnviar muestras — Mario — 20 jun'}
-                    className={inputCls}
-                  />
+                    className={inputCls} />
+                  <p className="text-[10px] text-[var(--color-app-text-subtle)] mt-1">
+                    Formato por línea: <strong>compromiso — responsable — fecha</strong>
+                  </p>
                 </Field>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <Field label="Participantes (separados por coma)">
-                  <input
-                    value={attendeesText}
-                    onChange={e => setAttendeesText(e.target.value)}
-                    placeholder="PM, Cliente, Producción"
-                    className={inputCls}
-                  />
+                  <input value={attendeesText} onChange={e => setAttendeesText(e.target.value)} placeholder="PM, Cliente, Producción" className={inputCls} />
                 </Field>
                 <Field label="Lugar / modalidad (opcional)">
-                  <input
-                    value={location}
-                    onChange={e => setLocation(e.target.value)}
-                    placeholder="Videollamada / Sala de juntas"
-                    className={inputCls}
-                  />
+                  <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Videollamada / Sala de juntas" className={inputCls} />
                 </Field>
               </div>
 
@@ -241,12 +200,9 @@ export function MeetingMinuteModal({ meeting, project, onClose, onSaved }: Props
               </div>
             </div>
           ) : (
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <button
-                  onClick={() => setPhase('input')}
-                  className="inline-flex items-center gap-1 text-sm text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]"
-                >
+                <button onClick={() => setPhase('input')} className="inline-flex items-center gap-1 text-sm text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]">
                   <ArrowLeft className="h-3.5 w-3.5" /> Editar datos
                 </button>
                 <Button variant="outline" size="sm" onClick={handleRegenerate}>
@@ -254,68 +210,28 @@ export function MeetingMinuteModal({ meeting, project, onClose, onSaved }: Props
                 </Button>
               </div>
 
-              <Field label="Título">
+              <Field label="Título del documento">
                 <input value={title} onChange={e => setTitle(e.target.value)} className={inputCls} />
               </Field>
 
-              <Field label="Introducción">
-                <textarea value={intro} onChange={e => setIntro(e.target.value)} rows={4} className={inputCls} />
-              </Field>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Participantes (coma)">
+                  <input
+                    value={attendees.join(', ')}
+                    onChange={e => setAttendees(parseAttendees(e.target.value))}
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="Lugar / modalidad">
+                  <input value={location} onChange={e => setLocation(e.target.value)} className={inputCls} />
+                </Field>
+              </div>
 
-              <Field label="Temas tratados">
-                <textarea value={topics} onChange={e => setTopics(e.target.value)} rows={6} className={inputCls} />
+              <Field label="Cuerpo de la minuta">
+                <RichTextEditor initialHtml={bodyHtml} resetKey={bodyKey} onChange={setBodyHtml} minHeight={320} />
                 <p className="text-[10px] text-[var(--color-app-text-subtle)] mt-1">
-                  Separa con una línea en blanco para crear párrafos.
+                  Usa la barra para negritas, títulos, listas, alineación, e insertar tablas o imágenes.
                 </p>
-              </Field>
-
-              {/* Acuerdos */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className={labelCls}>Acuerdos</label>
-                  <button onClick={() => setAgreements(p => [...p, ''])} className="text-xs text-[var(--color-app-primary)] inline-flex items-center gap-1">
-                    <Plus className="h-3 w-3" /> Agregar
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {agreements.length === 0 && <p className="text-xs text-[var(--color-app-text-subtle)]">Sin acuerdos.</p>}
-                  {agreements.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-xs text-[var(--color-app-text-muted)] w-4 text-right">{i + 1}.</span>
-                      <input value={a} onChange={e => setAgreement(i, e.target.value)} className={inputCls} />
-                      <button onClick={() => setAgreements(p => p.filter((_, idx) => idx !== i))} className="text-[var(--color-app-text-subtle)] hover:text-[var(--color-app-danger)]">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Compromisos */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className={labelCls}>Compromisos y próximos pasos</label>
-                  <button onClick={() => setActionItems(p => [...p, { task: '' }])} className="text-xs text-[var(--color-app-primary)] inline-flex items-center gap-1">
-                    <Plus className="h-3 w-3" /> Agregar
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {actionItems.length === 0 && <p className="text-xs text-[var(--color-app-text-subtle)]">Sin compromisos.</p>}
-                  {actionItems.map((it, i) => (
-                    <div key={i} className="flex items-center gap-1.5">
-                      <input value={it.task} onChange={e => setAction(i, { task: e.target.value })} placeholder="Compromiso" className={`${inputCls} flex-[2]`} />
-                      <input value={it.owner ?? ''} onChange={e => setAction(i, { owner: e.target.value })} placeholder="Responsable" className={`${inputCls} flex-1`} />
-                      <input value={it.due ?? ''} onChange={e => setAction(i, { due: e.target.value })} placeholder="Fecha" className={`${inputCls} w-24`} />
-                      <button onClick={() => setActionItems(p => p.filter((_, idx) => idx !== i))} className="text-[var(--color-app-text-subtle)] hover:text-[var(--color-app-danger)]">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <Field label="Conclusión">
-                <textarea value={closing} onChange={e => setClosing(e.target.value)} rows={4} className={inputCls} />
               </Field>
 
               {meeting.status === 'Programada' && (
@@ -354,12 +270,11 @@ export function MeetingMinuteModal({ meeting, project, onClose, onSaved }: Props
 
 const inputCls =
   'w-full px-2.5 py-1.5 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm text-[var(--color-app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]';
-const labelCls = 'block text-xs font-medium text-[var(--color-app-text)]';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className={labelCls}>{label}</label>
+      <label className="block text-xs font-medium text-[var(--color-app-text)]">{label}</label>
       {children}
     </div>
   );

@@ -101,6 +101,87 @@ export function composeMinute(input: MinuteInput, ctx: MinuteContext): {
   };
 }
 
+// ── Generación del cuerpo enriquecido (HTML) ──────────────────────────────
+
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Convierte texto plano (párrafos separados por línea en blanco) en <p>. */
+function paragraphsToHtml(text: string): string {
+  const paras = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  if (paras.length === 0) return '';
+  return paras.map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('');
+}
+
+/**
+ * Documento HTML profesional (editable) con secciones, lista de acuerdos y
+ * tabla de compromisos. Es lo que se carga en el editor enriquecido.
+ */
+export function composeBodyHtml(input: MinuteInput, ctx: MinuteContext): string {
+  const doc = composeMinute(input, ctx);
+  let html = '';
+  html += `<h2>Introducción</h2>${paragraphsToHtml(doc.intro)}`;
+  html += `<h2>Temas tratados</h2>${paragraphsToHtml(doc.topics)}`;
+
+  if (input.agreements.length > 0) {
+    html += `<h2>Acuerdos</h2><ol>${input.agreements
+      .map(a => `<li>${escapeHtml(a)}</li>`)
+      .join('')}</ol>`;
+  }
+
+  if (input.actionItems.length > 0) {
+    const rows = input.actionItems
+      .map(
+        (it, i) =>
+          `<tr><td>${i + 1}</td><td>${escapeHtml(it.task)}</td><td>${escapeHtml(
+            it.owner || ''
+          )}</td><td>${escapeHtml(it.due || '')}</td></tr>`
+      )
+      .join('');
+    html +=
+      `<h2>Compromisos y próximos pasos</h2>` +
+      `<table><thead><tr><th>#</th><th>Compromiso</th><th>Responsable</th><th>Fecha</th></tr></thead>` +
+      `<tbody>${rows}</tbody></table>`;
+  }
+
+  html += `<h2>Conclusión</h2>${paragraphsToHtml(doc.closing)}`;
+  return html;
+}
+
+/** Reconstruye el HTML a partir de una minuta vieja (sin bodyHtml). */
+export function legacyToBodyHtml(m: {
+  intro?: string;
+  topics?: string;
+  closing?: string;
+  agreements?: string[];
+  actionItems?: MinuteActionItem[];
+}): string {
+  let html = '';
+  if (m.intro) html += `<h2>Introducción</h2>${paragraphsToHtml(m.intro)}`;
+  if (m.topics) html += `<h2>Temas tratados</h2>${paragraphsToHtml(m.topics)}`;
+  if (m.agreements && m.agreements.length > 0) {
+    html += `<h2>Acuerdos</h2><ol>${m.agreements.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ol>`;
+  }
+  if (m.actionItems && m.actionItems.length > 0) {
+    const rows = m.actionItems
+      .map(
+        (it, i) =>
+          `<tr><td>${i + 1}</td><td>${escapeHtml(it.task)}</td><td>${escapeHtml(it.owner || '')}</td><td>${escapeHtml(it.due || '')}</td></tr>`
+      )
+      .join('');
+    html +=
+      `<h2>Compromisos y próximos pasos</h2>` +
+      `<table><thead><tr><th>#</th><th>Compromiso</th><th>Responsable</th><th>Fecha</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  if (m.closing) html += `<h2>Conclusión</h2>${paragraphsToHtml(m.closing)}`;
+  return html;
+}
+
 /** Construye un objeto MeetingMinute completo (datos + documento generado). */
 export function buildMinute(input: MinuteInput, ctx: MinuteContext): MeetingMinute {
   const doc = composeMinute(input, ctx);

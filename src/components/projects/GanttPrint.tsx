@@ -56,7 +56,7 @@ export function GanttPrint({ startDate, tasks, endDate, title, subtitle, onClose
         @media print {
           @page { size: letter landscape; margin: 10mm; }
           html, body { background: white !important; height: auto !important; min-height: 0 !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; }
-          body > #root { display: none !important; }
+          body > * { display: none !important; }
           body > #gantt-print-root { position: static !important; inset: auto !important; background: white !important; overflow: visible !important; display: block !important; }
           .gp-toolbar { display: none !important; }
           .gp-stage { max-width: none !important; padding: 0 !important; margin: 0 !important; }
