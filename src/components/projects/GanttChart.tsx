@@ -167,7 +167,7 @@ export function GanttChart({
                   className={
                     scrollable
                       ? 'h-8 relative bg-[var(--color-app-surface-alt)] rounded-md shrink-0'
-                      : 'flex-1 h-8 relative bg-[var(--color-app-surface-alt)] rounded-md overflow-hidden'
+                      : 'flex-1 h-8 relative bg-[var(--color-app-surface-alt)] rounded-md'
                   }
                   style={trackStyle}
                 >
@@ -194,15 +194,13 @@ export function GanttChart({
                     </div>
                   </Bar>
 
-                  {/* Fechas inicio–fin junto a la barra (solo en pantalla) */}
-                  {scrollable && (
-                    <div
-                      className="absolute top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-app-text-muted)] whitespace-nowrap pl-1.5"
-                      style={{ left: `calc(${posLeft(task.startDay)} + ${sizeW(task.duration)})` }}
-                    >
-                      {format(taskStartDate, 'dd MMM', { locale: es })} – {format(taskEnd, 'dd MMM', { locale: es })}
-                    </div>
-                  )}
+                  {/* Fechas inicio–fin junto a la barra */}
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 text-[9px] text-[var(--color-app-text-muted)] whitespace-nowrap pl-1.5"
+                    style={{ left: `calc(${posLeft(task.startDay)} + ${sizeW(task.duration)})` }}
+                  >
+                    {format(taskStartDate, 'dd MMM', { locale: es })} – {format(taskEnd, 'dd MMM', { locale: es })}
+                  </div>
                 </div>
               </div>
             );
