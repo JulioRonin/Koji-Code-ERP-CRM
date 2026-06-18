@@ -440,6 +440,8 @@ export interface BomItem {
   actual_delivery_date: string | null;
   notes: string | null;
   production_relevant: boolean;
+  /** Marca de "parte en riesgo" (entrega/criticidad) para seguimiento de compras. */
+  at_risk?: boolean;
   image_url: string | null;
   created_at: string;
   updated_at: string;

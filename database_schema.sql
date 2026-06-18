@@ -418,6 +418,7 @@ ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS image_url            TEXT;
 -- Esta última es la que se muestra en Producción, Diseño y Calidad.
 -- Si es NULL, esos módulos hacen fallback a quantity.
 ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_quantity  NUMERIC;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS at_risk              BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- ---------------------------------------------------------------------------
 -- 7. COMPRAS — Requisiciones y POs

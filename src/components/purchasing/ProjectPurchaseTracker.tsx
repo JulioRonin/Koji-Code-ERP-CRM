@@ -586,6 +586,9 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                     <th className="text-center p-2 font-medium" title="Va a producción">
                       <Factory className="h-3.5 w-3.5 inline" />
                     </th>
+                    <th className="text-center p-2 font-medium" title="Parte en riesgo">
+                      <AlertTriangle className="h-3.5 w-3.5 inline text-[var(--color-app-danger)]" />
+                    </th>
                     <th className="text-right p-2 font-medium">Cantidad</th>
                     <th className="text-right p-2 font-medium">Precio unit.</th>
                     <th className="text-left p-2 font-medium">Proveedor</th>
@@ -612,7 +615,7 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                             className="bg-[var(--color-app-surface-alt)]/80 cursor-pointer hover:bg-[var(--color-app-surface-alt)]"
                             onClick={() => toggleGroup(group.key)}
                           >
-                            <td colSpan={11} className="p-2">
+                            <td colSpan={12} className="p-2">
                               <div className="flex items-center gap-2 text-xs">
                                 {collapsed ? (
                                   <ChevronRight className="h-3.5 w-3.5" />
@@ -963,6 +966,16 @@ function BomRow({ item, categories, onPatch, onDelete }: RowProps) {
             checked={item.production_relevant}
             onChange={e => onPatch({ production_relevant: e.target.checked })}
             className="h-4 w-4 accent-[var(--color-app-primary)] cursor-pointer"
+          />
+        </label>
+      </td>
+      <td className="p-2 text-center">
+        <label className="inline-flex items-center justify-center cursor-pointer" title="Marcar parte en riesgo">
+          <input
+            type="checkbox"
+            checked={!!item.at_risk}
+            onChange={e => onPatch({ at_risk: e.target.checked })}
+            className="h-4 w-4 accent-[var(--color-app-danger)] cursor-pointer"
           />
         </label>
       </td>

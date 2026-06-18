@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, AlertTriangle } from 'lucide-react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -79,6 +79,8 @@ export function PurchasingInsights({ items }: Props) {
   const total = data.reduce((s, d) => s + d.value, 0);
   const colorFor = (name: string, idx: number) =>
     groupBy === 'bom_status' ? STATUS_COLORS[name] ?? '#94a3b8' : PALETTE[idx % PALETTE.length];
+
+  const atRisk = useMemo(() => items.filter(i => i.at_risk), [items]);
 
   const fmt = (v: number) => (metric === 'amount' ? MXN.format(v) : String(v));
   const chartHeight = Math.max(180, data.length * 34 + 20);
@@ -161,6 +163,43 @@ export function PurchasingInsights({ items }: Props) {
             </ResponsiveContainer>
           </div>
         )}
+
+        {/* Partes marcadas en riesgo */}
+        <div className="mt-4 pt-4 border-t border-[var(--color-app-border)]">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />
+            <span className="text-sm font-semibold text-[var(--color-app-text)]">Partes en riesgo</span>
+            <span className="text-xs text-[var(--color-app-text-muted)]">({atRisk.length})</span>
+          </div>
+          {atRisk.length === 0 ? (
+            <p className="text-xs text-[var(--color-app-text-muted)]">
+              Marca la casilla de riesgo (⚠) en la tabla para listar aquí las partes críticas.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {atRisk.map(i => (
+                <div
+                  key={i.id}
+                  className="flex items-center gap-3 p-2 rounded-md border border-[var(--color-app-danger)]/30 bg-[var(--color-app-danger-soft)]/40 text-xs"
+                >
+                  <span className="font-mono font-semibold shrink-0">{i.part_number}</span>
+                  <span className="flex-1 min-w-0 truncate text-[var(--color-app-text-muted)]">
+                    {i.description ?? '—'}
+                  </span>
+                  <span className="shrink-0 text-[var(--color-app-text-muted)] hidden sm:inline">
+                    {i.supplier_name ?? 'Sin proveedor'}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-[var(--color-app-text-muted)]">
+                    {i.quantity} {i.uom}
+                  </span>
+                  <span className="shrink-0 px-1.5 py-0.5 rounded bg-white border border-[var(--color-app-border)] text-[var(--color-app-text-muted)]">
+                    {i.bom_status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
