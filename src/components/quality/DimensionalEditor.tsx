@@ -25,13 +25,14 @@ import {
   useSaveDimensionalReport,
   uploadDimensionalFile,
 } from '@/lib/api';
-import { specLimits, readingPasses, characteristicResult } from '@/lib/dimensional';
+import { specLimits, readingPasses, characteristicResult, isAttribute } from '@/lib/dimensional';
 import { useDimensionalBaseImage } from './useDimensionalBaseImage';
 import { DimensionalReportPrint } from './DimensionalReportPrint';
 import type {
   BomItem,
   DimensionalBalloon,
   DimensionalCharacteristic,
+  DimensionalKind,
   DimensionalReport,
   DimensionalStatus,
 } from '@/types/database';
@@ -151,6 +152,26 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
     setChars(prev => prev.map(c => (c.n === n ? { ...c, ...patch } : c)));
   };
 
+  // Cambia el tipo (dimensión / rosca / dowel); al cambiar limpiamos las
+  // lecturas porque cambia el formato (número vs OK/NOK).
+  const setKind = (n: number, kind: DimensionalKind) => {
+    setChars(prev =>
+      prev.map(c => (c.n === n ? { ...c, kind, readings: c.readings.map(() => null) } : c))
+    );
+  };
+
+  // Lectura por atributo (rosca/dowel): OK / NOK / sin capturar.
+  const setAttrReading = (n: number, idx: number, value: '' | 'OK' | 'NOK') => {
+    setChars(prev =>
+      prev.map(c => {
+        if (c.n !== n) return c;
+        const readings = [...c.readings];
+        readings[idx] = value === '' ? null : value;
+        return { ...c, readings };
+      })
+    );
+  };
+
   const updateReading = (n: number, idx: number, raw: string) => {
     const text = sanitizeDecimal(raw);
     setDrafts(d => ({ ...d, [readingKey(n, idx)]: text }));
@@ -196,9 +217,10 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
     const n = Number(t);
     return Number.isNaN(n) ? null : n;
   };
-  const cellText = (key: string, num: number | null): string => {
+  const cellText = (key: string, num: number | string | null): string => {
     if (key in drafts) return drafts[key];
-    return num == null ? '' : String(num);
+    if (num == null || typeof num !== 'number') return '';
+    return String(num);
   };
   const updateCharNumber = (
     n: number,
@@ -411,6 +433,7 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
                   <tr className="text-[var(--color-app-text-muted)]">
                     <th className="p-1.5 border border-[var(--color-app-border)] w-8">#</th>
                     <th className="p-1.5 border border-[var(--color-app-border)] text-left min-w-[110px]">Característica</th>
+                    <th className="p-1.5 border border-[var(--color-app-border)] w-20">Tipo</th>
                     <th className="p-1.5 border border-[var(--color-app-border)] w-16">Nominal</th>
                     <th className="p-1.5 border border-[var(--color-app-border)] w-14">Tol +</th>
                     <th className="p-1.5 border border-[var(--color-app-border)] w-14">Tol −</th>
@@ -427,6 +450,7 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
                     const { lsl, usl } = specLimits(c);
                     const res = characteristicResult(c);
                     const isSel = selected === c.n;
+                    const att = isAttribute(c);
                     return (
                       <tr
                         key={c.n}
@@ -442,60 +466,101 @@ export function DimensionalEditor({ report, item, projectName, onClose, onSaved 
                           <input
                             value={c.label}
                             onChange={e => updateChar(c.n, { label: e.target.value })}
-                            placeholder="Ø, largo…"
+                            placeholder={att ? 'M8x1.25, Ø6 dowel…' : 'Ø, largo…'}
                             className="w-full h-7 px-1.5 bg-transparent focus:outline-none focus:bg-white"
                           />
                         </td>
                         <td className="p-0 border border-[var(--color-app-border)]">
-                          <input
-                            value={cellText(nominalKey(c.n), c.nominal)}
-                            onChange={e => updateCharNumber(c.n, 'nominal', nominalKey(c.n), e.target.value)}
-                            inputMode="decimal"
-                            className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
-                          />
-                        </td>
-                        <td className="p-0 border border-[var(--color-app-border)]">
-                          <input
-                            value={cellText(plusKey(c.n), c.tolPlus)}
-                            onChange={e => updateCharNumber(c.n, 'tolPlus', plusKey(c.n), e.target.value)}
-                            inputMode="decimal"
-                            placeholder="+"
-                            className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
-                          />
-                        </td>
-                        <td className="p-0 border border-[var(--color-app-border)]">
-                          <input
-                            value={cellText(minusKey(c.n), c.tolMinus)}
-                            onChange={e => updateCharNumber(c.n, 'tolMinus', minusKey(c.n), e.target.value)}
-                            inputMode="decimal"
-                            placeholder="−"
-                            className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
-                          />
-                        </td>
-                        <td className="p-0 border border-[var(--color-app-border)]">
                           <select
-                            value={c.unit}
-                            onChange={e => updateChar(c.n, { unit: e.target.value })}
-                            className="w-full h-7 px-1 bg-transparent focus:outline-none text-center"
+                            value={c.kind ?? 'dimensional'}
+                            onChange={e => setKind(c.n, e.target.value as DimensionalKind)}
+                            className="w-full h-7 px-1 bg-transparent focus:outline-none text-center text-[11px]"
                           >
-                            {UNITS.map(u => (
-                              <option key={u} value={u}>{u}</option>
-                            ))}
+                            <option value="dimensional">Dimensión</option>
+                            <option value="rosca">Rosca</option>
+                            <option value="dowel">Dowel</option>
                           </select>
+                        </td>
+                        <td className="p-0 border border-[var(--color-app-border)]">
+                          {att ? (
+                            <span className="flex h-7 items-center justify-center text-[var(--color-app-text-subtle)]">—</span>
+                          ) : (
+                            <input
+                              value={cellText(nominalKey(c.n), c.nominal)}
+                              onChange={e => updateCharNumber(c.n, 'nominal', nominalKey(c.n), e.target.value)}
+                              inputMode="decimal"
+                              className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
+                            />
+                          )}
+                        </td>
+                        <td className="p-0 border border-[var(--color-app-border)]">
+                          {att ? (
+                            <span className="flex h-7 items-center justify-center text-[var(--color-app-text-subtle)]">—</span>
+                          ) : (
+                            <input
+                              value={cellText(plusKey(c.n), c.tolPlus)}
+                              onChange={e => updateCharNumber(c.n, 'tolPlus', plusKey(c.n), e.target.value)}
+                              inputMode="decimal"
+                              placeholder="+"
+                              className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
+                            />
+                          )}
+                        </td>
+                        <td className="p-0 border border-[var(--color-app-border)]">
+                          {att ? (
+                            <span className="flex h-7 items-center justify-center text-[var(--color-app-text-subtle)]">—</span>
+                          ) : (
+                            <input
+                              value={cellText(minusKey(c.n), c.tolMinus)}
+                              onChange={e => updateCharNumber(c.n, 'tolMinus', minusKey(c.n), e.target.value)}
+                              inputMode="decimal"
+                              placeholder="−"
+                              className="w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums"
+                            />
+                          )}
+                        </td>
+                        <td className="p-0 border border-[var(--color-app-border)]">
+                          {att ? (
+                            <span className="flex h-7 items-center justify-center text-[var(--color-app-text-subtle)]">—</span>
+                          ) : (
+                            <select
+                              value={c.unit}
+                              onChange={e => updateChar(c.n, { unit: e.target.value })}
+                              className="w-full h-7 px-1 bg-transparent focus:outline-none text-center"
+                            >
+                              {UNITS.map(u => (
+                                <option key={u} value={u}>{u}</option>
+                              ))}
+                            </select>
+                          )}
                         </td>
                         {pieces.map(j => {
                           const r = c.readings[j] ?? null;
                           const pass = readingPasses(c, r);
                           return (
                             <td key={j} className="p-0 border border-[var(--color-app-border)]">
-                              <input
-                                value={cellText(readingKey(c.n, j), r)}
-                                onChange={e => updateReading(c.n, j, e.target.value)}
-                                inputMode="decimal"
-                                className={`w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums ${
-                                  pass === false ? 'text-[var(--color-app-danger)] font-semibold' : pass === true ? 'text-[var(--color-app-success)]' : ''
-                                }`}
-                              />
+                              {att ? (
+                                <select
+                                  value={r === 'OK' || r === 'NOK' ? r : ''}
+                                  onChange={e => setAttrReading(c.n, j, e.target.value as '' | 'OK' | 'NOK')}
+                                  className={`w-full h-7 px-1 bg-transparent focus:outline-none text-center font-semibold ${
+                                    pass === false ? 'text-[var(--color-app-danger)]' : pass === true ? 'text-[var(--color-app-success)]' : ''
+                                  }`}
+                                >
+                                  <option value="">—</option>
+                                  <option value="OK">OK</option>
+                                  <option value="NOK">NOK</option>
+                                </select>
+                              ) : (
+                                <input
+                                  value={cellText(readingKey(c.n, j), r)}
+                                  onChange={e => updateReading(c.n, j, e.target.value)}
+                                  inputMode="decimal"
+                                  className={`w-full h-7 px-1.5 text-center bg-transparent focus:outline-none focus:bg-white tabular-nums ${
+                                    pass === false ? 'text-[var(--color-app-danger)] font-semibold' : pass === true ? 'text-[var(--color-app-success)]' : ''
+                                  }`}
+                                />
+                              )}
                             </td>
                           );
                         })}

@@ -627,12 +627,21 @@ export interface DimensionalBalloon {
   y: number;
 }
 
+/** Tipo de característica: cota dimensional (numérica) o calibre pasa/no pasa
+ *  para rosca o dowel (atributo OK/NOK). */
+export type DimensionalKind = 'dimensional' | 'rosca' | 'dowel';
+
+/** Lectura de una pieza: número (dimensional) u OK/NOK (rosca/dowel). */
+export type DimensionalReading = number | 'OK' | 'NOK' | null;
+
 /** Una característica a inspeccionar (un renglón del reporte), ligada a la
  *  burbuja con el mismo número. `readings` tiene una lectura por pieza de la
  *  muestra (longitud = sample_size); null = sin capturar. */
 export interface DimensionalCharacteristic {
   n: number;
   label: string;
+  /** Tipo de verificación; por defecto 'dimensional'. */
+  kind?: DimensionalKind;
   /** Cota nominal */
   nominal: number | null;
   /** Tolerancias como magnitudes positivas. USL = nominal + tolPlus,
@@ -642,7 +651,7 @@ export interface DimensionalCharacteristic {
   unit: string;
   /** Instrumento de medición usado (opcional, trazabilidad ISO) */
   instrument?: string | null;
-  readings: (number | null)[];
+  readings: DimensionalReading[];
 }
 
 export interface DimensionalPayload {
