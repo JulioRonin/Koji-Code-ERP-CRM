@@ -45,6 +45,7 @@ import {
   useUpdateProductionQuantities,
 } from '@/lib/api';
 import { TableControls } from '@/components/shared/TableControls';
+import { PurchasingInsights } from './PurchasingInsights';
 import { applyTableState, type TableState } from '@/lib/tableControls';
 import { PURCHASING_FIELDS } from '@/lib/bomFields';
 import type { BomItem, BomStatus } from '@/types/database';
@@ -522,6 +523,9 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
           />
         </div>
       )}
+
+      {/* Análisis configurable por estatus / categoría / proveedor */}
+      {activeProject && projectItems.length > 0 && <PurchasingInsights items={projectItems} />}
 
       {/* Tabla de items agrupada por categoría */}
       {activeProject && (
