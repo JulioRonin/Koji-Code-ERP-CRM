@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Package,
   MoreHorizontal,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -59,6 +60,103 @@ export function BOMManager() {
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [expandedProjects, setExpandedProjects] = useState<string[]>([]);
   const [filter, setFilter] = useState('');
+
+  // Alta manual de una sola parte al BOM
+  const [isManualOpen, setIsManualOpen] = useState(false);
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manual, setManual] = useState({
+    project_id: '',
+    part_number: '',
+    description: '',
+    category: 'General',
+    quantity: '1',
+    uom: 'Pzas',
+    material: '',
+    unit_price: '',
+    currency: 'MXN',
+    supplier_name: '',
+    requisition_date: '',
+    delivery_date: '',
+    notes: '',
+    production_relevant: false,
+    production_quantity: '',
+  });
+
+  const openManual = () => {
+    setManualError(null);
+    setManual({
+      project_id: expandedProjects[0] ?? projects[0]?.id ?? '',
+      part_number: '',
+      description: '',
+      category: 'General',
+      quantity: '1',
+      uom: 'Pzas',
+      material: '',
+      unit_price: '',
+      currency: 'MXN',
+      supplier_name: '',
+      requisition_date: '',
+      delivery_date: '',
+      notes: '',
+      production_relevant: false,
+      production_quantity: '',
+    });
+    setIsManualOpen(true);
+  };
+
+  // Sugerencias de categoría tomadas de los BOMs existentes (datalist).
+  const categorySuggestions = useMemo(
+    () => Array.from(new Set(allBomItems.map(i => i.category).filter(Boolean))).sort(),
+    [allBomItems]
+  );
+
+  const handleManualSave = async () => {
+    setManualError(null);
+    if (!manual.project_id) return setManualError('Selecciona el proyecto destino.');
+    if (!manual.part_number.trim()) return setManualError('El número de parte es obligatorio.');
+    const qty = Number(manual.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) return setManualError('La cantidad debe ser un número mayor a 0.');
+    const prodQty = manual.production_quantity.trim() === '' ? null : Number(manual.production_quantity);
+    if (prodQty != null && (!Number.isFinite(prodQty) || prodQty < 0)) {
+      return setManualError('La cantidad para producción debe ser un número.');
+    }
+    const price = manual.unit_price.trim() === '' ? null : Number(manual.unit_price);
+    if (price != null && (!Number.isFinite(price) || price < 0)) {
+      return setManualError('El precio unitario debe ser un número.');
+    }
+    setManualSaving(true);
+    try {
+      await insertBom([
+        {
+          project_id: manual.project_id,
+          part_number: manual.part_number.trim(),
+          description: manual.description.trim() || null,
+          category: manual.category.trim() || 'General',
+          quantity: qty,
+          uom: manual.uom.trim() || 'Pzas',
+          material: manual.material.trim() || null,
+          unit_price: price,
+          currency: manual.currency.trim() || 'MXN',
+          supplier_name: manual.supplier_name.trim() || null,
+          requisition_date: manual.requisition_date || null,
+          delivery_date: manual.delivery_date || null,
+          notes: manual.notes.trim() || null,
+          production_relevant: manual.production_relevant,
+          production_quantity: prodQty,
+        },
+      ]);
+      await refetchBom();
+      if (!expandedProjects.includes(manual.project_id)) {
+        setExpandedProjects(prev => [manual.project_id, ...prev]);
+      }
+      setIsManualOpen(false);
+    } catch (err) {
+      setManualError((err as Error).message || 'No se pudo agregar la parte.');
+    } finally {
+      setManualSaving(false);
+    }
+  };
 
   // Auto-expande el primer proyecto si hay BOMs
   React.useEffect(() => {
@@ -227,6 +325,9 @@ export function BOMManager() {
             <Button variant="outline" size="sm" className="h-8 px-2.5">
               <Filter className="h-4 w-4" />
             </Button>
+            <Button size="sm" className="h-8" onClick={openManual}>
+              <Plus className="h-4 w-4 mr-1.5" /> Agregar parte
+            </Button>
           </div>
         </div>
 
@@ -388,6 +489,198 @@ export function BOMManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Alta manual de una parte */}
+      <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-[var(--color-app-primary)]" /> Agregar parte al BOM
+            </DialogTitle>
+            <DialogDescription>
+              Captura una línea adicional al BOM sin necesidad de subir un Excel.
+            </DialogDescription>
+          </DialogHeader>
+
+          {manualError && (
+            <div className="p-2.5 bg-[var(--color-app-danger-soft)] border border-[var(--color-app-danger)]/30 rounded-md text-sm text-[var(--color-app-danger)]">
+              {manualError}
+            </div>
+          )}
+
+          <datalist id="bom-manual-categories">
+            {categorySuggestions.map(c => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+            <Field label="Proyecto destino *" full>
+              <select
+                value={manual.project_id}
+                onChange={e => setManual(m => ({ ...m, project_id: e.target.value }))}
+                className={selectCls}
+              >
+                <option value="" disabled>Seleccionar proyecto…</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.id} — {p.name} ({p.client_name})
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="No. de parte *">
+              <Input
+                value={manual.part_number}
+                onChange={e => setManual(m => ({ ...m, part_number: e.target.value }))}
+                placeholder="IBA-02-…"
+                className="font-mono"
+              />
+            </Field>
+            <Field label="Categoría / grupo">
+              <Input
+                list="bom-manual-categories"
+                value={manual.category}
+                onChange={e => setManual(m => ({ ...m, category: e.target.value }))}
+                placeholder="Eléctrico, Neumático…"
+              />
+            </Field>
+
+            <Field label="Descripción" full>
+              <Input
+                value={manual.description}
+                onChange={e => setManual(m => ({ ...m, description: e.target.value }))}
+                placeholder="Descripción de la parte"
+              />
+            </Field>
+
+            <Field label="Cantidad *">
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={manual.quantity}
+                onChange={e => setManual(m => ({ ...m, quantity: e.target.value }))}
+              />
+            </Field>
+            <Field label="Unidad">
+              <Input
+                value={manual.uom}
+                onChange={e => setManual(m => ({ ...m, uom: e.target.value }))}
+                placeholder="Pzas, m, kg…"
+              />
+            </Field>
+
+            <Field label="Material">
+              <Input
+                value={manual.material}
+                onChange={e => setManual(m => ({ ...m, material: e.target.value }))}
+                placeholder="Aluminio 6061…"
+              />
+            </Field>
+            <Field label="Proveedor">
+              <Input
+                value={manual.supplier_name}
+                onChange={e => setManual(m => ({ ...m, supplier_name: e.target.value }))}
+                placeholder="FESTO, SMC…"
+              />
+            </Field>
+
+            <Field label="Precio unitario">
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={manual.unit_price}
+                onChange={e => setManual(m => ({ ...m, unit_price: e.target.value }))}
+              />
+            </Field>
+            <Field label="Moneda">
+              <select
+                value={manual.currency}
+                onChange={e => setManual(m => ({ ...m, currency: e.target.value }))}
+                className={selectCls}
+              >
+                <option value="MXN">MXN</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </Field>
+
+            <Field label="Fecha de requisición">
+              <Input
+                type="date"
+                value={manual.requisition_date}
+                onChange={e => setManual(m => ({ ...m, requisition_date: e.target.value }))}
+              />
+            </Field>
+            <Field label="Fecha de entrega">
+              <Input
+                type="date"
+                value={manual.delivery_date}
+                onChange={e => setManual(m => ({ ...m, delivery_date: e.target.value }))}
+              />
+            </Field>
+
+            <Field label="¿Va a producción?" full>
+              <label className="inline-flex items-center gap-2 text-sm h-9">
+                <input
+                  type="checkbox"
+                  checked={manual.production_relevant}
+                  onChange={e => setManual(m => ({ ...m, production_relevant: e.target.checked }))}
+                  className="h-4 w-4 accent-[var(--color-app-primary)]"
+                />
+                Marca si esta parte se fabrica (entra al flujo de producción y calidad).
+              </label>
+            </Field>
+
+            {manual.production_relevant && (
+              <Field label="Cantidad para producción">
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={manual.production_quantity}
+                  onChange={e => setManual(m => ({ ...m, production_quantity: e.target.value }))}
+                  placeholder="Igual a Cantidad si lo dejas vacío"
+                />
+              </Field>
+            )}
+
+            <Field label="Notas" full>
+              <textarea
+                value={manual.notes}
+                onChange={e => setManual(m => ({ ...m, notes: e.target.value }))}
+                rows={2}
+                className="w-full px-2.5 py-1.5 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+                placeholder="Observaciones, alternativas…"
+              />
+            </Field>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsManualOpen(false)} disabled={manualSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleManualSave} disabled={manualSaving || inserting}>
+              {manualSaving ? 'Guardando…' : 'Agregar parte'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+const selectCls =
+  'w-full h-9 px-2.5 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]';
+
+function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
+  return (
+    <div className={cn('space-y-1.5', full && 'sm:col-span-2')}>
+      <label className="block text-xs font-medium text-[var(--color-app-text)]">{label}</label>
+      {children}
     </div>
   );
 }
