@@ -43,7 +43,7 @@ export function BoxLabel({ project, shipment, label, items, trackingUrl }: BoxLa
       {/* Header */}
       <div className="flex items-start justify-between border-b-2 border-black pb-2 mb-3">
         <div>
-          <p className="text-[10px] tracking-widest font-bold">KOJI CODE ERP</p>
+          <p className="text-[10px] tracking-widest font-bold">KANRI</p>
           <p className="text-xs font-bold mt-0.5">{project.client_name}</p>
         </div>
         <div className="text-right">

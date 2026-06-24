@@ -71,7 +71,7 @@ export function ResetPassword() {
           <div className="h-12 w-12 rounded-xl bg-[var(--color-app-primary)] flex items-center justify-center mb-4 shadow-sm">
             <Factory className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-2xl font-semibold text-[var(--color-app-text)]">Koji Code ERP</h1>
+          <h1 className="text-2xl font-semibold text-[var(--color-app-text)]">KANRI</h1>
         </div>
 
         <Card>

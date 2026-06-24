@@ -88,7 +88,7 @@ export function ShareClientLinkModal({ project, open, onClose }: ShareClientLink
     `Estimado equipo de ${project.client_name},\n\n` +
       `Compartimos el enlace donde pueden seguir en tiempo real el avance del proyecto ${project.name} (${project.id}):\n\n` +
       `${portalUrl}\n\n` +
-      `Saludos,\nKoji Code ERP`
+      `Saludos,\nKANRI`
   );
   const mailtoUrl = `mailto:?subject=${mailSubject}&body=${mailBody}`;
 

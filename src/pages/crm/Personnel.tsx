@@ -861,7 +861,7 @@ export function Personnel() {
                 onClick={() => {
                   copyToClipboard(
                     `Hola ${createdCredentials.full_name},\n\n` +
-                      `Tu cuenta en Koji Code ERP está lista:\n` +
+                      `Tu cuenta en KANRI está lista:\n` +
                       `Correo: ${createdCredentials.email}\n` +
                       `Contraseña: ${createdCredentials.password}\n` +
                       `Rol: ${createdCredentials.role} (${createdCredentials.department})\n\n` +

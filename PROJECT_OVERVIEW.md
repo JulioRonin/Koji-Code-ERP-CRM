@@ -1,4 +1,4 @@
-# Koji Code ERP/CRM — Resumen del Proyecto
+# KANRI · ERP/CRM — Resumen del Proyecto
 
 **Cliente piloto:** IMC Design (taller CNC en México)
 **Producto:** plataforma ERP/CRM para talleres de manufactura por arranque de viruta
@@ -42,7 +42,7 @@ Hoy IMC Design lo opera para sí misma; el siguiente paso es ofrecerlo como SaaS
 
 ### 3.2 Configuración de empresa (multi-tenant ready, hoy single-tenant)
 - `company_settings` con razón social, RFC, régimen SAT, domicilio fiscal, contacto, **logo y color de marca**.
-- Branding dinámico: sidebar, login, reportes y PDFs usan los datos de la empresa, **no** "Koji Code".
+- Branding dinámico: sidebar, login, reportes y PDFs usan los datos de la empresa cliente, **no** "KANRI".
 
 ### 3.3 Cotizaciones y proyectos
 - Wizard de **nuevo proyecto** + carga de BOM por Excel con detección de duplicados, columnas dinámicas y validación.
@@ -220,7 +220,7 @@ Hoy IMC Design lo opera para sí misma; el siguiente paso es ofrecerlo como SaaS
 2. **Master Plan PMI con escalamiento por volumen** — más realista que Gantt manual o Trello.
 3. **Minutas de junta asistidas, listas para firmar** — ahorra horas administrativas.
 4. **Portal del cliente con magic link** — diferencial frente a competencia que exige login del cliente.
-5. **Branding white-label completo** — el cliente final ve "su" plataforma, no "Koji Code".
+5. **Branding white-label completo** — el cliente final ve "su" plataforma, no "KANRI".
 6. **Modo demo offline** — comercializar sin necesidad de conectar nada de Supabase.
 
 ---

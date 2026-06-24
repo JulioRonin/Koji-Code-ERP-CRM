@@ -198,7 +198,7 @@ export function Login() {
         </AnimatePresence>
 
         <p className="text-center text-xs text-[var(--color-app-text-subtle)] mt-6">
-          {company.legal_name} · powered by Koji Code
+          {company.legal_name} · powered by KANRI
         </p>
       </div>
     </div>

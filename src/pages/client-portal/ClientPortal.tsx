@@ -93,7 +93,7 @@ export function ClientPortal() {
               K
             </div>
             <div>
-              <p className="font-semibold text-sm">Koji Code ERP</p>
+              <p className="font-semibold text-sm">KANRI</p>
               <p className="text-xs text-[var(--color-app-text-muted)]">Portal de seguimiento</p>
             </div>
           </div>
@@ -265,7 +265,7 @@ export function ClientPortal() {
         )}
 
         <p className="text-center text-xs text-[var(--color-app-text-muted)] py-4">
-          Koji Code ERP · {new Date().getFullYear()}
+          KANRI · {new Date().getFullYear()}
         </p>
       </main>
     </div>
