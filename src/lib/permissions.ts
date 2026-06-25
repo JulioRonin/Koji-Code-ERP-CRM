@@ -20,6 +20,11 @@ export type Role =
   | 'Técnico'
   | (string & {}); // permite roles libres sin romper TS
 
+/** Acceso mínimo para usuarios autenticados con un rol "desconocido" — al
+ *  menos el dashboard y el chat, para que NUNCA queden atrapados en una
+ *  redirección infinita. */
+const FALLBACK_ACCESS = ['/', '/chat'];
+
 /** Rutas (paths) que cada rol puede ver. "ALL" = todo. */
 export const ROLE_ACCESS: Record<string, string[]> = {
   Administrador: ['ALL'],
@@ -28,6 +33,9 @@ export const ROLE_ACCESS: Record<string, string[]> = {
   Compras: ['/', '/projects', '/quotes', '/chat', '/purchasing', '/billing'],
   Producción: ['/', '/chat', '/quality', '/technicians', '/production'],
   Calidad: ['/', '/chat', '/quality', '/technicians', '/production'],
+  // Rol por defecto del schema (DEFAULT 'Operador'). Le damos el mismo
+  // acceso de Producción para que pueda ver el piso, su KPI y el chat.
+  Operador: ['/', '/chat', '/quality', '/technicians', '/production'],
   // Los técnicos viven en /technician-portal (su dashboard exclusivo) y
   // pueden saltar a /chat para discutir piezas. /technicians lo dejamos
   // permitido sólo para que el redirect del sidebar no rompa: el
@@ -35,11 +43,34 @@ export const ROLE_ACCESS: Record<string, string[]> = {
   Técnico: ['/technician-portal', '/chat', '/technicians'],
 };
 
+/** Normaliza un rol guardado en BD para tolerar variaciones simples (acentos,
+ *  espacios extra, mayúsculas). Si después de normalizar coincide con una
+ *  clave conocida, la devuelve; si no, devuelve el original. */
+function resolveRole(role: string): string {
+  if (ROLE_ACCESS[role]) return role;
+  const norm = role
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // quita acentos
+    .toLowerCase()
+    .trim();
+  // Coincidencia tolerante por nombre canónico.
+  if (norm === 'administracion' || norm.includes('admin') && norm.includes('pm'))
+    return 'Administración / PM';
+  if (norm === 'administrador') return 'Administrador';
+  if (norm === 'disenador' || norm === 'diseno' || norm === 'diseño') return 'Diseñador';
+  if (norm === 'compras') return 'Compras';
+  if (norm === 'produccion') return 'Producción';
+  if (norm === 'calidad') return 'Calidad';
+  if (norm === 'operador') return 'Operador';
+  if (norm === 'tecnico' || norm.startsWith('tecnico')) return 'Técnico';
+  return role;
+}
+
 /** Devuelve true si el rol puede entrar a la ruta. */
 export function canAccessPath(role: string | undefined, path: string): boolean {
   if (!role) return false;
-  const allowed = ROLE_ACCESS[role];
-  if (!allowed) return false;
+  const resolved = resolveRole(role);
+  const allowed = ROLE_ACCESS[resolved] ?? FALLBACK_ACCESS;
   if (allowed.includes('ALL')) return true;
   // Match exacto o prefijo (ej. /projects/123 cae bajo /projects)
   return allowed.some(a => path === a || (a !== '/' && path.startsWith(a + '/')));
@@ -48,13 +79,14 @@ export function canAccessPath(role: string | undefined, path: string): boolean {
 /** Ruta home / fallback adecuado para cada rol — la primera ruta accesible. */
 export function defaultRouteForRole(role: string | undefined): string {
   if (!role) return '/login';
+  const resolved = resolveRole(role);
   // Caso especial: los técnicos siempre van a su portal exclusivo, sin
   // pasar por el dashboard administrativo.
-  if (role === 'Técnico') return '/technician-portal';
-  const allowed = ROLE_ACCESS[role];
-  if (!allowed || allowed.length === 0) return '/chat';
+  if (resolved === 'Técnico') return '/technician-portal';
+  const allowed = ROLE_ACCESS[resolved] ?? FALLBACK_ACCESS;
   if (allowed.includes('ALL')) return '/';
-  // Evita "/" si no puede llegar al dashboard
-  const first = allowed.find(a => a !== '/') ?? '/chat';
-  return first;
+  // Preferimos siempre el dashboard como home cuando esté permitido (en vez
+  // del antiguo /chat, que dejaba al usuario "atrapado" si no podía ver nada).
+  if (allowed.includes('/')) return '/';
+  return allowed[0] ?? '/';
 }
