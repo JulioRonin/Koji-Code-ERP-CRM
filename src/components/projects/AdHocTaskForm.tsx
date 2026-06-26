@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format, addDays } from 'date-fns';
-import { Plus, X, CalendarRange, Trash2, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
+import { Plus, X, CalendarRange, Trash2, CheckCircle2, Circle, AlertTriangle, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAddProjectTask, useUpdateProjectTask, useDeleteProjectTask } from '@/lib/api';
@@ -62,12 +62,33 @@ export function AdHocTaskForm({ projectId, tasks, onChanged }: Props) {
     }
   };
 
-  const handleToggle = async (task: ProjectTask) => {
-    const nextStatus: ProjectTask['status'] =
-      task.status === 'completed' ? 'pending' : task.status === 'pending' ? 'in-progress' : 'completed';
-    const nextProgress = nextStatus === 'completed' ? 100 : nextStatus === 'in-progress' ? 50 : 0;
-    await update(task.id, { status: nextStatus, progress: nextProgress });
-    await onChanged?.();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const statusFromProgress = (p: number): ProjectTask['status'] =>
+    p >= 100 ? 'completed' : p > 0 ? 'in-progress' : 'pending';
+
+  const handleSetProgress = async (task: ProjectTask, p: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(p)));
+    setError(null);
+    try {
+      await update(task.id, { progress: clamped, status: statusFromProgress(clamped) });
+      await onChanged?.();
+    } catch (err) {
+      setError((err as Error).message || 'No se pudo actualizar el progreso.');
+    }
+  };
+
+  const handlePatchTask = async (
+    task: ProjectTask,
+    patch: Partial<Pick<ProjectTask, 'name' | 'department' | 'start_date' | 'end_date'>>
+  ) => {
+    setError(null);
+    try {
+      await update(task.id, patch);
+      await onChanged?.();
+    } catch (err) {
+      setError((err as Error).message || 'No se pudo actualizar la tarea.');
+    }
   };
 
   const handleDelete = async (taskId: string) => {
@@ -158,63 +179,193 @@ export function AdHocTaskForm({ projectId, tasks, onChanged }: Props) {
         <div className="space-y-1.5">
           {tasks.map(task => {
             const color = task.department ? DEPT_COLORS[task.department] : '#94a3b8';
+            const isOpen = expandedId === task.id;
             return (
               <div
                 key={task.id}
                 className={cn(
-                  'flex items-center gap-2.5 p-2.5 rounded-md border bg-white transition-colors',
+                  'rounded-md border bg-white transition-colors',
                   task.status === 'completed'
                     ? 'border-[var(--color-app-success)]/30 bg-[var(--color-app-success-soft)]/30'
                     : 'border-[var(--color-app-border)]'
                 )}
               >
-                <button
-                  onClick={() => handleToggle(task)}
-                  className="shrink-0"
-                  title="Cambiar estado"
-                >
-                  {task.status === 'completed' ? (
-                    <CheckCircle2 className="h-4 w-4 text-[var(--color-app-success)]" />
-                  ) : task.status === 'in-progress' ? (
-                    <div className="h-4 w-4 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin" />
-                  ) : (
-                    <Circle className="h-4 w-4 text-[var(--color-app-text-subtle)]" />
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={cn(
-                      'text-sm font-medium truncate',
-                      task.status === 'completed' && 'text-[var(--color-app-text-muted)] line-through'
-                    )}
+                <div className="flex items-center gap-2.5 p-2.5">
+                  <button
+                    onClick={() =>
+                      handleSetProgress(task, task.progress >= 100 ? 0 : task.progress >= 50 ? 100 : 50)
+                    }
+                    className="shrink-0"
+                    title="Avanzar / completar"
                   >
-                    {task.name}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-[var(--color-app-text-muted)] flex-wrap">
-                    {task.department && (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-                        {task.department}
-                      </span>
+                    {task.status === 'completed' ? (
+                      <CheckCircle2 className="h-4 w-4 text-[var(--color-app-success)]" />
+                    ) : task.status === 'in-progress' ? (
+                      <div className="h-4 w-4 rounded-full border-2 border-[var(--color-app-primary)] border-t-transparent animate-spin" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-[var(--color-app-text-subtle)]" />
                     )}
-                    {task.start_date && task.end_date && (
-                      <span className="inline-flex items-center gap-1">
-                        <CalendarRange className="h-3 w-3" />
-                        {task.start_date} → {task.end_date}
-                      </span>
+                  </button>
+
+                  <button
+                    onClick={() => setExpandedId(isOpen ? null : task.id)}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <p
+                      className={cn(
+                        'text-sm font-medium truncate',
+                        task.status === 'completed' && 'text-[var(--color-app-text-muted)] line-through'
+                      )}
+                    >
+                      {task.name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-[var(--color-app-text-muted)] flex-wrap">
+                      {task.department && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                          {task.department}
+                        </span>
+                      )}
+                      {task.start_date && task.end_date && (
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarRange className="h-3 w-3" />
+                          {task.start_date} → {task.end_date}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+
+                  <Badge variant="outline" className="shrink-0 hidden sm:inline-flex tabular-nums">
+                    {task.progress}%
+                  </Badge>
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 shrink-0 text-[var(--color-app-text-subtle)] transition-transform',
+                      isOpen && 'rotate-180'
                     )}
-                  </div>
+                  />
+                  <button
+                    onClick={() => handleDelete(task.id)}
+                    className="shrink-0 p-1 text-[var(--color-app-text-subtle)] hover:text-[var(--color-app-danger)]"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <Badge variant="outline" className="shrink-0 hidden sm:inline-flex">
-                  {task.progress}%
-                </Badge>
-                <button
-                  onClick={() => handleDelete(task.id)}
-                  className="shrink-0 p-1 text-[var(--color-app-text-subtle)] hover:text-[var(--color-app-danger)]"
-                  title="Eliminar"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+
+                {isOpen && (
+                  <div className="border-t border-[var(--color-app-border)] p-3 space-y-3 bg-[var(--color-app-surface-alt)]/30">
+                    {/* Progreso */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10px] uppercase tracking-wide text-[var(--color-app-text-muted)]">
+                          Progreso
+                        </label>
+                        <span className="text-xs font-medium tabular-nums">{task.progress}%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={task.progress}
+                          onChange={e => handleSetProgress(task, Number(e.target.value))}
+                          className="flex-1 accent-[var(--color-app-primary)]"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={task.progress}
+                          onChange={e => handleSetProgress(task, Number(e.target.value) || 0)}
+                          className="w-16 h-8 px-2 rounded border border-[var(--color-app-border-strong)] bg-white text-sm text-right tabular-nums"
+                        />
+                      </div>
+                      <div className="flex gap-1.5 mt-1.5">
+                        {[0, 25, 50, 75, 100].map(v => (
+                          <button
+                            key={v}
+                            onClick={() => handleSetProgress(task, v)}
+                            className={cn(
+                              'text-[11px] px-2 py-0.5 rounded border tabular-nums',
+                              task.progress === v
+                                ? 'bg-[var(--color-app-primary)] text-white border-[var(--color-app-primary)]'
+                                : 'bg-white border-[var(--color-app-border)] text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]'
+                            )}
+                          >
+                            {v}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Datos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
+                          Nombre
+                        </label>
+                        <input
+                          defaultValue={task.name}
+                          onBlur={e =>
+                            e.target.value !== task.name && handlePatchTask(task, { name: e.target.value })
+                          }
+                          className="w-full h-8 px-2 rounded border border-[var(--color-app-border-strong)] bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
+                          Departamento
+                        </label>
+                        <select
+                          value={task.department ?? ''}
+                          onChange={e =>
+                            handlePatchTask(task, {
+                              department: (e.target.value || null) as Department | null,
+                            })
+                          }
+                          className="w-full h-8 px-2 rounded border border-[var(--color-app-border-strong)] bg-white text-sm"
+                        >
+                          <option value="">— Sin asignar —</option>
+                          {DEPARTMENTS.map(d => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
+                            Inicio
+                          </label>
+                          <input
+                            type="date"
+                            defaultValue={task.start_date ?? ''}
+                            onBlur={e =>
+                              e.target.value !== (task.start_date ?? '') &&
+                              handlePatchTask(task, { start_date: e.target.value || null })
+                            }
+                            className="w-full h-8 px-2 rounded border border-[var(--color-app-border-strong)] bg-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase text-[var(--color-app-text-muted)] mb-1">
+                            Fin
+                          </label>
+                          <input
+                            type="date"
+                            defaultValue={task.end_date ?? ''}
+                            onBlur={e =>
+                              e.target.value !== (task.end_date ?? '') &&
+                              handlePatchTask(task, { end_date: e.target.value || null })
+                            }
+                            className="w-full h-8 px-2 rounded border border-[var(--color-app-border-strong)] bg-white text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
