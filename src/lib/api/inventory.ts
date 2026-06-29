@@ -167,6 +167,51 @@ interface MovementInput {
   reference?: string | null;
 }
 
+export interface BulkInventoryRow {
+  sku: string | null;
+  name: string;
+  category: string;
+  uom: string;
+  stock: number;
+  min_stock: number;
+  max_stock: number | null;
+  unit_cost: number;
+  unit_price: number;
+  location: string | null;
+  supplier_name: string | null;
+}
+
+/** Inserta varios productos de inventario en lote (importación Excel/CSV). */
+export function useBulkInsertInventory() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+  const insert = useCallback(async (rows: BulkInventoryRow[]): Promise<number> => {
+    if (rows.length === 0) return 0;
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        const now = new Date().toISOString();
+        const existing = readItems();
+        const created: InventoryItem[] = rows.map((r, i) => ({
+          ...r, id: `inv-${Date.now().toString(36)}-${i}`, tenant_id: null,
+          barcode: null, active: true, notes: null, created_at: now, updated_at: now,
+        }));
+        writeItems([...created, ...existing]);
+        setState({ loading: false, error: null });
+        return created.length;
+      }
+      const { error } = await supabase.from('inventory_items').insert(rows);
+      if (error) throw error;
+      setState({ loading: false, error: null });
+      return rows.length;
+    } catch (err) {
+      const e = err as Error;
+      setState({ loading: false, error: e });
+      throw e;
+    }
+  }, []);
+  return { insert, ...state };
+}
+
 export function useRegisterMovement() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
   const register = useCallback(async (input: MovementInput): Promise<void> => {

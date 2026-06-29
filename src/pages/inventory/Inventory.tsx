@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   Boxes, Plus, ArrowDownUp, Search, AlertTriangle, PackageX, DollarSign,
-  Bell, Pencil, Trash2, TrendingDown, TrendingUp,
+  Bell, Pencil, Trash2, TrendingDown, TrendingUp, Upload, FileDown, Loader2, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,8 +19,10 @@ import {
 import { cn } from '@/lib/utils';
 import { useTenant } from '@/contexts/TenantContext';
 import {
-  useInventoryItems, useUpsertInventoryItem, useDeleteInventoryItem, useRegisterMovement, stockStatus,
+  useInventoryItems, useUpsertInventoryItem, useDeleteInventoryItem, useRegisterMovement,
+  useBulkInsertInventory, stockStatus,
 } from '@/lib/api';
+import { parseInventoryFile, downloadInventoryTemplate } from '@/lib/inventoryImport';
 import type { InventoryItem, InventoryMovementType, StockStatus } from '@/types/database';
 
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
@@ -41,6 +43,7 @@ export function Inventory() {
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [movItem, setMovItem] = useState<InventoryItem | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   // Notificaciones automáticas: disponibles en planes superiores (no básico).
   const notificationsAvailable = tenant.plan !== 'basico';
@@ -87,9 +90,12 @@ export function Inventory() {
             Control de stock en tiempo real, entradas/salidas y mínimos/máximos.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-1.5" /> Importar
+          </Button>
           <Button variant="outline" onClick={() => setMovItem(items[0] ?? null)} disabled={items.length === 0}>
-            <ArrowDownUp className="h-4 w-4 mr-1.5" /> Registrar movimiento
+            <ArrowDownUp className="h-4 w-4 mr-1.5" /> Movimiento
           </Button>
           <Button onClick={() => setNewOpen(true)}>
             <Plus className="h-4 w-4 mr-1.5" /> Nuevo producto
@@ -235,7 +241,109 @@ export function Inventory() {
           onSaved={async () => { setMovItem(null); await refetch(); }}
         />
       )}
+      {importOpen && (
+        <ImportModal onClose={() => setImportOpen(false)} onDone={async () => { setImportOpen(false); await refetch(); }} />
+      )}
     </div>
+  );
+}
+
+// ── Modal: importación masiva (Excel/CSV) ──
+function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const { insert, loading } = useBulkInsertInventory();
+  const [rows, setRows] = useState<import('@/lib/api').BulkInventoryRow[]>([]);
+  const [skipped, setSkipped] = useState(0);
+  const [fileName, setFileName] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<number | null>(null);
+
+  const handleFile = async (file: File) => {
+    setError(null);
+    setParsing(true);
+    try {
+      const res = await parseInventoryFile(file);
+      setRows(res.rows);
+      setSkipped(res.skipped);
+      setFileName(file.name);
+    } catch {
+      setError('No se pudo leer el archivo. Asegúrate de usar la plantilla (.xlsx o .csv).');
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const doImport = async () => {
+    setError(null);
+    try {
+      const n = await insert(rows);
+      setDone(n);
+      setTimeout(onDone, 900);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Importar inventario</DialogTitle>
+          <DialogDescription>Sube tu BOM de inventario en Excel o CSV. Usa la plantilla para que siempre cargue igual.</DialogDescription>
+        </DialogHeader>
+
+        {error && <div className="p-2.5 bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)] rounded-md text-sm">{error}</div>}
+
+        {done != null ? (
+          <div className="py-8 text-center space-y-2">
+            <CheckCircle2 className="h-10 w-10 text-[var(--color-app-success)] mx-auto" />
+            <p className="text-sm font-medium">Se importaron {done} productos.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <Button variant="outline" className="w-full" onClick={downloadInventoryTemplate}>
+              <FileDown className="h-4 w-4 mr-1.5" /> Descargar plantilla (.xlsx)
+            </Button>
+
+            <label className="block">
+              <div className="border-2 border-dashed border-[var(--color-app-border-strong)] rounded-lg p-6 text-center cursor-pointer hover:bg-[var(--color-app-surface-alt)]/40">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="sr-only"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
+                />
+                {parsing ? (
+                  <span className="inline-flex items-center gap-2 text-sm text-[var(--color-app-text-muted)]"><Loader2 className="h-4 w-4 animate-spin" /> Leyendo…</span>
+                ) : (
+                  <>
+                    <Upload className="h-6 w-6 mx-auto text-[var(--color-app-primary)] mb-1.5" />
+                    <p className="text-sm font-medium">{fileName || 'Selecciona o arrastra tu archivo'}</p>
+                    <p className="text-xs text-[var(--color-app-text-muted)]">.xlsx, .xls o .csv</p>
+                  </>
+                )}
+              </div>
+            </label>
+
+            {rows.length > 0 && (
+              <div className="text-sm rounded-md bg-[var(--color-app-success-soft)]/40 p-3 border border-[var(--color-app-success)]/30">
+                <strong>{rows.length}</strong> productos detectados
+                {skipped > 0 && <span className="text-[var(--color-app-text-muted)]"> · {skipped} filas ignoradas (sin nombre)</span>}.
+              </div>
+            )}
+          </div>
+        )}
+
+        {done == null && (
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
+            <Button onClick={doImport} disabled={loading || rows.length === 0}>
+              {loading ? 'Importando…' : `Importar ${rows.length || ''} productos`}
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

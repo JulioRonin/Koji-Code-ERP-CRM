@@ -109,14 +109,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 className="h-8 w-8 rounded-md object-cover bg-white"
               />
             ) : (
-              <div className="h-8 w-8 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm shrink-0">
+              <div className="h-8 w-8 rounded-lg bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm shrink-0 font-display">
                 {brandInitial}
               </div>
             )}
             <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-sm font-semibold text-white truncate">{brandName}</span>
-              <span className="text-[10px] text-slate-400 truncate">
-                {company.tagline || 'ERP · Manufactura'}
+              <span className="text-sm font-semibold text-white truncate font-display">{brandName}</span>
+              <span className="text-[10px] text-slate-400 truncate uppercase tracking-wider font-mono">
+                {company.tagline || 'powered by KANRI'}
               </span>
             </div>
           </div>
