@@ -29,7 +29,8 @@ function shade(hex: string, amount: number): string {
 /** Aplica el color primario de la empresa a las variables CSS de la app. */
 function applyTheme(primary: string | null | undefined) {
   const root = document.documentElement;
-  const color = primary && /^#[0-9a-fA-F]{6}$/.test(primary) ? primary : '#0369a1';
+  // Default de marca KANRI: bermellón. Cada empresa puede personalizar su color.
+  const color = primary && /^#[0-9a-fA-F]{6}$/.test(primary) ? primary : '#E2401F';
   root.style.setProperty('--color-app-primary', color);
   root.style.setProperty('--color-app-primary-hover', shade(color, -0.18));
   root.style.setProperty('--color-app-primary-soft', shade(color, 0.85));

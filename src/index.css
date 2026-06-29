@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 /* =====================================================================
@@ -7,27 +7,33 @@
    ===================================================================== */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* === Brand palette === */
-  --color-app-bg: #f6f7f9;          /* page background */
+  /* === KANRI brand palette ===
+     Ink #16181D · Accent (bermellón) #E2401F · Steel #8A9099 · Paper #F7F5F0 */
+  --color-app-bg: #f7f5f0;          /* Paper — page background */
   --color-app-surface: #ffffff;      /* cards / panels */
-  --color-app-surface-alt: #f1f5f9;  /* subtle backgrounds, table headers */
-  --color-app-sidebar: #0f172a;      /* dark navy sidebar */
-  --color-app-sidebar-hover: #1e293b;
+  --color-app-surface-alt: #efece5;  /* subtle backgrounds, table headers */
+  --color-app-sidebar: #16181d;      /* Ink sidebar */
+  --color-app-sidebar-hover: #23252c;
 
-  --color-app-border: #e2e8f0;
-  --color-app-border-strong: #cbd5e1;
+  --color-app-border: #e6e2da;
+  --color-app-border-strong: #d3cfc6;
 
-  --color-app-text: #0f172a;         /* primary text */
-  --color-app-text-muted: #475569;   /* secondary */
-  --color-app-text-subtle: #94a3b8;  /* tertiary */
-  --color-app-text-on-dark: #e2e8f0;
+  --color-app-text: #16181d;         /* Ink — primary text */
+  --color-app-text-muted: #5a5e66;   /* secondary */
+  --color-app-text-subtle: #8a9099;  /* Steel — tertiary */
+  --color-app-text-on-dark: #ece9e2;
 
-  --color-app-primary: #0369a1;      /* steel/industrial blue */
-  --color-app-primary-hover: #075985;
-  --color-app-primary-soft: #e0f2fe;
+  --color-app-primary: #e2401f;      /* bermellón — acento de marca */
+  --color-app-primary-hover: #c2330f;
+  --color-app-primary-soft: #fbe7e0;
   --color-app-primary-fg: #ffffff;
+
+  /* Ink como color "fuerte"/secundario para botones oscuros y headers. */
+  --color-app-ink: #16181d;
+  --color-app-accent: #e2401f;
 
   --color-app-success: #15803d;
   --color-app-success-soft: #dcfce7;
@@ -85,6 +91,12 @@
    BASE
    ===================================================================== */
 *, *::before, *::after { box-sizing: border-box; }
+
+/* Identidad KANRI: títulos en Poppins (display), cuerpo en Inter para densidad. */
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
 
 html, body {
   background-color: var(--color-app-bg);

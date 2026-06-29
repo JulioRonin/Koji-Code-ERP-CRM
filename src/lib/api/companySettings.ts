@@ -27,7 +27,7 @@ export const DEFAULT_COMPANY: CompanySettings = {
   website: null,
   legal_rep: null,
   logo_url: null,
-  primary_color: '#0369a1',
+  primary_color: '#E2401F',
   currency: 'MXN',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
