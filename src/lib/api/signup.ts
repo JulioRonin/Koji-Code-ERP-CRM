@@ -3,7 +3,6 @@ import { createTenant } from './tenants';
 import type { Tenant } from '@/lib/saas';
 
 export interface SignupInput {
-  /** Borrador de la empresa (en Supabase el id real lo asigna la función). */
   tenant: Tenant;
   adminName?: string;
   adminEmail: string;
@@ -11,43 +10,53 @@ export interface SignupInput {
   trialDays: number;
 }
 
+export interface SignupResult {
+  /** Sólo en modo demo: el id local del tenant creado. */
+  tenantId?: string;
+  /** true si Supabase requiere confirmar el correo antes de entrar. */
+  needsConfirmation: boolean;
+}
+
+function humanize(msg: string): string {
+  const m = (msg || '').toLowerCase();
+  if (m.includes('already registered') || m.includes('already been registered') || m.includes('user already'))
+    return 'Ese correo ya está registrado. Inicia sesión.';
+  if (m.includes('password')) return 'La contraseña no cumple los requisitos (mínimo 8 caracteres).';
+  if (m.includes('rate limit')) return 'Demasiados intentos. Espera unos minutos e intenta de nuevo.';
+  return msg || 'No se pudo crear la empresa.';
+}
+
 /**
  * Da de alta una empresa nueva y su primer administrador.
- * - Con Supabase: invoca la Edge Function `signup-tenant` (service_role).
- * - En modo demo: crea el tenant en localStorage (sin usuario real).
+ * - Con Supabase: usa auth.signUp con metadata; un trigger en la BD crea el
+ *   tenant + el perfil admin automáticamente (no requiere Edge Function).
+ * - En modo demo: crea el tenant en localStorage.
  */
-export async function signupTenant(input: SignupInput): Promise<{ tenantId: string }> {
+export async function signupTenant(input: SignupInput): Promise<SignupResult> {
   if (!supabase) {
     const created = await createTenant(input.tenant);
-    return { tenantId: created.id };
+    return { tenantId: created.id, needsConfirmation: false };
   }
 
-  const { data, error } = await supabase.functions.invoke('signup-tenant', {
-    body: {
-      name: input.tenant.name,
-      slug: input.tenant.slug,
-      industry: input.tenant.industry,
-      plan: input.tenant.plan,
-      enabledModules: input.tenant.enabledModules,
-      trialDays: input.trialDays,
-      adminName: input.adminName,
-      adminEmail: input.adminEmail,
-      adminPassword: input.adminPassword,
+  const trialEnds = new Date(Date.now() + input.trialDays * 86400_000).toISOString();
+  const { data, error } = await supabase.auth.signUp({
+    email: input.adminEmail.trim(),
+    password: input.adminPassword,
+    options: {
+      data: {
+        kanri_signup: 'true',
+        full_name: input.adminName ?? '',
+        tenant_name: input.tenant.name,
+        slug: input.tenant.slug,
+        industry: input.tenant.industry,
+        plan: input.tenant.plan,
+        enabled_modules: input.tenant.enabledModules,
+        trial_ends_at: trialEnds,
+      },
     },
   });
+  if (error) throw new Error(humanize(error.message));
 
-  if (error) {
-    // Intenta leer el mensaje devuelto por la función (viene en el contexto).
-    let msg = error.message;
-    try {
-      const ctx = (error as unknown as { context?: { json?: () => Promise<{ error?: string }> } }).context;
-      const body = ctx?.json ? await ctx.json() : null;
-      if (body?.error) msg = body.error;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(msg);
-  }
-  if (data?.error) throw new Error(data.error);
-  return { tenantId: data.tenantId as string };
+  // Si hay sesión, el correo no requiere confirmación y ya quedó autenticado.
+  return { needsConfirmation: !data.session };
 }

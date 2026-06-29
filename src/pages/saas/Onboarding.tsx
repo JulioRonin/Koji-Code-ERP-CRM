@@ -6,7 +6,6 @@ import { KanriLogo, KANRI } from '@/components/saas/KanriLogo';
 import { markEntered } from './LandingHome';
 import { signupTenant } from '@/lib/api/signup';
 import { useTenant } from '@/contexts/TenantContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import {
   INDUSTRIES, PLANS, MODULES, getModule, getPlan, getIndustry,
@@ -35,7 +34,6 @@ function Lead({ light }: { light?: boolean }) {
 export function Onboarding() {
   const navigate = useNavigate();
   const { setActiveTenantId } = useTenant();
-  const { login } = useAuth();
   const [searchParams] = useSearchParams();
   const needsAccount = !!supabase;
 
@@ -92,16 +90,21 @@ export function Onboarding() {
       updatedAt: now,
     };
     try {
-      const { tenantId } = await signupTenant({ tenant: draft, adminName, adminEmail: adminEmail.trim(), adminPassword, trialDays });
-      if (needsAccount) {
-        const res = await login('', adminEmail.trim(), adminPassword);
-        if (!res.ok) {
-          setCreating(false);
-          setCreateError(`Empresa creada, pero no se pudo iniciar sesión: ${res.error}. Intenta entrar manualmente.`);
-          return;
-        }
+      const { tenantId, needsConfirmation } = await signupTenant({
+        tenant: draft, adminName, adminEmail: adminEmail.trim(), adminPassword, trialDays,
+      });
+      if (needsConfirmation) {
+        // Supabase pide confirmar el correo antes de entrar.
+        setCreating(false);
+        setCreateError(
+          'Tu empresa fue creada. Te enviamos un correo para confirmar tu cuenta; ' +
+            'confírmalo y luego inicia sesión.'
+        );
+        return;
       }
-      await setActiveTenantId(tenantId);
+      // tenantId solo viene en modo demo; con Supabase el perfil ya quedó ligado
+      // a su empresa y el TenantContext la resuelve al recargar.
+      await setActiveTenantId(tenantId ?? null);
       markEntered();
       window.location.href = '/';
     } catch (err) {
