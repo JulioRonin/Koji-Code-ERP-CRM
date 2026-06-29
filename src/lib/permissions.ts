@@ -30,12 +30,12 @@ export const ROLE_ACCESS: Record<string, string[]> = {
   Administrador: ['ALL'],
   'Administración / PM': ['ALL'],
   Diseñador: ['/', '/projects', '/design', '/chat'],
-  Compras: ['/', '/projects', '/quotes', '/chat', '/purchasing', '/billing'],
-  Producción: ['/', '/chat', '/quality', '/technicians', '/production'],
+  Compras: ['/', '/projects', '/quotes', '/inventory', '/chat', '/purchasing', '/billing'],
+  Producción: ['/', '/chat', '/inventory', '/quality', '/technicians', '/production'],
   Calidad: ['/', '/chat', '/quality', '/technicians', '/production'],
   // Rol por defecto del schema (DEFAULT 'Operador'). Le damos el mismo
   // acceso de Producción para que pueda ver el piso, su KPI y el chat.
-  Operador: ['/', '/chat', '/quality', '/technicians', '/production'],
+  Operador: ['/', '/chat', '/inventory', '/quality', '/technicians', '/production'],
   // Los técnicos viven en /technician-portal (su dashboard exclusivo) y
   // pueden saltar a /chat para discutir piezas. /technicians lo dejamos
   // permitido sólo para que el redirect del sidebar no rompa: el

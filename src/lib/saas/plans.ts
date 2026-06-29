@@ -16,11 +16,11 @@ export const PLANS: PlanDef[] = [
     tagline: 'Ideal para MRO, venta de herramientas e insumos, talleres chicos y startups: inventario y cotizaciones rápidas.',
     trialDays: 14,
     limits: { users: 5, activeProjects: 10, storageGb: 10 },
-    modules: ['dashboard', 'projects', 'personnel', 'quotes', 'purchasing', 'design', 'meetings', 'chat'],
+    modules: ['dashboard', 'projects', 'personnel', 'quotes', 'inventory', 'purchasing', 'design', 'meetings', 'chat'],
     highlights: [
       'Hasta 5 usuarios',
-      'Cotizaciones rápidas',
-      'Inventario y compras (BOM)',
+      'Inventario en tiempo real (mín/máx)',
+      'Cotizaciones rápidas y compras (BOM)',
       'Diseño (planos 2D/3D)',
       'Juntas y minutas',
       'Soporte por correo',
@@ -36,7 +36,7 @@ export const PLANS: PlanDef[] = [
     featured: true,
     limits: { users: 25, activeProjects: -1, storageGb: 50 },
     modules: [
-      'dashboard', 'projects', 'personnel', 'quotes', 'design', 'purchasing',
+      'dashboard', 'projects', 'personnel', 'quotes', 'inventory', 'design', 'purchasing',
       'master_plan', 'production', 'quality', 'shipping', 'pmo', 'technicians',
       'meetings', 'chat', 'client_portal', 'billing',
     ],

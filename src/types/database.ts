@@ -816,3 +816,46 @@ export interface Database {
     };
   };
 }
+
+// ============================================================================
+// TABLAS: inventory_items / inventory_movements (módulo de Inventario)
+// ============================================================================
+
+export type InventoryMovementType = 'entrada' | 'salida' | 'ajuste';
+
+export interface InventoryItem {
+  id: string;
+  tenant_id?: string | null;
+  sku: string | null;
+  name: string;
+  category: string;
+  uom: string;
+  stock: number;
+  min_stock: number;
+  max_stock: number | null;
+  unit_cost: number;
+  unit_price: number;
+  location: string | null;
+  supplier_name: string | null;
+  barcode: string | null;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  tenant_id?: string | null;
+  item_id: string;
+  type: InventoryMovementType;
+  quantity: number;
+  reason: string | null;
+  reference: string | null;
+  balance_after: number | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** Estado de un item según su stock vs min/max. */
+export type StockStatus = 'agotado' | 'bajo' | 'sobre' | 'ok';

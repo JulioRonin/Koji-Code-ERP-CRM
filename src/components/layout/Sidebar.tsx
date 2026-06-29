@@ -15,6 +15,7 @@ import {
   Truck,
   FileBarChart,
   Calculator,
+  Boxes,
   Layers,
   X,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { name: 'Dashboard',    path: '/',            icon: LayoutDashboard },
   { name: 'Cotizaciones', path: '/quotes',      icon: Calculator },
+  { name: 'Inventario',   path: '/inventory',   icon: Boxes },
   { name: 'Proyectos',    path: '/projects',    icon: FolderKanban },
   { name: 'Diseño',       path: '/design',      icon: Ruler },
   { name: 'Compras',      path: '/purchasing',  icon: ShoppingCart },

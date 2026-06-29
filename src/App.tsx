@@ -14,6 +14,7 @@ import { Projects } from './pages/projects/Projects';
 import { ProjectDetails } from './pages/projects/ProjectDetails';
 import { NewProjectWizard } from './pages/projects/NewProjectWizard';
 import { Purchasing } from './pages/purchasing/Purchasing';
+import { Inventory } from './pages/inventory/Inventory';
 import { Design } from './pages/design/Design';
 import { Production } from './pages/production/Production';
 import { WorkOrderDetails } from './pages/production/WorkOrderDetails';
@@ -132,6 +133,7 @@ export default function App() {
           <Route path="projects/new" element={<ProtectedRoute><NewProjectWizard /></ProtectedRoute>} />
           <Route path="projects/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
           <Route path="purchasing" element={<ProtectedRoute><Purchasing /></ProtectedRoute>} />
+          <Route path="inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
           <Route path="design" element={<ProtectedRoute><Design /></ProtectedRoute>} />
           <Route path="production" element={<ProtectedRoute><Production /></ProtectedRoute>} />
           <Route path="production/wo/:id" element={<ProtectedRoute><WorkOrderDetails /></ProtectedRoute>} />

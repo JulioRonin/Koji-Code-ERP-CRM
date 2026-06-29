@@ -21,6 +21,13 @@ export const MODULES: ModuleDef[] = [
     minPlan: 'basico',
   },
   {
+    key: 'inventory',
+    label: 'Inventario',
+    path: '/inventory',
+    description: 'Control de stock en tiempo real, entradas/salidas y mín/máx con alertas.',
+    minPlan: 'basico',
+  },
+  {
     key: 'projects',
     label: 'Proyectos',
     path: '/projects',

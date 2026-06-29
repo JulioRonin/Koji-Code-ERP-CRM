@@ -14,7 +14,7 @@ export const INDUSTRIES: IndustryDef[] = [
     tagline: 'Maquinado de precisión, fresado y torneado CNC de alto volumen.',
     icon: 'Factory',
     defaultModules: [
-      'quotes', 'projects', 'master_plan', 'design', 'purchasing',
+      'quotes', 'inventory', 'projects', 'master_plan', 'design', 'purchasing',
       'production', 'quality', 'shipping', 'pmo', 'technicians',
       'meetings', 'chat', 'client_portal', 'billing',
     ],
@@ -28,7 +28,7 @@ export const INDUSTRIES: IndustryDef[] = [
     tagline: 'Torno, fresa y rectificado convencional; lotes y refacciones.',
     icon: 'Cog',
     defaultModules: [
-      'quotes', 'projects', 'design', 'purchasing', 'production',
+      'quotes', 'inventory', 'projects', 'design', 'purchasing', 'production',
       'quality', 'shipping', 'technicians', 'meetings', 'chat', 'billing',
     ],
     recommendedPlan: 'profesional',
@@ -41,7 +41,7 @@ export const INDUSTRIES: IndustryDef[] = [
     tagline: 'Mantenimiento, reparación y operación; servicios y refacciones.',
     icon: 'Wrench',
     defaultModules: [
-      'quotes', 'projects', 'purchasing', 'production', 'quality',
+      'quotes', 'inventory', 'projects', 'purchasing', 'production', 'quality',
       'technicians', 'meetings', 'chat', 'client_portal', 'billing',
     ],
     recommendedPlan: 'basico',
@@ -105,7 +105,7 @@ export const INDUSTRIES: IndustryDef[] = [
     tagline: 'Distribución y venta de herramienta, consumibles e insumos.',
     icon: 'Hammer',
     defaultModules: [
-      'quotes', 'purchasing', 'shipping', 'meetings', 'chat',
+      'quotes', 'inventory', 'purchasing', 'shipping', 'meetings', 'chat',
       'client_portal', 'billing',
     ],
     recommendedPlan: 'basico',

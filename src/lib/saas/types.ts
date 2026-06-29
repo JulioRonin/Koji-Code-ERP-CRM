@@ -15,6 +15,7 @@
 export type ModuleKey =
   | 'dashboard'
   | 'quotes'
+  | 'inventory'
   | 'projects'
   | 'design'
   | 'purchasing'
