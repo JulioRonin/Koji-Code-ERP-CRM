@@ -32,6 +32,7 @@ import { Pricing } from './pages/saas/Pricing';
 import { Onboarding } from './pages/saas/Onboarding';
 import { PlatformAdmin } from './pages/saas/PlatformAdmin';
 import { LandingHome } from './pages/saas/LandingHome';
+import { Subscription } from './pages/saas/Subscription';
 import { Billing } from './pages/Placeholders';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
@@ -148,6 +149,7 @@ export default function App() {
           <Route path="chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute><CompanySettingsPage /></ProtectedRoute>} />
+          <Route path="subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
           
           {/* Universal Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />

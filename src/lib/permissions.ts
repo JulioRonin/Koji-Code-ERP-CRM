@@ -69,6 +69,8 @@ function resolveRole(role: string): string {
 /** Devuelve true si el rol puede entrar a la ruta. */
 export function canAccessPath(role: string | undefined, path: string): boolean {
   if (!role) return false;
+  // La suscripción es accesible para cualquier usuario autenticado.
+  if (path.startsWith('/subscription')) return true;
   const resolved = resolveRole(role);
   const allowed = ROLE_ACCESS[resolved] ?? FALLBACK_ACCESS;
   if (allowed.includes('ALL')) return true;

@@ -7,6 +7,7 @@ export * from './types';
 export * from './modules';
 export * from './industries';
 export * from './plans';
+export * from './subscription';
 
 const ALL_MODULE_KEYS: ModuleKey[] = MODULES.map(m => m.key);
 
