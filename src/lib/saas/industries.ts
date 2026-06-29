@@ -18,6 +18,8 @@ export const INDUSTRIES: IndustryDef[] = [
       'production', 'quality', 'shipping', 'pmo', 'technicians',
       'meetings', 'chat', 'client_portal', 'billing',
     ],
+    recommendedPlan: 'profesional',
+    recommendationReason: 'Producción, calidad ISO 9001 y trazabilidad completa.',
     vocabulary: { project: 'Proyecto', part: 'Pieza', workOrder: 'Orden de trabajo', client: 'Cliente' },
   },
   {
@@ -29,6 +31,8 @@ export const INDUSTRIES: IndustryDef[] = [
       'quotes', 'projects', 'design', 'purchasing', 'production',
       'quality', 'shipping', 'technicians', 'meetings', 'chat', 'billing',
     ],
+    recommendedPlan: 'profesional',
+    recommendationReason: 'Producción y calidad para lotes y refacciones.',
     vocabulary: { project: 'Trabajo', part: 'Pieza', workOrder: 'Orden de trabajo', client: 'Cliente' },
   },
   {
@@ -40,6 +44,8 @@ export const INDUSTRIES: IndustryDef[] = [
       'quotes', 'projects', 'purchasing', 'production', 'quality',
       'technicians', 'meetings', 'chat', 'client_portal', 'billing',
     ],
+    recommendedPlan: 'basico',
+    recommendationReason: 'Inventario, refacciones y cotizaciones rápidas.',
     vocabulary: { project: 'Orden de servicio', part: 'Refacción', workOrder: 'Servicio', client: 'Cliente' },
   },
   {
@@ -51,6 +57,8 @@ export const INDUSTRIES: IndustryDef[] = [
       'quotes', 'projects', 'design', 'meetings', 'chat',
       'client_portal', 'billing',
     ],
+    recommendedPlan: 'basico',
+    recommendationReason: 'Proyectos, cotizaciones y entregables sin planta.',
     vocabulary: { project: 'Campaña', part: 'Entregable', workOrder: 'Tarea', client: 'Cliente' },
   },
   {
@@ -62,6 +70,8 @@ export const INDUSTRIES: IndustryDef[] = [
       'quotes', 'projects', 'design', 'master_plan', 'meetings',
       'chat', 'client_portal', 'billing',
     ],
+    recommendedPlan: 'profesional',
+    recommendationReason: 'Master Plan, portal de cliente y entregables.',
     vocabulary: { project: 'Proyecto', part: 'Entregable', workOrder: 'Actividad', client: 'Cliente' },
   },
   {
@@ -73,6 +83,8 @@ export const INDUSTRIES: IndustryDef[] = [
       'quotes', 'projects', 'master_plan', 'pmo', 'meetings',
       'chat', 'client_portal', 'billing',
     ],
+    recommendedPlan: 'profesional',
+    recommendationReason: 'PMO, portal de cliente y seguimiento por proyecto.',
     vocabulary: { project: 'Engagement', part: 'Entregable', workOrder: 'Actividad', client: 'Cliente' },
   },
   {
@@ -83,6 +95,8 @@ export const INDUSTRIES: IndustryDef[] = [
     defaultModules: [
       'quotes', 'projects', 'personnel', 'meetings', 'chat', 'billing',
     ],
+    recommendedPlan: 'basico',
+    recommendationReason: 'Cohortes, cotizaciones y gestión ligera.',
     vocabulary: { project: 'Curso', part: 'Material', workOrder: 'Sesión', client: 'Participante' },
   },
   {
@@ -94,6 +108,8 @@ export const INDUSTRIES: IndustryDef[] = [
       'quotes', 'purchasing', 'shipping', 'meetings', 'chat',
       'client_portal', 'billing',
     ],
+    recommendedPlan: 'basico',
+    recommendationReason: 'Inventario, surtido y facturación.',
     vocabulary: { project: 'Pedido', part: 'Producto', workOrder: 'Surtido', client: 'Cliente' },
   },
 ];

@@ -66,6 +66,10 @@ export interface IndustryDef {
   icon: string;
   /** Módulos que se activan por defecto al elegir este giro. */
   defaultModules: ModuleKey[];
+  /** Plan sugerido para este giro (se destaca en el onboarding). */
+  recommendedPlan: PlanKey;
+  /** Por qué se recomienda ese plan (texto corto para el onboarding). */
+  recommendationReason: string;
   /** Renombrado de conceptos según el sector (ej. "Orden de trabajo" vs
    *  "Servicio"). El frontend puede leer estos labels para adaptarse. */
   vocabulary?: Partial<Record<'project' | 'part' | 'workOrder' | 'client', string>>;
