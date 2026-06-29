@@ -18,9 +18,23 @@
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- 0. EXTENSIONES
+-- 0. EXTENSIONES + FIX del trigger set_updated_at
 -- ---------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Algunas tablas (p. ej. project_notes) NO tienen columna updated_at, pero el
+-- trigger genérico set_updated_at intentaba asignarla y rompía cualquier UPDATE
+-- (incluido el backfill de tenant_id). Lo hacemos tolerante: solo asigna
+-- updated_at si la fila realmente tiene esa columna.
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF to_jsonb(NEW) ? 'updated_at' THEN
+        NEW.updated_at := NOW();
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- ---------------------------------------------------------------------------
 -- 1. TABLA DE EMPRESAS (TENANTS)

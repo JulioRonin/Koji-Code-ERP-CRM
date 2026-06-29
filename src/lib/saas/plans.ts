@@ -11,15 +11,16 @@ export const PLANS: PlanDef[] = [
   {
     key: 'basico',
     label: 'Básico',
-    priceMxn: 1499,
-    priceMxnAnnual: 14990, // ~2 meses gratis
-    tagline: 'Para talleres y despachos pequeños que arrancan a digitalizarse.',
+    priceMxn: 5500,
+    priceMxnAnnual: 55000, // ~2 meses gratis
+    tagline: 'Ideal para MRO, venta de herramientas e insumos, talleres chicos y startups: inventario y cotizaciones rápidas.',
     trialDays: 14,
-    limits: { users: 5, activeProjects: 5, storageGb: 5 },
-    modules: ['dashboard', 'projects', 'personnel', 'quotes', 'design', 'purchasing', 'meetings', 'chat'],
+    limits: { users: 5, activeProjects: 10, storageGb: 10 },
+    modules: ['dashboard', 'projects', 'personnel', 'quotes', 'purchasing', 'design', 'meetings', 'chat'],
     highlights: [
       'Hasta 5 usuarios',
-      'Proyectos, cotizaciones y compras',
+      'Cotizaciones rápidas',
+      'Inventario y compras (BOM)',
       'Diseño (planos 2D/3D)',
       'Juntas y minutas',
       'Soporte por correo',
@@ -28,9 +29,9 @@ export const PLANS: PlanDef[] = [
   {
     key: 'profesional',
     label: 'Profesional',
-    priceMxn: 3999,
-    priceMxnAnnual: 39990,
-    tagline: 'Operación completa: producción, calidad y portal de clientes.',
+    priceMxn: 12000,
+    priceMxnAnnual: 120000,
+    tagline: 'Para talleres medianos y grandes y empresas de gestión profesional de alto valor.',
     trialDays: 14,
     featured: true,
     limits: { users: 25, activeProjects: -1, storageGb: 50 },
