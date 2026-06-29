@@ -12,8 +12,10 @@ import {
   type IndustryKey, type PlanKey, type ModuleKey, type Tenant,
 } from '@/lib/saas';
 import { slugify, newTenantId } from '@/lib/saas/platformStore';
-import { createTenant } from '@/lib/api/tenants';
+import { signupTenant } from '@/lib/api/signup';
 import { useTenant } from '@/contexts/TenantContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -22,12 +24,18 @@ const DEMO_TRIAL_DAYS = 20;
 export function Onboarding() {
   const navigate = useNavigate();
   const { setActiveTenantId } = useTenant();
+  const { login } = useAuth();
   const [searchParams] = useSearchParams();
   const isDemo = searchParams.get('demo') === '1';
+  const needsAccount = !!supabase; // con backend real pedimos las credenciales del admin
   const [step, setStep] = useState<Step>(1);
   const [createError, setCreateError] = useState<string | null>(null);
   const [industry, setIndustry] = useState<IndustryKey | null>(null);
   const [name, setName] = useState('');
+  // Credenciales del primer administrador
+  const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [plan, setPlan] = useState<PlanKey>('profesional');
   const [modules, setModules] = useState<ModuleKey[]>([]);
   const [creating, setCreating] = useState(false);
@@ -68,16 +76,28 @@ export function Onboarding() {
       updatedAt: now,
     };
     try {
-      const created = await createTenant(draft); // Supabase asigna id real; demo conserva el draft
-      await setActiveTenantId(created.id);
+      const { tenantId } = await signupTenant({
+        tenant: draft,
+        adminName,
+        adminEmail: adminEmail.trim(),
+        adminPassword,
+        trialDays,
+      });
+      // Con backend: inicia sesión con el admin recién creado.
+      if (needsAccount) {
+        const res = await login('', adminEmail.trim(), adminPassword);
+        if (!res.ok) {
+          setCreating(false);
+          setCreateError(`Empresa creada, pero no se pudo iniciar sesión: ${res.error}. Intenta entrar manualmente.`);
+          return;
+        }
+      }
+      await setActiveTenantId(tenantId);
       markEntered();
       window.location.href = '/';
     } catch (err) {
       setCreating(false);
-      setCreateError(
-        (err as Error).message ||
-          'No se pudo crear la empresa. El alta de empresas la realiza el equipo KANRI desde el panel de Plataforma.'
-      );
+      setCreateError((err as Error).message || 'No se pudo crear la empresa.');
     }
   };
 
@@ -165,8 +185,53 @@ export function Onboarding() {
                   Giro: <strong>{getIndustry(industry).label}</strong>
                 </div>
               )}
+
+              {/* Cuenta del primer administrador (solo con backend real) */}
+              {needsAccount && (
+                <div className="pt-2 border-t border-[var(--color-app-border)] space-y-4">
+                  <p className="text-xs font-medium text-[var(--color-app-text-muted)] uppercase tracking-wide">
+                    Tu cuenta de administrador
+                  </p>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-[var(--color-app-text)]">Tu nombre</label>
+                    <input
+                      value={adminName}
+                      onChange={e => setAdminName(e.target.value)}
+                      placeholder="Nombre y apellido"
+                      className="w-full h-10 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-[var(--color-app-text)]">Correo (será tu acceso)</label>
+                    <input
+                      type="email"
+                      value={adminEmail}
+                      onChange={e => setAdminEmail(e.target.value)}
+                      placeholder="tu@empresa.com"
+                      className="w-full h-10 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-[var(--color-app-text)]">Contraseña</label>
+                    <input
+                      type="password"
+                      value={adminPassword}
+                      onChange={e => setAdminPassword(e.target.value)}
+                      placeholder="Mínimo 8 caracteres"
+                      className="w-full h-10 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-            <Nav onBack={() => setStep(1)} onNext={() => setStep(3)} nextDisabled={!name.trim()} />
+            <Nav
+              onBack={() => setStep(1)}
+              onNext={() => setStep(3)}
+              nextDisabled={
+                !name.trim() ||
+                (needsAccount && (!/^\S+@\S+\.\S+$/.test(adminEmail) || adminPassword.length < 8))
+              }
+            />
           </Section>
         )}
 
