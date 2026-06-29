@@ -11,7 +11,9 @@ import {
   initialModules, availableModulesForTenant, formatMxn,
   type IndustryKey, type PlanKey, type ModuleKey, type Tenant,
 } from '@/lib/saas';
-import { upsertTenant, setActiveTenant, slugify, newTenantId } from '@/lib/saas/platformStore';
+import { slugify, newTenantId } from '@/lib/saas/platformStore';
+import { createTenant } from '@/lib/api/tenants';
+import { useTenant } from '@/contexts/TenantContext';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -19,9 +21,11 @@ const DEMO_TRIAL_DAYS = 20;
 
 export function Onboarding() {
   const navigate = useNavigate();
+  const { setActiveTenantId } = useTenant();
   const [searchParams] = useSearchParams();
   const isDemo = searchParams.get('demo') === '1';
   const [step, setStep] = useState<Step>(1);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [industry, setIndustry] = useState<IndustryKey | null>(null);
   const [name, setName] = useState('');
   const [plan, setPlan] = useState<PlanKey>('profesional');
@@ -39,13 +43,14 @@ export function Onboarding() {
     setModules(prev => (on ? Array.from(new Set([...prev, key])) : prev.filter(m => m !== key)));
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!industry || !name.trim()) return;
     setCreating(true);
+    setCreateError(null);
     const now = new Date().toISOString();
     const planDef = getPlan(plan);
     const trialDays = isDemo ? DEMO_TRIAL_DAYS : planDef.trialDays;
-    const tenant: Tenant = {
+    const draft: Tenant = {
       id: newTenantId(),
       name: name.trim(),
       slug: slugify(name),
@@ -62,11 +67,18 @@ export function Onboarding() {
       createdAt: now,
       updatedAt: now,
     };
-    upsertTenant(tenant);
-    setActiveTenant(tenant.id);
-    markEntered(); // entró a propósito: no volver a la pantalla de inicio
-    // Recarga para que el TenantContext tome el nuevo activo.
-    window.location.href = '/';
+    try {
+      const created = await createTenant(draft); // Supabase asigna id real; demo conserva el draft
+      await setActiveTenantId(created.id);
+      markEntered();
+      window.location.href = '/';
+    } catch (err) {
+      setCreating(false);
+      setCreateError(
+        (err as Error).message ||
+          'No se pudo crear la empresa. El alta de empresas la realiza el equipo KANRI desde el panel de Plataforma.'
+      );
+    }
   };
 
   return (
@@ -229,6 +241,11 @@ export function Onboarding() {
               {modules.length} módulos activos · plan {getPlan(plan).label} ·{' '}
               {isDemo ? `${DEMO_TRIAL_DAYS} días de demo (sin tarjeta)` : `${getPlan(plan).trialDays} días de prueba`}
             </div>
+            {createError && (
+              <div className="mt-3 p-3 rounded-md bg-[var(--color-app-danger-soft)] border border-[var(--color-app-danger)]/30 text-sm text-[var(--color-app-danger)]">
+                {createError}
+              </div>
+            )}
             <Nav
               onBack={() => setStep(3)}
               onNext={handleCreate}

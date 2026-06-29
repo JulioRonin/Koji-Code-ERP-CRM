@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Building2, Plus, LogIn, Trash2, Pencil, ShieldAlert, ArrowLeft, Users, DollarSign, Layers,
@@ -16,9 +16,8 @@ import {
   PLANS, MODULES, getPlan, getIndustry, getModule, availableModulesForTenant,
   type Tenant, type PlanKey, type SubscriptionStatus, type ModuleKey,
 } from '@/lib/saas';
-import { listTenants, upsertTenant, deleteTenant, setActiveTenant } from '@/lib/saas/platformStore';
-
-const ADMIN_ROLES = ['Administrador', 'Administración / PM'];
+import { useTenant } from '@/contexts/TenantContext';
+import { listTenants, saveTenant, deleteTenant } from '@/lib/api/tenants';
 
 const STATUS_VARIANT: Record<SubscriptionStatus, 'success' | 'warning' | 'destructive' | 'secondary'> = {
   active: 'success',
@@ -33,13 +32,24 @@ const STATUS_LABEL: Record<SubscriptionStatus, string> = {
 
 export function PlatformAdmin() {
   const { user } = useAuth();
+  const { setActiveTenantId } = useTenant();
   const navigate = useNavigate();
-  const isAllowed = !!user && ADMIN_ROLES.includes(user.role);
+  const isAllowed = !!user && user.isPlatformOwner === true;
 
-  const [tenants, setTenants] = useState<Tenant[]>(() => listTenants());
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [editing, setEditing] = useState<Tenant | null>(null);
 
-  const refresh = () => setTenants(listTenants());
+  const refresh = async () => {
+    try {
+      setTenants(await listTenants());
+    } catch (err) {
+      console.warn('No se pudieron cargar las empresas', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAllowed) refresh();
+  }, [isAllowed]);
 
   const stats = useMemo(() => {
     const billable = tenants.filter(t => t.subscription.status === 'active');
@@ -52,21 +62,29 @@ export function PlatformAdmin() {
     };
   }, [tenants]);
 
-  const handleEnter = (t: Tenant) => {
-    setActiveTenant(t.id);
+  const handleEnter = async (t: Tenant) => {
+    await setActiveTenantId(t.id);
     window.location.href = '/';
   };
 
-  const handleDelete = (t: Tenant) => {
+  const handleDelete = async (t: Tenant) => {
     if (!window.confirm(`¿Eliminar la empresa "${t.name}"? (no borra sus datos de operación, solo el registro de plataforma)`)) return;
-    deleteTenant(t.id);
-    refresh();
+    try {
+      await deleteTenant(t.id);
+      await refresh();
+    } catch (err) {
+      window.alert((err as Error).message);
+    }
   };
 
-  const handleSaveEdit = (next: Tenant) => {
-    upsertTenant(next);
-    refresh();
-    setEditing(null);
+  const handleSaveEdit = async (next: Tenant) => {
+    try {
+      await saveTenant(next);
+      await refresh();
+      setEditing(null);
+    } catch (err) {
+      window.alert((err as Error).message);
+    }
   };
 
   if (!isAllowed) {

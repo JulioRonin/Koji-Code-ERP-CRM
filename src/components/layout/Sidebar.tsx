@@ -160,22 +160,27 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        {canSeeSettings && (
+        {(canSeeSettings || user?.isPlatformOwner) && (
           <div className="px-2 py-3 border-t border-[var(--color-app-sidebar-hover)] shrink-0 space-y-1">
-            <NavLink
-              to="/platform"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors',
-                  isActive
-                    ? 'bg-white/10 text-white'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
-                )
-              }
-            >
-              <Layers className="h-4 w-4 text-slate-400" />
-              <span>Plataforma</span>
-            </NavLink>
+            {/* Panel de plataforma: SOLO para el dueño de la plataforma (KANRI),
+                no para los admins de las empresas cliente. */}
+            {user?.isPlatformOwner && (
+              <NavLink
+                to="/platform"
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors',
+                    isActive
+                      ? 'bg-white/10 text-white'
+                      : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  )
+                }
+              >
+                <Layers className="h-4 w-4 text-slate-400" />
+                <span>Plataforma</span>
+              </NavLink>
+            )}
+            {canSeeSettings && (
             <NavLink
               to="/settings"
               className={({ isActive }) =>
@@ -190,6 +195,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <Settings className="h-4 w-4 text-slate-400" />
               <span>Configuración</span>
             </NavLink>
+            )}
           </div>
         )}
       </aside>

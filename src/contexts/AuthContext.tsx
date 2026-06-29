@@ -276,6 +276,8 @@ async function fetchProfileAsStaffMember(userId: string): Promise<StaffMember | 
     department: data.department,
     avatar: initialsFor(data.full_name),
     email: data.email,
+    tenantId: data.tenant_id ?? null,
+    isPlatformOwner: data.is_platform_owner ?? false,
     phone: data.phone ?? '',
     status: 'Activo',
     joinDate: data.join_date,
