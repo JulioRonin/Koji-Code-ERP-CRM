@@ -28,6 +28,8 @@ import { QuoteBuilder } from './pages/quotes/QuoteBuilder';
 import { Integrations } from './pages/settings/Integrations';
 import { CompanySettingsPage } from './pages/settings/CompanySettingsPage';
 import { Pricing } from './pages/saas/Pricing';
+import { Onboarding } from './pages/saas/Onboarding';
+import { PlatformAdmin } from './pages/saas/PlatformAdmin';
 import { Billing } from './pages/Placeholders';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
@@ -84,6 +86,10 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/platform" element={
+          <ProtectedRoute><PlatformAdmin /></ProtectedRoute>
+        } />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 

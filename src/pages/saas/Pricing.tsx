@@ -109,7 +109,7 @@ function PlanCard({ plan, annual }: { plan: PlanDef; annual: boolean }) {
         {plan.trialDays} días de prueba gratis
       </p>
 
-      <Link to="/login" className="block">
+      <Link to="/onboarding" className="block">
         <Button className="w-full" variant={plan.featured ? 'default' : 'outline'}>
           {isCustom ? 'Contactar ventas' : 'Comenzar prueba'} <ArrowRight className="h-4 w-4 ml-1.5" />
         </Button>
