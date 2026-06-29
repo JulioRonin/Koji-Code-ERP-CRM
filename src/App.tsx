@@ -30,6 +30,7 @@ import { CompanySettingsPage } from './pages/settings/CompanySettingsPage';
 import { Pricing } from './pages/saas/Pricing';
 import { Onboarding } from './pages/saas/Onboarding';
 import { PlatformAdmin } from './pages/saas/PlatformAdmin';
+import { LandingHome } from './pages/saas/LandingHome';
 import { Billing } from './pages/Placeholders';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
@@ -56,7 +57,23 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Puerta de entrada: pantalla de inicio con opciones (login / registrar /
+    // demo), no el login directo.
+    return <Navigate to="/welcome" state={{ from: location }} replace />;
+  }
+
+  // Aunque haya sesión, al abrir la raíz mostramos primero la pantalla de
+  // inicio para que el usuario elija (entrar / registrar otra empresa). Una vez
+  // que entra (markEntered), navega normal dentro de la app.
+  const entered = (() => {
+    try {
+      return sessionStorage.getItem('kanri_entered') === '1';
+    } catch {
+      return true;
+    }
+  })();
+  if (!entered && location.pathname === '/') {
+    return <Navigate to="/welcome" replace />;
   }
 
   // Técnicos viven en /technician-portal pero pueden ir a /chat para
@@ -84,6 +101,7 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/welcome" element={<LandingHome />} />
         <Route path="/login" element={<Login />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/onboarding" element={<Onboarding />} />

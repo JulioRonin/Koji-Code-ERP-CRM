@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Check, Factory, Sparkles } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowRight, ArrowLeft, Check, Factory, Sparkles, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { IndustryIcon } from '@/components/saas/IndustryIcon';
+import { markEntered } from './LandingHome';
 import {
   INDUSTRIES, PLANS, MODULES, getModule, getPlan, getIndustry,
   initialModules, availableModulesForTenant, formatMxn,
@@ -13,8 +14,12 @@ import { upsertTenant, setActiveTenant, slugify, newTenantId } from '@/lib/saas/
 
 type Step = 1 | 2 | 3 | 4;
 
+const DEMO_TRIAL_DAYS = 20;
+
 export function Onboarding() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isDemo = searchParams.get('demo') === '1';
   const [step, setStep] = useState<Step>(1);
   const [industry, setIndustry] = useState<IndustryKey | null>(null);
   const [name, setName] = useState('');
@@ -38,6 +43,7 @@ export function Onboarding() {
     setCreating(true);
     const now = new Date().toISOString();
     const planDef = getPlan(plan);
+    const trialDays = isDemo ? DEMO_TRIAL_DAYS : planDef.trialDays;
     const tenant: Tenant = {
       id: newTenantId(),
       name: name.trim(),
@@ -47,7 +53,7 @@ export function Onboarding() {
       enabledModules: modules,
       subscription: {
         status: 'trialing',
-        currentPeriodEnd: new Date(Date.now() + planDef.trialDays * 86400_000).toISOString(),
+        currentPeriodEnd: new Date(Date.now() + trialDays * 86400_000).toISOString(),
         billingCycle: 'monthly',
         stripeCustomerId: null,
         stripeSubscriptionId: null,
@@ -57,6 +63,7 @@ export function Onboarding() {
     };
     upsertTenant(tenant);
     setActiveTenant(tenant.id);
+    markEntered(); // entró a propósito: no volver a la pantalla de inicio
     // Recarga para que el TenantContext tome el nuevo activo.
     window.location.href = '/';
   };
@@ -70,6 +77,11 @@ export function Onboarding() {
           </div>
           <span className="font-semibold text-[var(--color-app-text)]">KANRI</span>
           <span className="text-sm text-[var(--color-app-text-muted)] ml-2">· Configura tu empresa</span>
+          {isDemo && (
+            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]">
+              <Rocket className="h-3.5 w-3.5" /> Demo · {DEMO_TRIAL_DAYS} días gratis · sin tarjeta
+            </span>
+          )}
         </div>
       </header>
 
@@ -216,7 +228,8 @@ export function Onboarding() {
             </div>
             <div className="mt-4 p-3 rounded-md bg-[var(--color-app-success-soft)]/40 flex items-center gap-2 text-sm text-[var(--color-app-text)]">
               <Sparkles className="h-4 w-4 text-[var(--color-app-success)]" />
-              {modules.length} módulos activos · plan {getPlan(plan).label} · {getPlan(plan).trialDays} días de prueba
+              {modules.length} módulos activos · plan {getPlan(plan).label} ·{' '}
+              {isDemo ? `${DEMO_TRIAL_DAYS} días de demo (sin tarjeta)` : `${getPlan(plan).trialDays} días de prueba`}
             </div>
             <Nav
               onBack={() => setStep(3)}

@@ -43,6 +43,13 @@ export function Login() {
     const result = await login(selectedDept, email, password);
 
     if (result.ok) {
+      // El usuario eligió entrar explícitamente: no volver a mostrar la
+      // pantalla de inicio en esta sesión de navegador.
+      try {
+        sessionStorage.setItem('kanri_entered', '1');
+      } catch {
+        /* ignore */
+      }
       if (selectedDept === 'Técnico') {
         navigate('/technician-portal');
       } else {

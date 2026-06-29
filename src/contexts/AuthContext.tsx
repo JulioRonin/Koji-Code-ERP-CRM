@@ -229,6 +229,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setIsRecovery(false);
     localStorage.removeItem(STORAGE_KEY);
+    // Vuelve a la pantalla de inicio (elección de empresa / login).
+    try {
+      sessionStorage.removeItem('kanri_entered');
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
