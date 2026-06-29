@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Factory, ArrowRight } from 'lucide-react';
+import { Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { KanriLogo } from '@/components/saas/KanriLogo';
 import { PLANS, formatMxn, type PlanDef } from '@/lib/saas';
 
 export function Pricing() {
@@ -13,11 +14,8 @@ export function Pricing() {
       {/* Header */}
       <header className="border-b border-[var(--color-app-border)] bg-white">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-[#0F0F10] flex items-center justify-center">
-              <Factory className="h-4 w-4 text-white" />
-            </div>
-            <span className="font-semibold text-[var(--color-app-text)]">KANRI</span>
+          <Link to="/welcome" className="flex items-center gap-2">
+            <KanriLogo size={30} />
           </Link>
           <Link to="/login">
             <Button variant="outline" size="sm">Iniciar sesión</Button>

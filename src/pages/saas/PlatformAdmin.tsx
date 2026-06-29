@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { IndustryIcon } from '@/components/saas/IndustryIcon';
+import { KanriLogo } from '@/components/saas/KanriLogo';
 import {
   PLANS, MODULES, getPlan, getIndustry, getModule, availableModulesForTenant,
   type Tenant, type PlanKey, type SubscriptionStatus, type ModuleKey,
@@ -88,10 +89,8 @@ export function PlatformAdmin() {
       <header className="border-b border-[var(--color-app-border)] bg-white">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-[#0F0F10] flex items-center justify-center">
-              <Layers className="h-4 w-4 text-white" />
-            </div>
-            <span className="font-semibold">KANRI · Plataforma</span>
+            <KanriLogo size={28} />
+            <span className="text-sm text-[var(--color-app-text-muted)]">· Plataforma</span>
           </div>
           <div className="flex gap-2">
             <Link to="/"><Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1.5" /> A la app</Button></Link>

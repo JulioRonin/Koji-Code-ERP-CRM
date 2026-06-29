@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Check, Factory, Sparkles, Rocket } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Sparkles, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { IndustryIcon } from '@/components/saas/IndustryIcon';
+import { KanriLogo } from '@/components/saas/KanriLogo';
 import { markEntered } from './LandingHome';
 import {
   INDUSTRIES, PLANS, MODULES, getModule, getPlan, getIndustry,
@@ -72,10 +73,7 @@ export function Onboarding() {
     <div className="min-h-screen bg-[var(--color-app-bg)]">
       <header className="border-b border-[var(--color-app-border)] bg-white">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-[#0F0F10] flex items-center justify-center">
-            <Factory className="h-4 w-4 text-white" />
-          </div>
-          <span className="font-semibold text-[var(--color-app-text)]">KANRI</span>
+          <KanriLogo size={28} />
           <span className="text-sm text-[var(--color-app-text-muted)] ml-2">· Configura tu empresa</span>
           {isDemo && (
             <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]">
