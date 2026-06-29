@@ -20,6 +20,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useTenant } from '@/contexts/TenantContext';
+import { moduleKeyForPath } from '@/lib/saas';
 import { canAccessPath } from '@/lib/permissions';
 
 type NavItem = {
@@ -52,6 +54,7 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { user } = useAuth();
   const { company } = useCompany();
+  const { isEnabled } = useTenant();
   const brandName = company.commercial_name || company.legal_name || 'Empresa';
   const brandInitial = brandName.trim().charAt(0).toUpperCase() || 'E';
 
@@ -59,6 +62,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   // dashboard administrativo de /technicians.
   const filteredNavItems = navItems
     .filter(item => canAccessPath(user?.role, item.path))
+    // Gating por módulos habilitados de la empresa (tenant). Si la ruta no
+    // mapea a un módulo, se muestra.
+    .filter(item => {
+      const mk = moduleKeyForPath(item.path);
+      return mk ? isEnabled(mk) : true;
+    })
     .map(item =>
       user?.role === 'Técnico' && item.path === '/technicians'
         ? { ...item, name: 'Mi portal', path: '/technician-portal' }
