@@ -218,6 +218,7 @@ export interface Quote {
   subtotal: number;
   total: number;
   converted_project_id: string | null;
+  inventory_deducted?: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -231,6 +232,7 @@ export interface QuoteItem {
   quantity: number;
   material_price_id: string | null;
   material_name: string | null;
+  inventory_item_id?: string | null;
   material_qty: number;
   material_unit_cost: number;
   machining_hours: number;
@@ -492,6 +494,8 @@ export interface PurchaseOrderItem {
   purchase_order_id: string;
   requisition_id: string | null;
   bom_item_id: string | null;
+  /** Producto de inventario que se sumará al stock al recibir (opcional). */
+  inventory_item_id?: string | null;
   description: string;
   quantity: number;
   uom: string;

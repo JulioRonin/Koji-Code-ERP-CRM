@@ -9,9 +9,9 @@ const DEMO_KEY = 'koji_company_settings';
 /** Empresa por defecto (mientras no haya configuración guardada). */
 export const DEFAULT_COMPANY: CompanySettings = {
   id: 'default',
-  legal_name: 'IMC Design',
-  commercial_name: 'IMC Design',
-  tagline: 'Manufactura CNC de precisión',
+  legal_name: 'KANRI',
+  commercial_name: 'KANRI',
+  tagline: 'powered by KANRI',
   rfc: null,
   tax_regime: null,
   address_street: null,

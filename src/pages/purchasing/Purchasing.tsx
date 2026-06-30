@@ -45,8 +45,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { BOMManager } from '@/components/purchasing/BOMManager';
 import { ProjectPurchaseTracker } from '@/components/purchasing/ProjectPurchaseTracker';
+import { SuppliersTab } from '@/components/purchasing/SuppliersTab';
+import { PurchaseOrdersTab } from '@/components/purchasing/PurchaseOrdersTab';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useRequisitions, useBomItems, summarizePurchasing } from '@/lib/api';
+import {
+  useRequisitions, useBomItems, summarizePurchasing, useCreateRequisition,
+} from '@/lib/api';
 import type { Requisition, Priority, RequisitionStatus } from '@/types/database';
 
 const priorityVariant: Record<Priority, 'destructive' | 'warning' | 'secondary'> = {
@@ -79,8 +89,9 @@ export function Purchasing() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('by-project');
-  const { data: requisitions } = useRequisitions();
+  const { data: requisitions, refetch: refetchReqs } = useRequisitions();
   const { data: bomItems } = useBomItems();
+  const [newReqOpen, setNewReqOpen] = useState(false);
 
   // KPIs reales derivados de bom_items — desglose por estatus de compra
   const kpis = React.useMemo(() => {
@@ -259,14 +270,19 @@ export function Purchasing() {
 
       {activeTab === 'requisitions' && (
         <div className="space-y-4">
-          <div className="relative w-72">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
-            <Input
-              placeholder="Buscar requisiciones..."
-              value={globalFilter ?? ''}
-              onChange={e => setGlobalFilter(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex items-center justify-between gap-3">
+            <div className="relative w-72">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
+              <Input
+                placeholder="Buscar requisiciones..."
+                value={globalFilter ?? ''}
+                onChange={e => setGlobalFilter(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button onClick={() => setNewReqOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Nueva requisición
+            </Button>
           </div>
 
           <Card className="p-0">
@@ -319,39 +335,66 @@ export function Purchasing() {
 
       {activeTab === 'bom' && <BOMManager />}
 
-      {activeTab === 'pos' && (
-        <Card>
-          <CardContent className="p-12 flex flex-col items-center justify-center text-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-[var(--color-app-surface-alt)] flex items-center justify-center">
-              <ShoppingCart className="h-5 w-5 text-[var(--color-app-text-muted)]" />
-            </div>
-            <h3 className="text-base font-medium">Órdenes de compra</h3>
-            <p className="text-sm text-[var(--color-app-text-muted)] max-w-sm">
-              Las órdenes de compra se generan automáticamente tras aprobar requisiciones o requerimientos de BOM.
-            </p>
-            <Button variant="outline" size="sm">
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Crear PO manual
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {activeTab === 'pos' && <PurchaseOrdersTab />}
 
-      {activeTab === 'suppliers' && (
-        <Card>
-          <CardContent className="p-12 flex flex-col items-center justify-center text-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-[var(--color-app-surface-alt)] flex items-center justify-center">
-              <FileText className="h-5 w-5 text-[var(--color-app-text-muted)]" />
-            </div>
-            <h3 className="text-base font-medium">Directorio de proveedores</h3>
-            <p className="text-sm text-[var(--color-app-text-muted)] max-w-sm">
-              Gestiona tu red de proveedores certificados y monitorea el cumplimiento de entregas.
-            </p>
-            <Button variant="outline" size="sm">
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Añadir proveedor
-            </Button>
-          </CardContent>
-        </Card>
+      {activeTab === 'suppliers' && <SuppliersTab />}
+
+      {newReqOpen && (
+        <NewRequisitionModal onClose={() => setNewReqOpen(false)} onCreated={async () => { setNewReqOpen(false); await refetchReqs(); }} />
       )}
     </div>
+  );
+}
+
+function NewRequisitionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { create, loading } = useCreateRequisition();
+  const [description, setDescription] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [uom, setUom] = useState('Pzas');
+  const [priority, setPriority] = useState<Priority>('Media');
+  const [neededBy, setNeededBy] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    setError(null);
+    if (!description.trim()) return setError('Describe lo que necesitas.');
+    try {
+      await create({ description: description.trim(), quantity: Number(quantity) || 1, uom, priority, needed_by: neededBy || null });
+      onCreated();
+    } catch (e) { setError((e as Error).message); }
+  };
+
+  return (
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nueva requisición</DialogTitle>
+          <DialogDescription>Solicita una compra de material o servicio.</DialogDescription>
+        </DialogHeader>
+        {error && <div className="p-2.5 bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)] rounded-md text-sm">{error}</div>}
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">¿Qué necesitas?</label>
+            <Input value={description} onChange={e => setDescription(e.target.value)} autoFocus placeholder="Ej. Brocas HSS 6mm" />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1.5"><label className="text-xs font-medium">Cantidad</label><Input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} /></div>
+            <div className="space-y-1.5"><label className="text-xs font-medium">Unidad</label><Input value={uom} onChange={e => setUom(e.target.value)} /></div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Prioridad</label>
+              <Select value={priority} onValueChange={v => setPriority(v as Priority)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{(['Alta', 'Media', 'Baja'] as Priority[]).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5"><label className="text-xs font-medium">Necesaria para</label><Input type="date" value={neededBy} onChange={e => setNeededBy(e.target.value)} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={submit} disabled={loading}>{loading ? 'Creando…' : 'Crear requisición'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

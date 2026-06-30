@@ -167,6 +167,45 @@ interface MovementInput {
   reference?: string | null;
 }
 
+/**
+ * Aplica un movimiento de inventario de forma imperativa (sin hook). Lo usa la
+ * recepción de órdenes de compra para SUMAR al stock al recibir. En demo
+ * replica el trigger de la BD.
+ */
+export async function applyInventoryMovement(
+  itemId: string,
+  type: InventoryMovementType,
+  quantity: number,
+  reason?: string | null,
+  reference?: string | null
+): Promise<void> {
+  if (!supabase) {
+    const items = readItems();
+    const idx = items.findIndex(i => i.id === itemId);
+    if (idx < 0) return;
+    const cur = items[idx].stock;
+    const q = Math.abs(quantity);
+    const nw = type === 'entrada' ? cur + q : type === 'salida' ? cur - q : quantity;
+    items[idx] = { ...items[idx], stock: nw, updated_at: new Date().toISOString() };
+    writeItems(items);
+    writeMovs([
+      {
+        id: `mov-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`,
+        tenant_id: null, item_id: itemId, type,
+        quantity: type === 'ajuste' ? quantity : Math.abs(quantity),
+        reason: reason ?? null, reference: reference ?? null, balance_after: nw,
+        created_by: null, created_at: new Date().toISOString(),
+      },
+      ...readMovs(),
+    ]);
+    return;
+  }
+  const { error } = await supabase.from('inventory_movements').insert({
+    item_id: itemId, type, quantity, reason: reason ?? null, reference: reference ?? null,
+  });
+  if (error) throw error;
+}
+
 export interface BulkInventoryRow {
   sku: string | null;
   name: string;

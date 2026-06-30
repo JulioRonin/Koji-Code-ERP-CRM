@@ -50,11 +50,12 @@ export function initialModules(industry: Tenant['industry'], plan: PlanKey): Mod
   return Array.from(set);
 }
 
-/** Tenant de demostración (IMC Design) — el primer cliente del SaaS. */
+/** Tenant placeholder (genérico de marca) usado mientras se resuelve la empresa
+ *  real del usuario. No debe contener datos de ningún cliente específico. */
 export const DEFAULT_TENANT: Tenant = {
-  id: 'tenant-imc',
-  name: 'IMC Design',
-  slug: 'imc-design',
+  id: 'tenant-default',
+  name: 'KANRI',
+  slug: 'kanri',
   industry: 'cnc',
   plan: 'enterprise',
   enabledModules: initialModules('cnc', 'enterprise'),

@@ -19,7 +19,7 @@ function read(): Tenant[] {
   } catch {
     /* ignore */
   }
-  // Semilla: la empresa demo (IMC Design).
+  // Semilla: tenant placeholder genérico (sin datos de ningún cliente real).
   const seed = [DEFAULT_TENANT];
   write(seed);
   return seed;

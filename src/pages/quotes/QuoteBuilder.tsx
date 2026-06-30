@@ -35,6 +35,8 @@ import {
   useMaterialPrices,
   useCreateProject,
   useBulkInsertBom,
+  useInventoryItems,
+  applyInventoryMovement,
   computeQuoteItem,
   computeQuoteTotals,
 } from '@/lib/api';
@@ -65,6 +67,7 @@ function emptyItem(machineRate: number): DraftItem {
     quantity: 1,
     material_price_id: null,
     material_name: null,
+    inventory_item_id: null,
     material_qty: 0,
     material_unit_cost: 0,
     machining_hours: 0,
@@ -85,6 +88,7 @@ export function QuoteBuilder() {
   const { data: quote, refetch: refetchQuote } = useQuote(id);
   const { data: savedItems, loading: loadingItems } = useQuoteItems(id);
   const { data: materialPrices } = useMaterialPrices();
+  const { data: inventory } = useInventoryItems();
   const { update: updateQuote } = useUpdateQuote();
   const { save: saveItems, loading: saving } = useSaveQuoteItems();
   const { create: createProject } = useCreateProject();
@@ -154,6 +158,24 @@ export function QuoteBuilder() {
     });
   };
 
+  // Liga la partida a un producto del inventario: autorrellena descripción, no.
+  // de parte y costo (como "extra" por pieza). El stock se descuenta al aprobar.
+  const selectInventory = (index: number, invId: string) => {
+    if (!invId) {
+      patchItem(index, { inventory_item_id: null });
+      return;
+    }
+    const it = inventory.find(x => x.id === invId);
+    if (!it) return;
+    const cur = items[index];
+    patchItem(index, {
+      inventory_item_id: invId,
+      part_number: cur.part_number || it.sku || it.name,
+      description: cur.description || it.name,
+      extra_cost: it.unit_cost,
+    });
+  };
+
   const handleSave = async () => {
     if (!quote) return;
     await saveItems(quote.id, computedItems, taxPct);
@@ -165,6 +187,36 @@ export function QuoteBuilder() {
 
   const handleStatusChange = async (status: QuoteStatus) => {
     if (!quote) return;
+
+    // Al aprobar por primera vez, descuenta del inventario las partidas ligadas.
+    if (status === 'Aprobada' && !quote.inventory_deducted) {
+      const linked = computedItems.filter(it => it.inventory_item_id && it.quantity > 0);
+      if (linked.length > 0) {
+        const ok = window.confirm(
+          `Esta cotización tiene ${linked.length} partida(s) ligada(s) al inventario.\n` +
+          `Al aprobarla se descontará el stock correspondiente. ¿Continuar?`
+        );
+        if (!ok) return;
+        try {
+          for (const it of linked) {
+            await applyInventoryMovement(
+              it.inventory_item_id as string,
+              'salida',
+              it.quantity,
+              `Cotización ${quote.id}`,
+              quote.id
+            );
+          }
+        } catch (e) {
+          window.alert(`No se pudo descontar el inventario: ${(e as Error).message}`);
+          return;
+        }
+        await updateQuote(quote.id, { status, inventory_deducted: true });
+        await refetchQuote();
+        return;
+      }
+    }
+
     await updateQuote(quote.id, { status });
     await refetchQuote();
   };
@@ -460,6 +512,44 @@ export function QuoteBuilder() {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+
+                  {/* Componente de inventario (opcional, descuenta stock al aprobar) */}
+                  {inventory.length > 0 && (
+                    <div className="flex items-center gap-2 pl-8 flex-wrap">
+                      <label className="text-[10px] text-[var(--color-app-text-muted)] uppercase shrink-0">
+                        Inventario
+                      </label>
+                      <select
+                        value={it.inventory_item_id ?? ''}
+                        onChange={e => selectInventory(i, e.target.value)}
+                        className="h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 min-w-[220px]"
+                      >
+                        <option value="">Sin componente de inventario</option>
+                        {inventory.map(inv => (
+                          <option key={inv.id} value={inv.id}>
+                            {inv.name} · stock {inv.stock} {inv.uom}
+                          </option>
+                        ))}
+                      </select>
+                      {it.inventory_item_id && (() => {
+                        const inv = inventory.find(x => x.id === it.inventory_item_id);
+                        if (!inv) return null;
+                        const insufficient = inv.stock < it.quantity;
+                        return (
+                          <span
+                            className={cn(
+                              'text-xs inline-flex items-center gap-1',
+                              insufficient ? 'text-[var(--color-app-danger)]' : 'text-[var(--color-app-text-muted)]'
+                            )}
+                          >
+                            {insufficient
+                              ? `Stock insuficiente (${inv.stock} disp. / ${it.quantity} req.)`
+                              : `Se descontarán ${it.quantity} ${inv.uom} al aprobar`}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* Fila 2: costos */}
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-2 pl-8">
