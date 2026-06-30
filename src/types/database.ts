@@ -218,6 +218,7 @@ export interface Quote {
   subtotal: number;
   total: number;
   converted_project_id: string | null;
+  inventory_deducted?: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -231,6 +232,7 @@ export interface QuoteItem {
   quantity: number;
   material_price_id: string | null;
   material_name: string | null;
+  inventory_item_id?: string | null;
   material_qty: number;
   material_unit_cost: number;
   machining_hours: number;
