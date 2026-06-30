@@ -35,8 +35,30 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useProjects, useWorkOrders, useNcrs, useInspections, useMachines } from '@/lib/api';
-import type { Project, ProjectStatus } from '@/types/database';
+import type { DashboardMode, Project, ProjectStatus } from '@/types/database';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useTenant } from '@/contexts/TenantContext';
+import { SalesDashboard } from './SalesDashboard';
+
+/** Giros que por defecto usan el tablero de ventas (venden artículos). */
+const SALES_INDUSTRIES = ['herramientas', 'mro'];
+
+export function resolveDashboardMode(
+  mode: DashboardMode | null | undefined,
+  industry: string | undefined,
+): DashboardMode {
+  if (mode) return mode;
+  return industry && SALES_INDUSTRIES.includes(industry) ? 'sales' : 'operations';
+}
+
+/** Selecciona la variante de tablero según el giro / la configuración. */
+export function Dashboard() {
+  const { company } = useCompany();
+  const { tenant } = useTenant();
+  const mode = resolveDashboardMode(company.dashboard_mode, tenant?.industry);
+  return mode === 'sales' ? <SalesDashboard /> : <OperationsDashboard />;
+}
 
 const statusBadge: Partial<Record<ProjectStatus, { variant: 'default' | 'success' | 'warning' | 'secondary' | 'outline'; label: string }>> = {
   'En Producción': { variant: 'default',   label: 'En producción' },
@@ -59,7 +81,7 @@ const STATUS_COLORS: Record<string, string> = {
   'Entregado':      '#94a3b8',
 };
 
-export function Dashboard() {
+function OperationsDashboard() {
   const navigate = useNavigate();
   const { data: projects } = useProjects();
   const { data: workOrders } = useWorkOrders();

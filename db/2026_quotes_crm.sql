@@ -23,6 +23,10 @@ ALTER TABLE public.company_settings
     ADD COLUMN IF NOT EXISTS bank_beneficiary TEXT,
     ADD COLUMN IF NOT EXISTS payment_notes    TEXT;
 
+-- 1c) Variante de tablero por empresa (operations | sales) ------------------
+ALTER TABLE public.company_settings
+    ADD COLUMN IF NOT EXISTS dashboard_mode TEXT;
+
 -- 3a) Backfill de tenant_id en company_settings (solo si la columna existe) --
 --     Asigna las filas sin empresa a la empresa "IMC" original (o a la única
 --     empresa existente) para que la RESTRICTIVE de aislamiento no bloquee.

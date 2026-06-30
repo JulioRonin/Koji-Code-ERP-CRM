@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Lock,
   Landmark,
+  LayoutDashboard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +84,7 @@ export function CompanySettingsPage() {
       bank_clabe: company.bank_clabe ?? '',
       bank_beneficiary: company.bank_beneficiary ?? '',
       payment_notes: company.payment_notes ?? '',
+      dashboard_mode: company.dashboard_mode ?? null,
     });
   }, [company.id, company.updated_at]);
 
@@ -258,6 +260,37 @@ export function CompanySettingsPage() {
           <Field label="CLABE interbancaria" value={form.bank_clabe} onChange={v => set({ bank_clabe: v })} disabled={!isAdmin} mono placeholder="012180001234567890" />
           <div className="md:col-span-2">
             <Field label="Notas de pago" value={form.payment_notes} onChange={v => set({ payment_notes: v })} disabled={!isAdmin} placeholder="Ej. Anticipo 50%, referencia, moneda de pago…" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tipo de tablero (dashboard) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LayoutDashboard className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Tipo de tablero (dashboard)
+          </CardTitle>
+          <CardDescription>
+            Elige la vista del Dashboard según tu giro. "Ventas" muestra ventas por día/mes,
+            ventas por cliente y stock con mín/máx; "Operativo" muestra producción y proyectos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Tablero</label>
+            <select
+              value={form.dashboard_mode ?? ''}
+              onChange={e => set({ dashboard_mode: (e.target.value || null) as 'operations' | 'sales' | null })}
+              disabled={!isAdmin}
+              className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 disabled:opacity-60"
+            >
+              <option value="">Automático según el giro</option>
+              <option value="sales">Ventas (comercio / proveeduría)</option>
+              <option value="operations">Operativo (manufactura / proyectos)</option>
+            </select>
+          </div>
+          <div className="text-xs text-[var(--color-app-text-muted)] flex items-end pb-2">
+            Giros que venden artículos (herramientas, MRO) usan "Ventas" por defecto. Guarda para aplicarlo.
           </div>
         </CardContent>
       </Card>

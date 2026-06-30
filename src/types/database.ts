@@ -106,9 +106,14 @@ export interface CompanySettings {
   bank_clabe?: string | null;
   bank_beneficiary?: string | null;
   payment_notes?: string | null;
+  dashboard_mode?: DashboardMode | null;
   created_at: string;
   updated_at: string;
 }
+
+/** Variante de tablero según el giro: operativo (manufactura/proyectos) o
+ *  ventas (comercio/proveeduría que vende artículos). */
+export type DashboardMode = 'operations' | 'sales';
 
 // ============================================================================
 // TABLA: profiles
