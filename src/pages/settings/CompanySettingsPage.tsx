@@ -47,7 +47,9 @@ export function CompanySettingsPage() {
   const { company, refresh } = useCompany();
   const { user } = useAuth();
   const { update, loading } = useUpdateCompanySettings();
-  const isAdmin = !!user && ADMIN_ROLES.includes(user.role);
+  const isAdmin = !!user && (
+    ADMIN_ROLES.includes(user.role) || user.isPlatformOwner || /admin/i.test(user.role ?? '')
+  );
 
   const [form, setForm] = useState<CompanySettingsInput>({});
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
@@ -152,8 +154,8 @@ export function CompanySettingsPage() {
           <CardDescription>Nombre que verán tus usuarios y clientes en la app y reportes.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Razón social *" value={form.legal_name} onChange={v => set({ legal_name: v })} disabled={!isAdmin} placeholder="IMC Design S.A. de C.V." />
-          <Field label="Nombre comercial" value={form.commercial_name} onChange={v => set({ commercial_name: v })} disabled={!isAdmin} placeholder="IMC Design" />
+          <Field label="Razón social *" value={form.legal_name} onChange={v => set({ legal_name: v })} disabled={!isAdmin} placeholder="Mi Empresa S.A. de C.V." />
+          <Field label="Nombre comercial" value={form.commercial_name} onChange={v => set({ commercial_name: v })} disabled={!isAdmin} placeholder="Mi Empresa" />
           <Field label="Tagline / giro" value={form.tagline} onChange={v => set({ tagline: v })} disabled={!isAdmin} placeholder="Manufactura CNC de precisión" />
           <Field label="Logo (URL)" value={form.logo_url} onChange={v => set({ logo_url: v })} disabled={!isAdmin} placeholder="https://…/logo.png" />
         </CardContent>

@@ -17,6 +17,7 @@ import {
   Calculator,
   Boxes,
   Layers,
+  Contact,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { name: 'Dashboard',    path: '/',            icon: LayoutDashboard },
+  { name: 'Clientes',     path: '/customers',   icon: Contact },
   { name: 'Cotizaciones', path: '/quotes',      icon: Calculator },
   { name: 'Inventario',   path: '/inventory',   icon: Boxes },
   { name: 'Proyectos',    path: '/projects',    icon: FolderKanban },

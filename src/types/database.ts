@@ -207,6 +207,7 @@ export interface Quote {
   id: string;
   customer_id: string | null;
   client_name: string;
+  client_email?: string | null;
   project_name: string;
   status: QuoteStatus;
   currency: string;
@@ -214,6 +215,7 @@ export interface Quote {
   tax_pct: number;
   machine_rate_per_hour: number;
   valid_until: string | null;
+  delivery_time?: string | null;
   notes: string | null;
   subtotal: number;
   total: number;

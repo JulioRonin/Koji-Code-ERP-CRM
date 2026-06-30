@@ -40,11 +40,13 @@ import {
 import {
   useQuotes,
   useCreateQuote,
+  useCustomers,
   useMaterialPrices,
   useUpsertMaterialPrice,
   useDeleteMaterialPrice,
   useBulkImportMaterialPrices,
 } from '@/lib/api';
+import { Combobox } from '@/components/ui/combobox';
 import type { MaterialPrice, QuoteStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -71,9 +73,10 @@ export function Quotes() {
   const [activeTab, setActiveTab] = useState<Tab>('quotes');
   const { data: quotes, refetch: refetchQuotes } = useQuotes();
   const { create: createQuote, loading: creating } = useCreateQuote();
+  const { data: customers } = useCustomers();
 
   const [showNew, setShowNew] = useState(false);
-  const [draft, setDraft] = useState({ client: '', project: '' });
+  const [draft, setDraft] = useState({ client: '', project: '', email: '', customerId: '', delivery: '' });
 
   const stats = useMemo(() => {
     const open = quotes.filter(q => q.status === 'Borrador' || q.status === 'Enviada');
@@ -85,11 +88,27 @@ export function Quotes() {
 
   const handleCreate = async () => {
     if (!draft.client || !draft.project) return;
-    const quote = await createQuote({ client_name: draft.client, project_name: draft.project });
+    const quote = await createQuote({
+      client_name: draft.client,
+      client_email: draft.email || null,
+      customer_id: draft.customerId || null,
+      project_name: draft.project,
+      delivery_time: draft.delivery || null,
+    });
     setShowNew(false);
-    setDraft({ client: '', project: '' });
+    setDraft({ client: '', project: '', email: '', customerId: '', delivery: '' });
     await refetchQuotes();
     navigate(`/quotes/${quote.id}`);
+  };
+
+  const pickCustomer = (id: string | null) => {
+    const c = id ? customers.find(x => x.id === id) : null;
+    setDraft(d => ({
+      ...d,
+      customerId: id ?? '',
+      client: c ? c.name : d.client,
+      email: c?.contact_email ?? d.email,
+    }));
   };
 
   return (
@@ -198,13 +217,39 @@ export function Quotes() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Cliente</label>
-              <Input
-                placeholder="Ej. BRP, Bosch..."
-                value={draft.client}
-                onChange={e => setDraft({ ...draft, client: e.target.value })}
-              />
+            {customers.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Cliente registrado</label>
+                <Combobox
+                  options={customers.map(c => ({ value: c.id, label: c.name, hint: c.tax_id ?? undefined }))}
+                  value={draft.customerId || null}
+                  onChange={pickCustomer}
+                  placeholder="Buscar cliente del CRM…"
+                  searchPlaceholder="Escribe para buscar…"
+                />
+                <p className="text-[11px] text-[var(--color-app-text-muted)]">
+                  ¿No está en la lista? Escríbelo abajo o regístralo en <span className="font-medium">Clientes</span>.
+                </p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Cliente</label>
+                <Input
+                  placeholder="Ej. BRP, Bosch..."
+                  value={draft.client}
+                  onChange={e => setDraft({ ...draft, client: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Correo del cliente</label>
+                <Input
+                  type="email"
+                  placeholder="cliente@empresa.com"
+                  value={draft.email}
+                  onChange={e => setDraft({ ...draft, email: e.target.value })}
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Nombre del proyecto</label>
@@ -212,6 +257,14 @@ export function Quotes() {
                 placeholder="Ej. Bujes para línea de ensamble"
                 value={draft.project}
                 onChange={e => setDraft({ ...draft, project: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Tiempo de entrega</label>
+              <Input
+                placeholder="Ej. 15 días hábiles"
+                value={draft.delivery}
+                onChange={e => setDraft({ ...draft, delivery: e.target.value })}
               />
             </div>
           </div>

@@ -316,10 +316,13 @@ export function useQuoteItems(quoteId: string | undefined): AsyncState<QuoteItem
 
 interface CreateQuoteInput {
   client_name: string;
+  client_email?: string | null;
+  customer_id?: string | null;
   project_name: string;
   margin_pct?: number;
   machine_rate_per_hour?: number;
   valid_until?: string | null;
+  delivery_time?: string | null;
   notes?: string | null;
 }
 
@@ -335,8 +338,9 @@ export function useCreateQuote() {
 
       const draft: Quote = {
         id,
-        customer_id: null,
+        customer_id: input.customer_id ?? null,
         client_name: input.client_name,
+        client_email: input.client_email ?? null,
         project_name: input.project_name,
         status: 'Borrador',
         currency: 'MXN',
@@ -344,6 +348,7 @@ export function useCreateQuote() {
         tax_pct: 16,
         machine_rate_per_hour: input.machine_rate_per_hour ?? 650,
         valid_until: input.valid_until ?? null,
+        delivery_time: input.delivery_time ?? null,
         notes: input.notes ?? null,
         subtotal: 0,
         total: 0,
@@ -359,7 +364,13 @@ export function useCreateQuote() {
         return draft;
       }
 
-      const { data, error } = await supabase.from('quotes').insert(draft).select('*').single();
+      let { data, error } = await supabase.from('quotes').insert(draft).select('*').single();
+      // Resiliencia: si faltan columnas nuevas (migración pendiente), reintenta
+      // sin ellas para no bloquear la creación de la cotización.
+      if (error && /client_email|delivery_time/i.test(error.message)) {
+        const { client_email: _e, delivery_time: _d, ...base } = draft;
+        ({ data, error } = await supabase.from('quotes').insert(base).select('*').single());
+      }
       if (error) throw error;
       setState({ loading: false, error: null });
       return data as Quote;
@@ -390,10 +401,14 @@ export function useUpdateQuote() {
         setState({ loading: false, error: null });
         return;
       }
-      const { error } = await supabase
+      let { error } = await supabase
         .from('quotes')
         .update({ ...patch, updated_at: now })
         .eq('id', id);
+      if (error && /client_email|delivery_time|inventory_deducted/i.test(error.message)) {
+        const { client_email: _e, delivery_time: _d, inventory_deducted: _x, ...rest } = patch;
+        ({ error } = await supabase.from('quotes').update({ ...rest, updated_at: now }).eq('id', id));
+      }
       if (error) throw error;
       setState({ loading: false, error: null });
     } catch (err) {
@@ -444,7 +459,14 @@ export function useSaveQuoteItems() {
         const { error: delErr } = await supabase.from('quote_items').delete().eq('quote_id', quoteId);
         if (delErr) throw delErr;
         if (rows.length > 0) {
-          const { error: insErr } = await supabase.from('quote_items').insert(rows);
+          let { error: insErr } = await supabase.from('quote_items').insert(rows);
+          // Resiliencia: si aún no se corrió la migración que agrega
+          // inventory_item_id, reintenta sin esa columna para no bloquear el
+          // guardado (el resto de la cotización sí persiste).
+          if (insErr && /inventory_item_id/i.test(insErr.message)) {
+            const stripped = rows.map(({ inventory_item_id: _omit, ...r }) => r);
+            ({ error: insErr } = await supabase.from('quote_items').insert(stripped));
+          }
           if (insErr) throw insErr;
         }
         const { error: updErr } = await supabase

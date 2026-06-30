@@ -30,7 +30,7 @@ export const ROLE_ACCESS: Record<string, string[]> = {
   Administrador: ['ALL'],
   'Administración / PM': ['ALL'],
   Diseñador: ['/', '/projects', '/design', '/chat'],
-  Compras: ['/', '/projects', '/quotes', '/inventory', '/chat', '/purchasing', '/billing'],
+  Compras: ['/', '/projects', '/quotes', '/customers', '/inventory', '/chat', '/purchasing', '/billing'],
   Producción: ['/', '/chat', '/inventory', '/quality', '/technicians', '/production'],
   Calidad: ['/', '/chat', '/quality', '/technicians', '/production'],
   // Rol por defecto del schema (DEFAULT 'Operador'). Le damos el mismo
