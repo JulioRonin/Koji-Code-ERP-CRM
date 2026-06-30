@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import type { Customer } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
 
@@ -31,7 +32,7 @@ export function useCustomers(): AsyncState<Customer[]> {
   return useAsync<Customer[]>(
     async () => {
       if (!supabase) return read().sort((a, b) => a.name.localeCompare(b.name));
-      const { data, error } = await supabase.from('customers').select('*').order('name');
+      const { data, error } = await scopeByTenant(supabase.from('customers').select('*')).order('name');
       if (error) throw error;
       return (data ?? []) as Customer[];
     },

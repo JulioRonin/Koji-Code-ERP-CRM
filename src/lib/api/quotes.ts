@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import type { MaterialPrice, Quote, QuoteItem, QuoteStatus } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
 
@@ -94,9 +95,9 @@ export function useMaterialPrices(): AsyncState<MaterialPrice[]> {
   return useAsync<MaterialPrice[]>(
     async () => {
       if (!supabase) return readDemoPrices();
-      const { data, error } = await supabase
+      const { data, error } = await scopeByTenant(supabase
         .from('material_prices')
-        .select('*')
+        .select('*'))
         .order('material');
       if (error) throw error;
       return (data ?? []) as MaterialPrice[];
@@ -266,9 +267,9 @@ export function useQuotes(): AsyncState<Quote[]> {
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
       }
-      const { data, error } = await supabase
+      const { data, error } = await scopeByTenant(supabase
         .from('quotes')
-        .select('*')
+        .select('*'))
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as Quote[];

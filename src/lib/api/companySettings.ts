@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import type { CompanySettings } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
 
@@ -68,9 +69,9 @@ export function useCompanySettings(): AsyncState<CompanySettings> {
         return readDemo() ?? DEFAULT_COMPANY;
       }
       try {
-        const { data, error } = await supabase
+        const { data, error } = await scopeByTenant(supabase
           .from('company_settings')
-          .select('*')
+          .select('*'))
           .order('created_at', { ascending: true })
           .limit(1);
         if (error) throw error;

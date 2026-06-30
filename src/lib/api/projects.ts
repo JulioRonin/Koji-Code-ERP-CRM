@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import { MOCK_PROJECTS } from './mocks';
 import type { Project, ProjectStatus } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
@@ -12,9 +13,9 @@ export function useProjects(): AsyncState<Project[]> {
   return useAsync<Project[]>(
     async () => {
       if (!supabase) return MOCK_PROJECTS;
-      const { data, error } = await supabase
+      const { data, error } = await scopeByTenant(supabase
         .from('projects')
-        .select('*')
+        .select('*'))
         .order('updated_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as Project[];

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import { applyInventoryMovement } from './inventory';
 import { MOCK_REQUISITIONS, MOCK_SUPPLIERS } from './mocks';
 import type {
@@ -34,7 +35,7 @@ export function useSuppliers(): AsyncState<Supplier[]> {
   return useAsync<Supplier[]>(
     async () => {
       if (!supabase) return read(SUP_KEY, MOCK_SUPPLIERS);
-      const { data, error } = await supabase.from('suppliers').select('*').order('name');
+      const { data, error } = await scopeByTenant(supabase.from('suppliers').select('*')).order('name');
       if (error) throw error;
       return (data ?? []) as Supplier[];
     },
@@ -116,7 +117,7 @@ export function useRequisitions(): AsyncState<Requisition[]> {
   return useAsync<Requisition[]>(
     async () => {
       if (!supabase) return read(REQ_KEY, MOCK_REQUISITIONS);
-      const { data, error } = await supabase.from('requisitions').select('*').order('created_at', { ascending: false });
+      const { data, error } = await scopeByTenant(supabase.from('requisitions').select('*')).order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as Requisition[];
     },
@@ -180,7 +181,7 @@ export function usePurchaseOrders(): AsyncState<PurchaseOrder[]> {
   return useAsync<PurchaseOrder[]>(
     async () => {
       if (!supabase) return read<PurchaseOrder>(PO_KEY, []);
-      const { data, error } = await supabase.from('purchase_orders').select('*').order('created_at', { ascending: false });
+      const { data, error } = await scopeByTenant(supabase.from('purchase_orders').select('*')).order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as PurchaseOrder[];
     },

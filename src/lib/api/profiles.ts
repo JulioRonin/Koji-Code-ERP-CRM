@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import { MOCK_PROFILES } from './mocks';
 import type { Profile, ProfileMetadata } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
@@ -36,7 +37,7 @@ export function useProfiles(
       const matchMock = (p: Profile) =>
         (!role || p.role === role) && (!department || p.department === department);
       if (!supabase) return MOCK_PROFILES.filter(matchMock);
-      let query = supabase.from('profiles').select('*').order('full_name');
+      let query = scopeByTenant(supabase.from('profiles').select('*')).order('full_name');
       if (role) query = query.eq('role', role);
       if (department) query = query.eq('department', department);
       const { data, error } = await query;
@@ -62,9 +63,9 @@ export function useTechnicians(): AsyncState<Profile[]> {
       if (!supabase) return MOCK_PROFILES.filter(matchesTech);
       // En Supabase usamos ILIKE para captar las variantes en una sola
       // query, sin asumir mayúsculas o acentos exactos.
-      const { data, error } = await supabase
+      const { data, error } = await scopeByTenant(supabase
         .from('profiles')
-        .select('*')
+        .select('*'))
         .or('role.ilike.Técnico%,role.ilike.Tecnico%')
         .order('full_name');
       if (error) throw error;

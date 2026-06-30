@@ -13,7 +13,7 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { tenant } = useTenant();
+  const { tenant, loading: tenantLoading } = useTenant();
   const { user } = useAuth();
 
   // Gating de suscripción: si la demo terminó (o el pago está vencido) y no es
@@ -50,6 +50,17 @@ export function AppShell() {
       document.body.style.overflow = '';
     };
   }, [sidebarOpen]);
+
+  // Espera a resolver la empresa activa antes de montar los módulos: así los
+  // hooks de datos ya filtran por la empresa correcta (evita ver, por un
+  // instante, datos/marca de otra empresa al entrar).
+  if (tenantLoading) {
+    return (
+      <div className="h-[100dvh] w-screen flex items-center justify-center bg-[var(--color-app-bg)]">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--color-app-primary)]" />
+      </div>
+    );
+  }
 
   // Demo terminada → pantalla de suscripción a pantalla completa.
   if (blocked) {
