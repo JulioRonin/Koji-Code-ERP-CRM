@@ -247,10 +247,15 @@ export function useCreatePurchaseOrder() {
       }
       const { error: e1 } = await supabase.from('purchase_orders').insert(po);
       if (e1) throw e1;
+      // line_total es columna GENERATED en la BD: NO se inserta (la calcula sola).
       const { error: e2 } = await supabase.from('purchase_order_items').insert(
-        items.map(({ id: _i, ...rest }) => rest) // dejar que la BD genere el uuid
+        items.map(({ id: _i, line_total: _lt, ...rest }) => rest)
       );
-      if (e2) throw e2;
+      if (e2) {
+        // Evita dejar una OC huérfana (sin partidas) si fallan las partidas.
+        await supabase.from('purchase_orders').delete().eq('id', id);
+        throw e2;
+      }
       setState({ loading: false, error: null });
       return po;
     } catch (err) { const e = err as Error; setState({ loading: false, error: e }); throw e; }
@@ -276,6 +281,28 @@ export function useUpdatePoStatus() {
     } catch (err) { const e = err as Error; setState({ loading: false, error: e }); throw e; }
   }, []);
   return { update, ...state };
+}
+
+/** Elimina una OC y sus partidas. */
+export function useDeletePurchaseOrder() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+  const remove = useCallback(async (poId: string): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        write(POI_KEY, read<PurchaseOrderItem>(POI_KEY, []).filter(i => i.purchase_order_id !== poId));
+        write(PO_KEY, read<PurchaseOrder>(PO_KEY, []).filter(p => p.id !== poId));
+        setState({ loading: false, error: null });
+        return;
+      }
+      // Borra partidas primero por si la FK no tiene ON DELETE CASCADE.
+      await supabase.from('purchase_order_items').delete().eq('purchase_order_id', poId);
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', poId);
+      if (error) throw error;
+      setState({ loading: false, error: null });
+    } catch (err) { const e = err as Error; setState({ loading: false, error: e }); throw e; }
+  }, []);
+  return { remove, ...state };
 }
 
 /** Recibe una OC: marca recibida, fija received_qty y SUMA al inventario. */

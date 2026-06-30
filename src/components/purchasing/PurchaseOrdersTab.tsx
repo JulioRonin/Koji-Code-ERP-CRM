@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, PackageCheck, Send, Truck } from 'lucide-react';
+import { Plus, Trash2, PackageCheck, Send, Truck, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,8 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  usePurchaseOrders, useSuppliers, useInventoryItems,
-  useCreatePurchaseOrder, useUpdatePoStatus, useReceivePurchaseOrder,
+  usePurchaseOrders, useSuppliers, useInventoryItems, usePurchaseOrderItems,
+  useCreatePurchaseOrder, useUpdatePoStatus, useReceivePurchaseOrder, useDeletePurchaseOrder,
 } from '@/lib/api';
 import type { PoStatus, PurchaseOrder } from '@/types/database';
 
@@ -27,7 +27,9 @@ export function PurchaseOrdersTab() {
   const { data: suppliers } = useSuppliers();
   const { update: setStatus } = useUpdatePoStatus();
   const { receive } = useReceivePurchaseOrder();
+  const { remove } = useDeletePurchaseOrder();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<PurchaseOrder | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const supplierName = (id: string) => suppliers.find(s => s.id === id)?.name ?? id;
@@ -40,6 +42,11 @@ export function PurchaseOrdersTab() {
     if (!window.confirm(`¿Marcar la orden ${po.id} como recibida? Se sumarán las cantidades al inventario.`)) return;
     setBusy(po.id);
     try { await receive(po.id); await refetch(); } catch (e) { window.alert((e as Error).message); } finally { setBusy(null); }
+  };
+  const doDelete = async (po: PurchaseOrder) => {
+    if (!window.confirm(`¿Eliminar la orden ${po.id}? Esta acción no se puede deshacer.`)) return;
+    setBusy(po.id);
+    try { await remove(po.id); await refetch(); } catch (e) { window.alert((e as Error).message); } finally { setBusy(null); }
   };
 
   return (
@@ -72,14 +79,17 @@ export function PurchaseOrdersTab() {
               </TableHeader>
               <TableBody>
                 {pos.map(po => (
-                  <TableRow key={po.id}>
+                  <TableRow key={po.id} className="cursor-pointer" onClick={() => setDetail(po)}>
                     <TableCell className="font-mono text-xs">{po.id}</TableCell>
                     <TableCell>{supplierName(po.supplier_id)}</TableCell>
                     <TableCell className="text-right tabular-nums">{MXN.format(po.total_amount)}</TableCell>
                     <TableCell className="text-[var(--color-app-text-muted)]">{po.expected_delivery ?? '—'}</TableCell>
                     <TableCell><Badge variant={STATUS_VARIANT[po.status] ?? 'secondary'}>{po.status.replace('_', ' ')}</Badge></TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" className="h-8" onClick={() => setDetail(po)} title="Ver detalles">
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
                         {po.status === 'Borrador' && (
                           <Button variant="ghost" size="sm" className="h-8" disabled={busy === po.id} onClick={() => emit(po)} title="Emitir">
                             <Send className="h-3.5 w-3.5 mr-1" /> Emitir
@@ -91,6 +101,9 @@ export function PurchaseOrdersTab() {
                           </Button>
                         )}
                         {po.status === 'Recibida' && <span className="text-xs text-[var(--color-app-success)] inline-flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Recibida</span>}
+                        <Button variant="ghost" size="sm" className="h-8 text-[var(--color-app-danger)]" disabled={busy === po.id} onClick={() => doDelete(po)} title="Eliminar">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -102,7 +115,99 @@ export function PurchaseOrdersTab() {
       </Card>
 
       {open && <PoModal onClose={() => setOpen(false)} onSaved={async () => { setOpen(false); await refetch(); }} />}
+      {detail && (
+        <PoDetailModal
+          po={detail}
+          supplierName={supplierName(detail.supplier_id)}
+          onClose={() => setDetail(null)}
+          onEmit={async () => { await emit(detail); setDetail(null); }}
+          onReceive={async () => { await doReceive(detail); setDetail(null); }}
+          onDelete={async () => { await doDelete(detail); setDetail(null); }}
+        />
+      )}
     </div>
+  );
+}
+
+function PoDetailModal({
+  po, supplierName, onClose, onEmit, onReceive, onDelete,
+}: {
+  po: PurchaseOrder;
+  supplierName: string;
+  onClose: () => void;
+  onEmit: () => void;
+  onReceive: () => void;
+  onDelete: () => void;
+}) {
+  const { data: items, loading } = usePurchaseOrderItems(po.id);
+
+  return (
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="font-mono text-sm">{po.id}</span>
+            <Badge variant={STATUS_VARIANT[po.status] ?? 'secondary'}>{po.status.replace('_', ' ')}</Badge>
+          </DialogTitle>
+          <DialogDescription>{supplierName}</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div><span className="text-[var(--color-app-text-muted)]">Entrega esperada:</span> {po.expected_delivery ?? '—'}</div>
+          <div className="text-right"><span className="text-[var(--color-app-text-muted)]">Total:</span> <span className="font-semibold tabular-nums">{MXN.format(po.total_amount)}</span></div>
+          {po.issued_at && <div><span className="text-[var(--color-app-text-muted)]">Emitida:</span> {new Date(po.issued_at).toLocaleDateString('es-MX')}</div>}
+          {po.received_at && <div><span className="text-[var(--color-app-text-muted)]">Recibida:</span> {new Date(po.received_at).toLocaleDateString('es-MX')}</div>}
+        </div>
+
+        <div className="rounded-md border border-[var(--color-app-border)] overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="text-right">Cant.</TableHead>
+                <TableHead className="text-right">P. unit.</TableHead>
+                <TableHead className="text-right">Importe</TableHead>
+                <TableHead className="text-right">Recibido</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-6 text-sm text-[var(--color-app-text-muted)]">Cargando…</TableCell></TableRow>
+              ) : items.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-6 text-sm text-[var(--color-app-text-muted)]">Sin partidas.</TableCell></TableRow>
+              ) : (
+                items.map(it => (
+                  <TableRow key={it.id}>
+                    <TableCell>
+                      {it.description}
+                      {it.inventory_item_id && <span className="ml-1.5 text-[10px] text-[var(--color-app-primary)] align-middle">↳ inventario</span>}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{it.quantity} {it.uom}</TableCell>
+                    <TableCell className="text-right tabular-nums">{MXN.format(it.unit_price)}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{MXN.format(it.line_total)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{it.received_qty ?? 0}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {po.notes && <p className="text-sm text-[var(--color-app-text-muted)]">{po.notes}</p>}
+
+        <DialogFooter className="flex-wrap gap-2">
+          <Button variant="ghost" className="text-[var(--color-app-danger)] mr-auto" onClick={onDelete}>
+            <Trash2 className="h-4 w-4 mr-1.5" /> Eliminar
+          </Button>
+          {po.status === 'Borrador' && (
+            <Button variant="outline" onClick={onEmit}><Send className="h-4 w-4 mr-1.5" /> Emitir</Button>
+          )}
+          {po.status !== 'Recibida' && po.status !== 'Cancelada' && po.status !== 'Borrador' && (
+            <Button onClick={onReceive}><PackageCheck className="h-4 w-4 mr-1.5" /> Recibir</Button>
+          )}
+          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
