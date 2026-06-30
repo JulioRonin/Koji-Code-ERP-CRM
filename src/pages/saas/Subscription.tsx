@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, Clock, AlertTriangle, CreditCard, ShieldCheck, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,12 +14,35 @@ import { PLANS, formatMxn, effectivePrice, getPlan, daysLeft, subState, type Pla
 /** Página de suscripción. Con `blocked` se usa como pantalla bloqueante cuando
  *  la demo terminó (cubre toda la pantalla, fuera del AppShell). */
 export function Subscription({ blocked = false }: { blocked?: boolean }) {
-  const { tenant } = useTenant();
+  const { tenant, refresh } = useTenant();
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [annual, setAnnual] = useState(tenant.subscription.billingCycle === 'annual');
   const [busyPlan, setBusyPlan] = useState<PlanKey | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Al volver de Stripe: refresca el estado del tenant (el webhook ya lo activó)
+  // y muestra confirmación. Reintenta unas veces por si el webhook tarda.
+  useEffect(() => {
+    const checkout = params.get('checkout');
+    if (!checkout) return;
+    if (checkout === 'success') {
+      setNotice('¡Pago recibido! Estamos activando tu suscripción…');
+      let tries = 0;
+      const poll = setInterval(async () => {
+        tries += 1;
+        await refresh();
+        if (tries >= 5) clearInterval(poll);
+      }, 2500);
+    } else if (checkout === 'cancel') {
+      setNotice('Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.');
+    }
+    params.delete('checkout');
+    setParams(params, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const state = subState(tenant);
   const left = daysLeft(tenant);
@@ -86,6 +109,12 @@ export function Subscription({ blocked = false }: { blocked?: boolean }) {
       </div>
 
       <StatusBanner />
+
+      {notice && (
+        <div className="p-3 rounded-md bg-[var(--color-app-success-soft)]/60 border border-[var(--color-app-success)]/30 text-sm text-[var(--color-app-text)]">
+          {notice}
+        </div>
+      )}
 
       {error && (
         <div className="p-3 rounded-md bg-[var(--color-app-warning-soft)]/60 border border-[var(--color-app-warning)]/30 text-sm text-[var(--color-app-text)]">
