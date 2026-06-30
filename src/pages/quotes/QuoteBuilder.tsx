@@ -114,26 +114,29 @@ export function QuoteBuilder() {
     setHydrated(true);
   }, [loadingItems, savedItems, hydrated]);
 
-  const marginDefault = quote?.margin_pct ?? 30;
+  // Cotización simple (venta de insumos): sin margen/costeo; precio directo.
+  const simple = company.quote_simple === true;
+  const marginDefault = simple ? 0 : (quote?.margin_pct ?? 30);
   const machineRate = quote?.machine_rate_per_hour ?? 650;
   const taxPct = quote?.tax_pct ?? 16;
 
-  // Recalcula precios derivados de cada draft (en render, no en estado)
+  // Recalcula precios derivados de cada draft (en render, no en estado).
+  // En modo simple el precio unitario es el capturado (extra_cost) sin margen.
   const computedItems: DraftItem[] = useMemo(
     () =>
       items.map(it => {
         const { unitPrice, lineTotal } = computeQuoteItem({
-          material_qty: it.material_qty,
-          material_unit_cost: it.material_unit_cost,
-          machining_hours: it.machining_hours,
-          machine_rate: it.machine_rate,
+          material_qty: simple ? 0 : it.material_qty,
+          material_unit_cost: simple ? 0 : it.material_unit_cost,
+          machining_hours: simple ? 0 : it.machining_hours,
+          machine_rate: simple ? 0 : it.machine_rate,
           extra_cost: it.extra_cost,
-          margin_pct: it.margin_pct ?? marginDefault,
+          margin_pct: simple ? 0 : (it.margin_pct ?? marginDefault),
           quantity: it.quantity,
         });
         return { ...it, unit_price: unitPrice, line_total: lineTotal };
       }),
-    [items, marginDefault]
+    [items, marginDefault, simple]
   );
 
   const totals = useMemo(
@@ -179,7 +182,8 @@ export function QuoteBuilder() {
       inventory_item_id: invId,
       part_number: cur.part_number || it.sku || it.name,
       description: cur.description || it.name,
-      extra_cost: it.unit_cost,
+      // En modo simple el precio = precio de venta; en costeo = costo del producto.
+      extra_cost: simple ? it.unit_price : it.unit_cost,
     });
   };
 
@@ -480,22 +484,26 @@ export function QuoteBuilder() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs text-[var(--color-app-text-muted)]">Margen (%)</label>
-              <Input
-                type="number"
-                defaultValue={quote.margin_pct}
-                onBlur={e => handleHeaderChange({ margin_pct: Number(e.target.value) || 30 })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs text-[var(--color-app-text-muted)]">Tarifa máquina ($/hr)</label>
-              <Input
-                type="number"
-                defaultValue={quote.machine_rate_per_hour}
-                onBlur={e => handleHeaderChange({ machine_rate_per_hour: Number(e.target.value) || 650 })}
-              />
-            </div>
+            {!simple && (
+              <div className="space-y-1.5">
+                <label className="text-xs text-[var(--color-app-text-muted)]">Margen (%)</label>
+                <Input
+                  type="number"
+                  defaultValue={quote.margin_pct}
+                  onBlur={e => handleHeaderChange({ margin_pct: Number(e.target.value) || 30 })}
+                />
+              </div>
+            )}
+            {!simple && (
+              <div className="space-y-1.5">
+                <label className="text-xs text-[var(--color-app-text-muted)]">Tarifa máquina ($/hr)</label>
+                <Input
+                  type="number"
+                  defaultValue={quote.machine_rate_per_hour}
+                  onBlur={e => handleHeaderChange({ machine_rate_per_hour: Number(e.target.value) || 650 })}
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <label className="text-xs text-[var(--color-app-text-muted)]">Vigencia hasta</label>
               <Input
@@ -648,7 +656,24 @@ export function QuoteBuilder() {
                     </div>
                   )}
 
-                  {/* Fila 2: costos */}
+                  {/* Fila 2: precio directo (modo simple) */}
+                  {simple && (
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-2 pl-8">
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-[10px] text-[var(--color-app-text-muted)] uppercase">Precio unitario</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="h-8 text-xs"
+                          value={it.extra_cost || ''}
+                          onChange={e => patchItem(i, { extra_cost: Number(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fila 2: costos (modo costeo / manufactura) */}
+                  {!simple && (
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-2 pl-8">
                     <div className="space-y-1 col-span-2">
                       <label className="text-[10px] text-[var(--color-app-text-muted)] uppercase">Material</label>
@@ -708,6 +733,7 @@ export function QuoteBuilder() {
                       />
                     </div>
                   </div>
+                  )}
 
                   {/* Fila 3: plano + resultados */}
                   <div className="flex items-center justify-between gap-3 pl-8 flex-wrap">

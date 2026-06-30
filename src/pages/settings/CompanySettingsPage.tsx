@@ -85,6 +85,7 @@ export function CompanySettingsPage() {
       bank_beneficiary: company.bank_beneficiary ?? '',
       payment_notes: company.payment_notes ?? '',
       dashboard_mode: company.dashboard_mode ?? null,
+      quote_simple: company.quote_simple ?? false,
     });
   }, [company.id, company.updated_at]);
 
@@ -291,6 +292,21 @@ export function CompanySettingsPage() {
           </div>
           <div className="text-xs text-[var(--color-app-text-muted)] flex items-end pb-2">
             Giros que venden artículos (herramientas, MRO) usan "Ventas" por defecto. Guarda para aplicarlo.
+          </div>
+          <div className="md:col-span-2 pt-2 border-t border-[var(--color-app-border)]">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={!!form.quote_simple}
+                onChange={e => set({ quote_simple: e.target.checked })}
+                disabled={!isAdmin}
+              />
+              Cotización simple (solo productos y precio)
+            </label>
+            <p className="text-xs text-[var(--color-app-text-muted)] mt-1">
+              Ideal para venta de insumos/herramientas. Oculta el margen, la tarifa de máquina
+              y el costeo por partida en el cotizador; cada partida usa precio directo.
+            </p>
           </div>
         </CardContent>
       </Card>

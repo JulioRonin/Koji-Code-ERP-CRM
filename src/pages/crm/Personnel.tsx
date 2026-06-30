@@ -332,13 +332,6 @@ export function Personnel() {
                   <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">{selectedStaff.role}</p>
                   <p className="text-xs text-[var(--color-app-text-muted)] mt-1">{selectedStaff.department}</p>
                 </div>
-                <div className="w-full space-y-1.5 pt-3 border-t border-[var(--color-app-border)]">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-[var(--color-app-text-muted)]">Eficiencia general</span>
-                    <span className="font-medium">{selectedStaff.metadata.efficiency ?? 90}%</span>
-                  </div>
-                  <Progress value={selectedStaff.metadata.efficiency ?? 90} className="h-1.5" />
-                </div>
                 {isAdmin ? (
                   <Button variant="outline" className="w-full" onClick={() => openEdit(selectedStaff)}>
                     Editar información

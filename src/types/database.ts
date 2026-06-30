@@ -107,6 +107,9 @@ export interface CompanySettings {
   bank_beneficiary?: string | null;
   payment_notes?: string | null;
   dashboard_mode?: DashboardMode | null;
+  /** Cotización simple (solo productos y precio): oculta margen, tarifa de
+   *  máquina y el costeo por partida. Ideal para venta de insumos/herramientas. */
+  quote_simple?: boolean | null;
   created_at: string;
   updated_at: string;
 }

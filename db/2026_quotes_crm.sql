@@ -27,6 +27,10 @@ ALTER TABLE public.company_settings
 ALTER TABLE public.company_settings
     ADD COLUMN IF NOT EXISTS dashboard_mode TEXT;
 
+-- 1d) Cotización simple (oculta margen/tarifa/costeo) -----------------------
+ALTER TABLE public.company_settings
+    ADD COLUMN IF NOT EXISTS quote_simple BOOLEAN;
+
 -- 3a) Backfill de tenant_id en company_settings (solo si la columna existe) --
 --     Asigna las filas sin empresa a la empresa "IMC" original (o a la única
 --     empresa existente) para que la RESTRICTIVE de aislamiento no bloquee.
