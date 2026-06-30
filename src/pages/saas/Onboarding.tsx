@@ -7,9 +7,10 @@ import { markEntered } from './LandingHome';
 import { signupTenant } from '@/lib/api/signup';
 import { useTenant } from '@/contexts/TenantContext';
 import { supabase } from '@/lib/supabase';
+import { PromoBanner } from '@/components/saas/PromoCountdown';
 import {
   INDUSTRIES, PLANS, MODULES, getModule, getPlan, getIndustry,
-  initialModules, availableModulesForTenant, formatMxn,
+  initialModules, availableModulesForTenant, formatMxn, effectivePrice,
   type IndustryKey, type PlanKey, type ModuleKey, type Tenant,
 } from '@/lib/saas';
 import { slugify, newTenantId } from '@/lib/saas/platformStore';
@@ -299,11 +300,14 @@ export function Onboarding() {
               </button>
             </div>
 
+            {showPlans && <PromoBanner className="mt-2" />}
+
             {showPlans && (
               <div className="grid sm:grid-cols-3 gap-3 mt-2">
                 {PLANS.map(p => {
                   const isRec = p.key === recommended;
                   const sel = !demoSelected && plan === p.key;
+                  const ep = effectivePrice(p, false);
                   return (
                     <button
                       key={p.key}
@@ -322,10 +326,20 @@ export function Onboarding() {
                           SUGERIDO
                         </span>
                       )}
+                      {ep.promo && (
+                        <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full" style={{ background: KANRI.accent, color: KANRI.paper, fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700 }}>
+                          −{ep.discountPct}%
+                        </span>
+                      )}
                       <p style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 14, color: sel ? KANRI.paper : KANRI.ink }}>{p.label}</p>
                       <p style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 18, color: sel ? KANRI.paper : KANRI.ink }} className="mt-1">
-                        {p.priceMxn == null ? 'A cotizar' : formatMxn(p.priceMxn)}
-                        {p.priceMxn != null && <span style={{ fontSize: 11, fontWeight: 400, color: KANRI.steel }}>/mes</span>}
+                        {ep.price == null ? 'A cotizar' : (
+                          <>
+                            {ep.promo && <span style={{ fontSize: 12, fontWeight: 400, color: KANRI.steel, textDecoration: 'line-through', marginRight: 6 }}>{formatMxn(ep.list!)}</span>}
+                            {formatMxn(ep.price)}
+                            <span style={{ fontSize: 11, fontWeight: 400, color: KANRI.steel }}>/mes</span>
+                          </>
+                        )}
                       </p>
                       <p style={{ fontSize: 11.5, color: sel ? '#C9CCD2' : '#6b6f77', lineHeight: 1.4 }} className="mt-1">{p.tagline}</p>
                     </button>

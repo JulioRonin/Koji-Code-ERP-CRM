@@ -6,7 +6,7 @@ import { Header } from './Header';
 import { PwaInstallPrompt } from '@/components/pwa/PwaInstallPrompt';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { isBlocked, isOnTrial, daysLeft } from '@/lib/saas';
+import { isBlocked, isOnTrial } from '@/lib/saas';
 import { Subscription } from '@/pages/saas/Subscription';
 
 export function AppShell() {
@@ -20,7 +20,19 @@ export function AppShell() {
   // el dueño de plataforma, se bloquea el acceso con la pantalla de planes.
   const blocked = isBlocked(tenant) && !user?.isPlatformOwner;
   const onTrial = isOnTrial(tenant);
-  const left = daysLeft(tenant);
+
+  // Contador en vivo de la demo: refresca cada minuto para que SÍ se vea bajar.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!onTrial) return;
+    const id = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [onTrial]);
+
+  const end = tenant.subscription.currentPeriodEnd;
+  const remainingMs = end ? Math.max(0, new Date(end).getTime() - Date.now()) : 0;
+  const trialDays = Math.floor(remainingMs / 86_400_000);
+  const trialHours = Math.floor((remainingMs % 86_400_000) / 3_600_000);
 
   // Cierra el drawer al navegar
   useEffect(() => {
@@ -59,7 +71,13 @@ export function AppShell() {
             className="shrink-0 w-full flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)] hover:brightness-95 transition"
           >
             <Clock className="h-3.5 w-3.5" />
-            Demo · te quedan <strong>{left} día{left === 1 ? '' : 's'}</strong> · <span className="underline">Elegir un plan</span>
+            Demo · te quedan{' '}
+            <strong>
+              {trialDays > 0
+                ? `${trialDays} día${trialDays === 1 ? '' : 's'} ${trialHours} h`
+                : `${trialHours} h`}
+            </strong>{' '}
+            · <span className="underline">Elegir un plan</span>
           </button>
         )}
 

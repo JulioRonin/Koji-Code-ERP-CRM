@@ -4,7 +4,8 @@ import { Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { KanriLogo } from '@/components/saas/KanriLogo';
-import { PLANS, formatMxn, type PlanDef } from '@/lib/saas';
+import { PromoBanner } from '@/components/saas/PromoCountdown';
+import { PLANS, formatMxn, effectivePrice, type PlanDef } from '@/lib/saas';
 
 export function Pricing() {
   const [annual, setAnnual] = useState(false);
@@ -56,6 +57,9 @@ export function Pricing() {
           </div>
         </div>
 
+        {/* Oferta de lanzamiento con contador */}
+        <PromoBanner className="mt-8 max-w-3xl mx-auto" />
+
         {/* Planes */}
         <div className="mt-10 grid gap-5 md:grid-cols-3">
           {PLANS.map(plan => (
@@ -73,18 +77,23 @@ export function Pricing() {
 }
 
 function PlanCard({ plan, annual }: { plan: PlanDef; annual: boolean }) {
-  const price = annual ? plan.priceMxnAnnual : plan.priceMxn;
-  const isCustom = price == null;
+  const ep = effectivePrice(plan, annual);
+  const isCustom = ep.price == null;
 
   return (
     <div
       className={cn(
-        'rounded-2xl border bg-white p-6 flex flex-col',
+        'rounded-2xl border bg-white p-6 flex flex-col relative',
         plan.featured
           ? 'border-[var(--color-app-primary)] shadow-lg ring-1 ring-[var(--color-app-primary)]/20'
           : 'border-[var(--color-app-border)]'
       )}
     >
+      {ep.promo && (
+        <span className="absolute top-4 right-4 text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-app-primary)] text-white">
+          −{ep.discountPct}%
+        </span>
+      )}
       {plan.featured && (
         <span className="self-start mb-3 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]">
           Más popular
@@ -98,8 +107,16 @@ function PlanCard({ plan, annual }: { plan: PlanDef; annual: boolean }) {
           <span className="text-3xl font-bold text-[var(--color-app-text)]">A cotizar</span>
         ) : (
           <>
-            <span className="text-3xl font-bold text-[var(--color-app-text)]">{formatMxn(price!)}</span>
+            {ep.promo && (
+              <span className="text-base text-[var(--color-app-text-subtle)] line-through mr-2">{formatMxn(ep.list!)}</span>
+            )}
+            <span className="text-3xl font-bold text-[var(--color-app-text)]">{formatMxn(ep.price!)}</span>
             <span className="text-sm text-[var(--color-app-text-muted)]"> /{annual ? 'año' : 'mes'}</span>
+            {ep.promo && (
+              <p className="text-[11px] text-[var(--color-app-primary)] font-medium mt-0.5">
+                Precio de oferta · regresa a {formatMxn(ep.list!)} al terminar
+              </p>
+            )}
           </>
         )}
       </div>

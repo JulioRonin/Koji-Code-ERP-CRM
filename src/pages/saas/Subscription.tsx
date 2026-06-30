@@ -7,8 +7,9 @@ import { cn } from '@/lib/utils';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { KanriLogo, KANRI } from '@/components/saas/KanriLogo';
+import { PromoBanner } from '@/components/saas/PromoCountdown';
 import { startCheckout, openBillingPortal } from '@/lib/api/billing';
-import { PLANS, formatMxn, getPlan, daysLeft, subState, type PlanKey, type PlanDef } from '@/lib/saas';
+import { PLANS, formatMxn, effectivePrice, getPlan, daysLeft, subState, type PlanKey, type PlanDef } from '@/lib/saas';
 
 /** Página de suscripción. Con `blocked` se usa como pantalla bloqueante cuando
  *  la demo terminó (cubre toda la pantalla, fuera del AppShell). */
@@ -92,6 +93,9 @@ export function Subscription({ blocked = false }: { blocked?: boolean }) {
         </div>
       )}
 
+      {/* Oferta de lanzamiento con contador */}
+      <PromoBanner />
+
       {/* Toggle ciclo */}
       <div className="flex justify-center">
         <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)]">
@@ -105,17 +109,23 @@ export function Subscription({ blocked = false }: { blocked?: boolean }) {
       {/* Planes */}
       <div className="grid md:grid-cols-3 gap-4">
         {PLANS.map(p => {
-          const price = annual ? p.priceMxnAnnual : p.priceMxn;
+          const ep = effectivePrice(p, annual);
           const current = tenant.plan === p.key && state === 'active';
           return (
-            <Card key={p.key} className={cn('p-0', p.featured && 'ring-1 ring-[var(--color-app-primary)]/30 border-[var(--color-app-primary)]')}>
+            <Card key={p.key} className={cn('p-0 relative', p.featured && 'ring-1 ring-[var(--color-app-primary)]/30 border-[var(--color-app-primary)]')}>
               <CardContent className="p-5 flex flex-col h-full">
+                {ep.promo && <span className="absolute top-3 right-3 text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-app-primary)] text-white">−{ep.discountPct}%</span>}
                 {p.featured && <span className="self-start mb-2 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)]">Más popular</span>}
                 <h3 className="text-base font-semibold">{p.label}</h3>
                 <p className="text-xs text-[var(--color-app-text-muted)] mt-1 min-h-[36px]">{p.tagline}</p>
                 <div className="mt-3 mb-3">
-                  {price == null ? <span className="text-2xl font-bold">A cotizar</span> : (
-                    <><span className="text-2xl font-bold">{formatMxn(price)}</span><span className="text-sm text-[var(--color-app-text-muted)]">/{annual ? 'año' : 'mes'}</span></>
+                  {ep.price == null ? <span className="text-2xl font-bold">A cotizar</span> : (
+                    <>
+                      {ep.promo && <span className="text-sm text-[var(--color-app-text-subtle)] line-through mr-1.5">{formatMxn(ep.list!)}</span>}
+                      <span className="text-2xl font-bold">{formatMxn(ep.price)}</span>
+                      <span className="text-sm text-[var(--color-app-text-muted)]">/{annual ? 'año' : 'mes'}</span>
+                      {ep.promo && <p className="text-[11px] text-[var(--color-app-primary)] font-medium mt-0.5">Oferta · regresa a {formatMxn(ep.list!)}</p>}
+                    </>
                   )}
                 </div>
                 <Button
