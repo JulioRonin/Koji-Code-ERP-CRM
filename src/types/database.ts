@@ -492,6 +492,8 @@ export interface PurchaseOrderItem {
   purchase_order_id: string;
   requisition_id: string | null;
   bom_item_id: string | null;
+  /** Producto de inventario que se sumará al stock al recibir (opcional). */
+  inventory_item_id?: string | null;
   description: string;
   quantity: number;
   uom: string;
