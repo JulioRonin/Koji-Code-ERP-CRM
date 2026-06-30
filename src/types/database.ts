@@ -101,6 +101,11 @@ export interface CompanySettings {
   logo_url: string | null;
   primary_color: string | null;
   currency: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  bank_clabe?: string | null;
+  bank_beneficiary?: string | null;
+  payment_notes?: string | null;
   created_at: string;
   updated_at: string;
 }

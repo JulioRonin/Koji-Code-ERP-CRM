@@ -506,9 +506,15 @@ export function QuoteBuilder() {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs text-[var(--color-app-text-muted)]">IVA</label>
-              <div className="h-9 px-3 rounded-md border border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)] flex items-center text-sm">
-                {taxPct}%
-              </div>
+              <select
+                value={taxPct}
+                onChange={e => handleHeaderChange({ tax_pct: Number(e.target.value) })}
+                className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+              >
+                <option value={16}>16% (general)</option>
+                <option value={8}>8% (región fronteriza)</option>
+                <option value={0}>0% (exento / exportación)</option>
+              </select>
             </div>
           </div>
         </CardContent>

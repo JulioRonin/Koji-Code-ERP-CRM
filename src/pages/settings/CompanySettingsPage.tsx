@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Lock,
+  Landmark,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,6 +78,11 @@ export function CompanySettingsPage() {
       website: company.website ?? '',
       logo_url: company.logo_url ?? '',
       primary_color: company.primary_color ?? '#0369a1',
+      bank_name: company.bank_name ?? '',
+      bank_account: company.bank_account ?? '',
+      bank_clabe: company.bank_clabe ?? '',
+      bank_beneficiary: company.bank_beneficiary ?? '',
+      payment_notes: company.payment_notes ?? '',
     });
   }, [company.id, company.updated_at]);
 
@@ -234,6 +240,25 @@ export function CompanySettingsPage() {
           <Field label="Teléfono" value={form.phone} onChange={v => set({ phone: v })} disabled={!isAdmin} placeholder="+52 ..." />
           <Field label="Correo" value={form.email} onChange={v => set({ email: v })} disabled={!isAdmin} placeholder="contacto@empresa.com" />
           <Field label="Sitio web" value={form.website} onChange={v => set({ website: v })} disabled={!isAdmin} placeholder="https://empresa.com" />
+        </CardContent>
+      </Card>
+
+      {/* Datos de pago / transferencia */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Landmark className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Datos para pago (transferencia)
+          </CardTitle>
+          <CardDescription>Se muestran en la cotización para que el cliente sepa a dónde transferir.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Banco" value={form.bank_name} onChange={v => set({ bank_name: v })} disabled={!isAdmin} placeholder="BBVA, Banorte…" />
+          <Field label="Beneficiario / titular" value={form.bank_beneficiary} onChange={v => set({ bank_beneficiary: v })} disabled={!isAdmin} placeholder="Razón social del titular" />
+          <Field label="No. de cuenta" value={form.bank_account} onChange={v => set({ bank_account: v })} disabled={!isAdmin} mono placeholder="0123456789" />
+          <Field label="CLABE interbancaria" value={form.bank_clabe} onChange={v => set({ bank_clabe: v })} disabled={!isAdmin} mono placeholder="012180001234567890" />
+          <div className="md:col-span-2">
+            <Field label="Notas de pago" value={form.payment_notes} onChange={v => set({ payment_notes: v })} disabled={!isAdmin} placeholder="Ej. Anticipo 50%, referencia, moneda de pago…" />
+          </div>
         </CardContent>
       </Card>
 

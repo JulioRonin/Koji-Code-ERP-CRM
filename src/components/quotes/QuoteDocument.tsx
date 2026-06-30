@@ -180,6 +180,30 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
             </div>
           </div>
 
+          {/* Datos para pago (transferencia) */}
+          {(company.bank_name || company.bank_clabe || company.bank_account) && (
+            <div className="mb-8 text-sm rounded-md border border-[#e2e8f0] p-4 bg-[#f8fafc]">
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: accent }}>
+                Datos para pago (transferencia)
+              </p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
+                {company.bank_beneficiary && (
+                  <p><span className="text-[#475569]">Beneficiario:</span> <span className="font-medium">{company.bank_beneficiary}</span></p>
+                )}
+                {company.bank_name && (
+                  <p><span className="text-[#475569]">Banco:</span> <span className="font-medium">{company.bank_name}</span></p>
+                )}
+                {company.bank_account && (
+                  <p><span className="text-[#475569]">Cuenta:</span> <span className="font-mono font-medium">{company.bank_account}</span></p>
+                )}
+                {company.bank_clabe && (
+                  <p><span className="text-[#475569]">CLABE:</span> <span className="font-mono font-medium">{company.bank_clabe}</span></p>
+                )}
+              </div>
+              {company.payment_notes && <p className="text-[#475569] text-xs mt-2">{company.payment_notes}</p>}
+            </div>
+          )}
+
           {/* Notas */}
           {quote.notes && (
             <div className="mb-8 text-sm">

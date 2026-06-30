@@ -29,6 +29,11 @@ export const DEFAULT_COMPANY: CompanySettings = {
   logo_url: null,
   primary_color: '#E2401F',
   currency: 'MXN',
+  bank_name: null,
+  bank_account: null,
+  bank_clabe: null,
+  bank_beneficiary: null,
+  payment_notes: null,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -109,6 +114,11 @@ export interface CompanySettingsInput {
   logo_url?: string | null;
   primary_color?: string | null;
   currency?: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  bank_clabe?: string | null;
+  bank_beneficiary?: string | null;
+  payment_notes?: string | null;
 }
 
 /**
@@ -137,11 +147,21 @@ export function useUpdateCompanySettings() {
 
         // Si el registro ya existe en la base (id real), update; si no, insert.
         if (current.id && current.id !== 'default') {
-          const { data, error } = await supabase
+          let { data, error } = await supabase
             .from('company_settings')
             .update({ ...patch, updated_at: merged.updated_at })
             .eq('id', current.id)
             .select('*');
+          // Resiliencia: si aún no se corrió la migración de datos bancarios,
+          // reintenta sin esas columnas para no bloquear el guardado.
+          if (error && /bank_|payment_notes/i.test(error.message)) {
+            const { bank_name: _b, bank_account: _a, bank_clabe: _c2, bank_beneficiary: _be, payment_notes: _p, ...rest } = patch;
+            ({ data, error } = await supabase
+              .from('company_settings')
+              .update({ ...rest, updated_at: merged.updated_at })
+              .eq('id', current.id)
+              .select('*'));
+          }
           if (error) throw error;
           if (!data || data.length === 0) {
             throw new Error(

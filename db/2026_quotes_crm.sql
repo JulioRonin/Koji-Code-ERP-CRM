@@ -15,6 +15,14 @@ ALTER TABLE public.quotes
     ADD COLUMN IF NOT EXISTS client_email  TEXT,
     ADD COLUMN IF NOT EXISTS delivery_time TEXT;
 
+-- 1b) Datos bancarios de la empresa (para mostrar en la cotización) ---------
+ALTER TABLE public.company_settings
+    ADD COLUMN IF NOT EXISTS bank_name        TEXT,
+    ADD COLUMN IF NOT EXISTS bank_account     TEXT,
+    ADD COLUMN IF NOT EXISTS bank_clabe       TEXT,
+    ADD COLUMN IF NOT EXISTS bank_beneficiary TEXT,
+    ADD COLUMN IF NOT EXISTS payment_notes    TEXT;
+
 -- 3a) Backfill de tenant_id en company_settings (solo si la columna existe) --
 --     Asigna las filas sin empresa a la empresa "IMC" original (o a la única
 --     empresa existente) para que la RESTRICTIVE de aislamiento no bloquee.

@@ -41,6 +41,7 @@ import {
   useQuotes,
   useCreateQuote,
   useCustomers,
+  useInventoryItems,
   useMaterialPrices,
   useUpsertMaterialPrice,
   useDeleteMaterialPrice,
@@ -468,6 +469,8 @@ function PriceBook() {
         </CardContent>
       </Card>
 
+      <InventoryPriceList />
+
       {/* Form modal */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent>
@@ -516,6 +519,74 @@ function PriceBook() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ============================================================================
+// CATÁLOGO DE INVENTARIO (precios de venta) — solo lectura, para cotizar
+// ============================================================================
+
+const money2 = (n: number) =>
+  n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
+
+function InventoryPriceList() {
+  const { data: inventory } = useInventoryItems();
+  const [search, setSearch] = useState('');
+
+  const filtered = inventory.filter(
+    i =>
+      !search.trim() ||
+      i.name.toLowerCase().includes(search.toLowerCase()) ||
+      (i.sku ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      i.category.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Card className="p-0">
+      <CardHeader className="pb-3 flex-row items-center justify-between space-y-0 gap-3">
+        <div>
+          <CardTitle className="text-base">Inventario (precios de venta)</CardTitle>
+          <CardDescription>Productos del inventario con su costo y precio de venta. Adminístralos en Inventario.</CardDescription>
+        </div>
+        <div className="relative w-full sm:w-64 shrink-0">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
+          <Input placeholder="Buscar producto o SKU…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Producto</TableHead>
+              <TableHead className="hidden md:table-cell">SKU</TableHead>
+              <TableHead className="hidden md:table-cell">Categoría</TableHead>
+              <TableHead className="text-right">Costo</TableHead>
+              <TableHead className="text-right">Precio venta</TableHead>
+              <TableHead className="text-right">Stock</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map(i => (
+              <TableRow key={i.id}>
+                <TableCell className="font-medium">{i.name}</TableCell>
+                <TableCell className="hidden md:table-cell font-mono text-xs text-[var(--color-app-text-muted)]">{i.sku ?? '—'}</TableCell>
+                <TableCell className="hidden md:table-cell text-[var(--color-app-text-muted)]">{i.category}</TableCell>
+                <TableCell className="text-right tabular-nums text-[var(--color-app-text-muted)]">{money2(i.unit_cost)}</TableCell>
+                <TableCell className="text-right tabular-nums font-semibold">{money2(i.unit_price)}</TableCell>
+                <TableCell className="text-right tabular-nums">{i.stock} {i.uom}</TableCell>
+              </TableRow>
+            ))}
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center text-[var(--color-app-text-muted)]">
+                  {inventory.length === 0 ? 'Sin productos en inventario. Cárgalos en el módulo de Inventario.' : 'Sin resultados.'}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
