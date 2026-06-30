@@ -3,6 +3,7 @@ import {
   Users,
   Briefcase,
   Wallet,
+  Clock,
   Search,
   Plus,
   ChevronRight,
@@ -21,6 +22,7 @@ import {
   CheckCircle2,
   RefreshCw,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,8 +40,9 @@ import {
 import { ROLES } from '@/data/crmData';
 import { ASSIGNABLE_MODULES } from '@/lib/permissions';
 import { PayrollTab } from '@/components/personnel/PayrollTab';
+import { AttendanceTab } from '@/components/personnel/AttendanceTab';
 import { cn } from '@/lib/utils';
-import { useProfiles, useUpdateProfile, useCreateStaffWithAuth, generateTempPassword } from '@/lib/api';
+import { useProfiles, useUpdateProfile, useCreateStaffWithAuth, useDeleteProfile, generateTempPassword } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Profile } from '@/types/database';
 
@@ -55,9 +58,10 @@ function initialsFor(name: string): string {
 }
 
 const tabs = [
-  { id: 'directory', label: 'Directorio',         icon: Users },
-  { id: 'roles',     label: 'Roles y facultades',  icon: Briefcase },
-  { id: 'payroll',   label: 'Nómina',              icon: Wallet },
+  { id: 'directory',  label: 'Directorio',        icon: Users },
+  { id: 'roles',      label: 'Roles y facultades', icon: Briefcase },
+  { id: 'attendance', label: 'Checador',          icon: Clock },
+  { id: 'payroll',    label: 'Nómina',            icon: Wallet },
 ] as const;
 type Tab = (typeof tabs)[number]['id'];
 
@@ -69,6 +73,18 @@ export function Personnel() {
   const [searchTerm, setSearchTerm] = useState('');
   const { data: staff, refetch: refetchStaff } = useProfiles();
   const { update: updateProfile, loading: savingProfile } = useUpdateProfile();
+  const { remove: deleteProfile } = useDeleteProfile();
+
+  const handleDeleteStaff = async (member: Profile) => {
+    if (!window.confirm(`¿Eliminar a "${member.full_name}" del personal? Esta acción no se puede deshacer.`)) return;
+    try {
+      await deleteProfile(member.id);
+      if (selectedStaff?.id === member.id) setSelectedStaff(null);
+      await refetchStaff();
+    } catch (e) {
+      window.alert((e as Error).message);
+    }
+  };
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [editDraft, setEditDraft] = useState<{
     full_name: string;
@@ -279,9 +295,18 @@ export function Personnel() {
             {filteredStaff.map(member => (
               <Card
                 key={member.id}
-                className="p-0 cursor-pointer hover:border-[var(--color-app-primary)]/40 hover:shadow-md transition-all"
+                className="p-0 cursor-pointer hover:border-[var(--color-app-primary)]/40 hover:shadow-md transition-all relative"
                 onClick={() => setSelectedStaff(member)}
               >
+                {isAdmin && member.id !== user?.id && (
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDeleteStaff(member); }}
+                    className="absolute top-3 right-3 z-10 h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--color-app-text-subtle)] hover:text-[var(--color-app-danger)] hover:bg-[var(--color-app-danger-soft)]"
+                    title="Eliminar del personal"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center font-medium">
@@ -447,6 +472,9 @@ export function Personnel() {
           </CardContent>
         </Card>
       )}
+
+      {/* Checador / asistencia */}
+      {activeTab === 'attendance' && <AttendanceTab staff={staff} isAdmin={isAdmin} />}
 
       {/* Payroll */}
       {activeTab === 'payroll' && <PayrollTab staff={staff} isAdmin={isAdmin} />}

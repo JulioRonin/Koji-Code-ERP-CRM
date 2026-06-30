@@ -44,7 +44,9 @@ export function useProfiles(
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
-    MOCK_PROFILES.filter(p => (!role || p.role === role) && (!department || p.department === department)),
+    // En modo Supabase NO sembramos perfiles de demostración (evita ver gente de
+    // la demo como "Carlos Méndez" mientras carga). Solo en demo puro.
+    supabase ? [] : MOCK_PROFILES.filter(p => (!role || p.role === role) && (!department || p.department === department)),
     [role, department]
   );
 }
@@ -71,7 +73,7 @@ export function useTechnicians(): AsyncState<Profile[]> {
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
-    MOCK_PROFILES.filter(
+    supabase ? [] : MOCK_PROFILES.filter(
       p =>
         (p.role ?? '').toLowerCase().startsWith('técnico') ||
         (p.role ?? '').toLowerCase().startsWith('tecnico')
@@ -142,6 +144,29 @@ export function useUpdateProfile() {
   }, []);
 
   return { update, ...state };
+}
+
+/** Elimina el perfil (fila en profiles). La cuenta de auth, si existía, queda
+ *  huérfana; para perfiles de prueba/seed esto los quita de la lista. */
+export function useDeleteProfile() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+  const remove = useCallback(async (id: string): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) { setState({ loading: false, error: null }); return; }
+      const { data, error } = await supabase.from('profiles').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('No se pudo eliminar. Solo administradores pueden hacerlo (verifica tu rol).');
+      }
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const e = err as Error;
+      setState({ loading: false, error: e });
+      throw e;
+    }
+  }, []);
+  return { remove, ...state };
 }
 
 export interface CreateStaffInput {
