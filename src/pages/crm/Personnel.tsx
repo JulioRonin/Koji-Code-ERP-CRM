@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/table';
 import { ROLES } from '@/data/crmData';
 import { ASSIGNABLE_MODULES } from '@/lib/permissions';
+import { PayrollTab } from '@/components/personnel/PayrollTab';
 import { cn } from '@/lib/utils';
 import { useProfiles, useUpdateProfile, useCreateStaffWithAuth, generateTempPassword } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -455,92 +456,7 @@ export function Personnel() {
       )}
 
       {/* Payroll */}
-      {activeTab === 'payroll' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Costo total nómina', value: '$105,000',  icon: TrendingUp },
-              { label: 'Próximo pago',        value: '15 abr 2026', icon: CreditCard },
-              { label: 'Bonos proyectados',   value: '$12,500',   icon: Zap },
-              { label: 'Colaboradores pagados', value: '24 / 25', icon: BadgeCheck },
-            ].map(s => (
-              <Card key={s.label} className="p-0">
-                <CardContent className="p-5 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-[var(--color-app-text-muted)]">{s.label}</p>
-                    <p className="text-xl font-semibold mt-1">{s.value}</p>
-                  </div>
-                  <s.icon className="h-5 w-5 text-[var(--color-app-text-muted)]" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <Card className="p-0">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Nómina del periodo</CardTitle>
-                <CardDescription>Salarios base y bonos de eficiencia.</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <Download className="h-3.5 w-3.5 mr-1.5" /> Reporte bancario
-                </Button>
-                <Button size="sm">Dispersar nómina</Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead>Sueldo base</TableHead>
-                    <TableHead>Bono</TableHead>
-                    <TableHead>Total bruto</TableHead>
-                    <TableHead>Estatus</TableHead>
-                    <TableHead className="text-right">Acción</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {staff.map(member => {
-                    const bonus = member.metadata.bonus ?? 0;
-                    return (
-                      <TableRow key={member.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-xs font-medium">
-                              {initialsFor(member.full_name)}
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">{member.full_name}</p>
-                              <p className="text-xs text-[var(--color-app-text-muted)] font-mono">{member.id.slice(0, 8)}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="tabular-nums">
-                          ${member.salary.toLocaleString()} MXN
-                        </TableCell>
-                        <TableCell className="tabular-nums text-[var(--color-app-success)]">
-                          +${bonus.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="font-semibold tabular-nums">
-                          ${(member.salary + bonus).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="success">Depósito listo</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm">Recibo</Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {activeTab === 'payroll' && <PayrollTab staff={staff} isAdmin={isAdmin} />}
 
       {/* Edit modal (sólo administradores) */}
       {editDraft && selectedStaff && (
