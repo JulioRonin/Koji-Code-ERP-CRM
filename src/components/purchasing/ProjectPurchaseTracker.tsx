@@ -45,6 +45,7 @@ import {
   useUpdateProductionQuantities,
 } from '@/lib/api';
 import { TableControls } from '@/components/shared/TableControls';
+import { PurchasingInsights } from './PurchasingInsights';
 import { applyTableState, type TableState } from '@/lib/tableControls';
 import { PURCHASING_FIELDS } from '@/lib/bomFields';
 import type { BomItem, BomStatus } from '@/types/database';
@@ -199,6 +200,7 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
   const [parseError, setParseError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BomItem | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deleteAllText, setDeleteAllText] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -354,6 +356,7 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
       const n = await deleteAllBom(selectedProjectId);
       await refetchBom();
       setConfirmDeleteAll(false);
+      setDeleteAllText('');
       flash(`Se eliminaron ${n} materiales del proyecto.`);
     } catch (err) {
       flash((err as Error).message || 'No se pudo eliminar la lista.', 'error');
@@ -521,6 +524,9 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
         </div>
       )}
 
+      {/* Análisis configurable por estatus / categoría / proveedor */}
+      {activeProject && projectItems.length > 0 && <PurchasingInsights items={projectItems} />}
+
       {/* Tabla de items agrupada por categoría */}
       {activeProject && (
         <Card className="p-0">
@@ -550,7 +556,10 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setConfirmDeleteAll(true)}
+                  onClick={() => {
+                    setDeleteAllText('');
+                    setConfirmDeleteAll(true);
+                  }}
                   disabled={projectItems.length === 0 || deletingAll}
                   className="text-[var(--color-app-danger)] hover:text-[var(--color-app-danger)]"
                 >
@@ -576,6 +585,9 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                     <th className="text-left p-2 font-medium">Grupo</th>
                     <th className="text-center p-2 font-medium" title="Va a producción">
                       <Factory className="h-3.5 w-3.5 inline" />
+                    </th>
+                    <th className="text-center p-2 font-medium" title="Parte en riesgo">
+                      <AlertTriangle className="h-3.5 w-3.5 inline text-[var(--color-app-danger)]" />
                     </th>
                     <th className="text-right p-2 font-medium">Cantidad</th>
                     <th className="text-right p-2 font-medium">Precio unit.</th>
@@ -603,7 +615,7 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
                             className="bg-[var(--color-app-surface-alt)]/80 cursor-pointer hover:bg-[var(--color-app-surface-alt)]"
                             onClick={() => toggleGroup(group.key)}
                           >
-                            <td colSpan={11} className="p-2">
+                            <td colSpan={12} className="p-2">
                               <div className="flex items-center gap-2 text-xs">
                                 {collapsed ? (
                                   <ChevronRight className="h-3.5 w-3.5" />
@@ -735,7 +747,15 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
       </Dialog>
 
       {/* Confirmar borrado masivo */}
-      <Dialog open={confirmDeleteAll} onOpenChange={open => !open && setConfirmDeleteAll(false)}>
+      <Dialog
+        open={confirmDeleteAll}
+        onOpenChange={open => {
+          if (!open) {
+            setConfirmDeleteAll(false);
+            setDeleteAllText('');
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -745,14 +765,37 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
             <DialogDescription>
               Se eliminarán <strong>{projectItems.length} materiales</strong> de{' '}
               <strong>{activeProject?.name}</strong>, incluyendo precios, proveedores y fechas de
-              entrega. Esta acción no se puede deshacer.
+              entrega. Esta acción <strong>no se puede deshacer</strong>.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="space-y-1.5">
+            <label className="text-sm text-[var(--color-app-text)]">
+              Para confirmar, escribe <strong className="font-mono">ELIMINAR</strong> en el campo:
+            </label>
+            <Input
+              autoFocus
+              value={deleteAllText}
+              onChange={e => setDeleteAllText(e.target.value)}
+              placeholder="ELIMINAR"
+              className="font-mono"
+              onKeyDown={e => {
+                if (e.key === 'Enter' && deleteAllText.trim().toUpperCase() === 'ELIMINAR' && !deletingAll) {
+                  handleDeleteAll();
+                }
+              }}
+            />
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDeleteAll(false)} disabled={deletingAll}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDeleteAll} disabled={deletingAll}>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAll}
+              disabled={deletingAll || deleteAllText.trim().toUpperCase() !== 'ELIMINAR'}
+            >
               <Eraser className="h-4 w-4 mr-1.5" />
               {deletingAll ? 'Eliminando…' : 'Eliminar todo'}
             </Button>
@@ -923,6 +966,16 @@ function BomRow({ item, categories, onPatch, onDelete }: RowProps) {
             checked={item.production_relevant}
             onChange={e => onPatch({ production_relevant: e.target.checked })}
             className="h-4 w-4 accent-[var(--color-app-primary)] cursor-pointer"
+          />
+        </label>
+      </td>
+      <td className="p-2 text-center">
+        <label className="inline-flex items-center justify-center cursor-pointer" title="Marcar parte en riesgo">
+          <input
+            type="checkbox"
+            checked={!!item.at_risk}
+            onChange={e => onPatch({ at_risk: e.target.checked })}
+            className="h-4 w-4 accent-[var(--color-app-danger)] cursor-pointer"
           />
         </label>
       </td>

@@ -58,7 +58,7 @@ export function PwaInstallPrompt() {
           <Download className="h-5 w-5 text-[var(--color-app-primary)]" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">Instala Koji ERP</p>
+          <p className="text-sm font-medium">Instala KANRI</p>
           <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
             Acceso rápido desde tu pantalla de inicio.
           </p>

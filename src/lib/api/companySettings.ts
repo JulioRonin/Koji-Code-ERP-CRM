@@ -27,7 +27,7 @@ export const DEFAULT_COMPANY: CompanySettings = {
   website: null,
   legal_rep: null,
   logo_url: null,
-  primary_color: '#0369a1',
+  primary_color: '#E2401F',
   currency: 'MXN',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -73,13 +73,17 @@ export function useCompanySettings(): AsyncState<CompanySettings> {
           writeDemo(row); // cache local para login/offline
           return row;
         }
-        return readDemo() ?? DEFAULT_COMPANY;
+        // Con backend real la RLS ya filtra por empresa: si esta empresa aún no
+        // configuró su marca, usamos el DEFAULT (el branding cae al nombre del
+        // tenant). NO usamos el cache local para no mostrar la marca de otra
+        // empresa que se haya visto antes en este navegador.
+        return DEFAULT_COMPANY;
       } catch {
         // Tabla inexistente o sin permisos → no rompemos la app
-        return readDemo() ?? DEFAULT_COMPANY;
+        return DEFAULT_COMPANY;
       }
     },
-    readDemo() ?? DEFAULT_COMPANY,
+    DEFAULT_COMPANY,
     []
   );
 }

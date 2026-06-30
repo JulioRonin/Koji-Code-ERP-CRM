@@ -59,7 +59,7 @@ export function QuoteDocument({ quote, items, onClose }: QuoteDocumentProps) {
                   K
                 </div>
                 <div>
-                  <p className="text-lg font-bold leading-tight">Koji Code</p>
+                  <p className="text-lg font-bold leading-tight">KANRI</p>
                   <p className="text-xs text-[#475569]">Manufactura CNC de precisión</p>
                 </div>
               </div>
@@ -170,7 +170,7 @@ export function QuoteDocument({ quote, items, onClose }: QuoteDocumentProps) {
           </div>
 
           <p className="text-center text-[10px] text-[#94a3b8] mt-10">
-            Koji Code ERP · {new Date().getFullYear()}
+            KANRI · {new Date().getFullYear()}
           </p>
         </div>
       </DialogContent>

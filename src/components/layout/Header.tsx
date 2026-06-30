@@ -8,6 +8,8 @@ import {
   Bell,
   Webhook,
   Menu,
+  Home,
+  CreditCard,
   X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -132,6 +134,20 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             <DropdownMenuItem onClick={() => navigate('/settings/integrations')} className="gap-2 cursor-pointer">
               <Webhook className="h-4 w-4 text-[var(--color-app-text-muted)]" />
               <span>Integraciones (n8n)</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/subscription')} className="gap-2 cursor-pointer">
+              <CreditCard className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+              <span>Suscripción</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                try { sessionStorage.removeItem('kanri_entered'); } catch { /* ignore */ }
+                navigate('/welcome');
+              }}
+              className="gap-2 cursor-pointer"
+            >
+              <Home className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+              <span>Pantalla de inicio</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-[var(--color-app-border)]" />
             <DropdownMenuItem

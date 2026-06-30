@@ -61,6 +61,17 @@ export function GanttPrint({ startDate, tasks, endDate, title, subtitle, onClose
           .gp-toolbar { display: none !important; }
           .gp-stage { max-width: none !important; padding: 0 !important; margin: 0 !important; }
           .gp-page { box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }
+          /* Imprime los colores de fondo de las barras, el avance y la pista
+             (de lo contrario el navegador los omite y el Gantt sale en blanco). */
+          #gantt-print-root, #gantt-print-root * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+        /* También en pantalla, para que el preview se vea idéntico. */
+        #gantt-print-root, #gantt-print-root * {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
       `}</style>
 

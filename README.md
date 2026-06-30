@@ -1,4 +1,4 @@
-# Koji Code ERP
+# KANRI · ERP/CRM
 
 ERP / CRM para talleres CNC. Cubre cotización, diseño, compras, producción,
 calidad, embarque y reportes PMO para clientes.

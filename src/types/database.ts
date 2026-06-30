@@ -440,6 +440,8 @@ export interface BomItem {
   actual_delivery_date: string | null;
   notes: string | null;
   production_relevant: boolean;
+  /** Marca de "parte en riesgo" (entrega/criticidad) para seguimiento de compras. */
+  at_risk?: boolean;
   image_url: string | null;
   created_at: string;
   updated_at: string;
@@ -627,12 +629,21 @@ export interface DimensionalBalloon {
   y: number;
 }
 
+/** Tipo de característica: cota dimensional (numérica) o calibre pasa/no pasa
+ *  para rosca o dowel (atributo OK/NOK). */
+export type DimensionalKind = 'dimensional' | 'rosca' | 'dowel';
+
+/** Lectura de una pieza: número (dimensional) u OK/NOK (rosca/dowel). */
+export type DimensionalReading = number | 'OK' | 'NOK' | null;
+
 /** Una característica a inspeccionar (un renglón del reporte), ligada a la
  *  burbuja con el mismo número. `readings` tiene una lectura por pieza de la
  *  muestra (longitud = sample_size); null = sin capturar. */
 export interface DimensionalCharacteristic {
   n: number;
   label: string;
+  /** Tipo de verificación; por defecto 'dimensional'. */
+  kind?: DimensionalKind;
   /** Cota nominal */
   nominal: number | null;
   /** Tolerancias como magnitudes positivas. USL = nominal + tolPlus,
@@ -642,7 +653,7 @@ export interface DimensionalCharacteristic {
   unit: string;
   /** Instrumento de medición usado (opcional, trazabilidad ISO) */
   instrument?: string | null;
-  readings: (number | null)[];
+  readings: DimensionalReading[];
 }
 
 export interface DimensionalPayload {
@@ -805,3 +816,46 @@ export interface Database {
     };
   };
 }
+
+// ============================================================================
+// TABLAS: inventory_items / inventory_movements (módulo de Inventario)
+// ============================================================================
+
+export type InventoryMovementType = 'entrada' | 'salida' | 'ajuste';
+
+export interface InventoryItem {
+  id: string;
+  tenant_id?: string | null;
+  sku: string | null;
+  name: string;
+  category: string;
+  uom: string;
+  stock: number;
+  min_stock: number;
+  max_stock: number | null;
+  unit_cost: number;
+  unit_price: number;
+  location: string | null;
+  supplier_name: string | null;
+  barcode: string | null;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  tenant_id?: string | null;
+  item_id: string;
+  type: InventoryMovementType;
+  quantity: number;
+  reason: string | null;
+  reference: string | null;
+  balance_after: number | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** Estado de un item según su stock vs min/max. */
+export type StockStatus = 'agotado' | 'bajo' | 'sobre' | 'ok';

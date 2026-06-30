@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, ReactNode } from 'react';
 import { useCompanySettings, DEFAULT_COMPANY } from '@/lib/api';
+import { useTenant } from '@/contexts/TenantContext';
+import { getIndustry } from '@/lib/saas';
 import type { CompanySettings } from '@/types/database';
 
 interface CompanyContextType {
@@ -29,7 +31,8 @@ function shade(hex: string, amount: number): string {
 /** Aplica el color primario de la empresa a las variables CSS de la app. */
 function applyTheme(primary: string | null | undefined) {
   const root = document.documentElement;
-  const color = primary && /^#[0-9a-fA-F]{6}$/.test(primary) ? primary : '#0369a1';
+  // Default de marca KANRI: bermellón. Cada empresa puede personalizar su color.
+  const color = primary && /^#[0-9a-fA-F]{6}$/.test(primary) ? primary : '#E2401F';
   root.style.setProperty('--color-app-primary', color);
   root.style.setProperty('--color-app-primary-hover', shade(color, -0.18));
   root.style.setProperty('--color-app-primary-soft', shade(color, 0.85));
@@ -37,20 +40,32 @@ function applyTheme(primary: string | null | undefined) {
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const { data: company, loading, refetch } = useCompanySettings();
+  const { tenant } = useTenant();
+
+  // Si la empresa aún no configuró su marca (company_settings = default), usamos
+  // el nombre de su empresa (tenant) para no mostrar el del primer cliente.
+  const effective: CompanySettings = useMemo(() => {
+    const base = company ?? DEFAULT_COMPANY;
+    if (base.id === 'default' && tenant?.name) {
+      const industryLabel = tenant.industry ? getIndustry(tenant.industry)?.label : '';
+      return { ...base, legal_name: tenant.name, commercial_name: tenant.name, tagline: industryLabel ?? '' };
+    }
+    return base;
+  }, [company, tenant?.name]);
 
   // Aplica el tema cada vez que cambia el color primario.
   useEffect(() => {
-    applyTheme(company?.primary_color);
-  }, [company?.primary_color]);
+    applyTheme(effective.primary_color);
+  }, [effective.primary_color]);
 
   // Actualiza el <title> con el nombre de la empresa.
   useEffect(() => {
-    const name = company?.commercial_name || company?.legal_name;
-    if (name) document.title = `${name} · ERP`;
-  }, [company?.commercial_name, company?.legal_name]);
+    const name = effective.commercial_name || effective.legal_name;
+    if (name) document.title = `${name} · KANRI`;
+  }, [effective.commercial_name, effective.legal_name]);
 
   return (
-    <CompanyContext.Provider value={{ company: company ?? DEFAULT_COMPANY, loading, refresh: refetch }}>
+    <CompanyContext.Provider value={{ company: effective, loading, refresh: refetch }}>
       {children}
     </CompanyContext.Provider>
   );

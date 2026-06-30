@@ -106,7 +106,7 @@ export function CompanySettingsPage() {
           <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Configuración</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Datos de la empresa, fiscales (México) y preferencias de marca. Este nombre se muestra en
-            la app y los reportes (Koji Code es el nombre de la plataforma y no se muestra al cliente).
+            la app y los reportes (KANRI es el nombre de la plataforma y no se muestra al cliente).
           </p>
         </div>
         {isAdmin && (

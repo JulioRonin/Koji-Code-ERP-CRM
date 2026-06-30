@@ -1,4 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="110" fill="#0369a1"/>
-  <text x="256" y="352" font-family="Inter,system-ui,sans-serif" font-size="290" font-weight="800" text-anchor="middle" fill="#ffffff">K</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="KANRI">
+  <rect width="100" height="100" rx="24" fill="#16181D"/>
+  <circle cx="44" cy="44" r="29" fill="none" stroke="#F7F5F0" stroke-width="8"/>
+  <g fill="#F7F5F0">
+    <rect x="32" y="26" width="7.5" height="36" rx="1.4"/>
+    <path d="M39.5 44 L58 26 h-10.5 L39.5 37 z"/>
+    <path d="M39.5 44 L58 62 h-10.5 L39.5 51 z"/>
+  </g>
+  <line x1="65" y1="65" x2="82" y2="82" stroke="#E2401F" stroke-width="7.5" stroke-linecap="round"/>
+  <circle cx="84" cy="84" r="7.5" fill="#E2401F"/>
 </svg>

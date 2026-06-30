@@ -30,3 +30,4 @@ export * from './chat';
 export * from './pdfThumbnail';
 export * from './companySettings';
 export * from './dimensionalReports';
+export * from './inventory';

@@ -14,6 +14,7 @@ import { Projects } from './pages/projects/Projects';
 import { ProjectDetails } from './pages/projects/ProjectDetails';
 import { NewProjectWizard } from './pages/projects/NewProjectWizard';
 import { Purchasing } from './pages/purchasing/Purchasing';
+import { Inventory } from './pages/inventory/Inventory';
 import { Design } from './pages/design/Design';
 import { Production } from './pages/production/Production';
 import { WorkOrderDetails } from './pages/production/WorkOrderDetails';
@@ -27,6 +28,11 @@ import { Quotes } from './pages/quotes/Quotes';
 import { QuoteBuilder } from './pages/quotes/QuoteBuilder';
 import { Integrations } from './pages/settings/Integrations';
 import { CompanySettingsPage } from './pages/settings/CompanySettingsPage';
+import { Pricing } from './pages/saas/Pricing';
+import { Onboarding } from './pages/saas/Onboarding';
+import { PlatformAdmin } from './pages/saas/PlatformAdmin';
+import { LandingHome } from './pages/saas/LandingHome';
+import { Subscription } from './pages/saas/Subscription';
 import { Billing } from './pages/Placeholders';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
@@ -53,7 +59,23 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Puerta de entrada: pantalla de inicio con opciones (login / registrar /
+    // demo), no el login directo.
+    return <Navigate to="/welcome" state={{ from: location }} replace />;
+  }
+
+  // Aunque haya sesión, al abrir la raíz mostramos primero la pantalla de
+  // inicio para que el usuario elija (entrar / registrar otra empresa). Una vez
+  // que entra (markEntered), navega normal dentro de la app.
+  const entered = (() => {
+    try {
+      return sessionStorage.getItem('kanri_entered') === '1';
+    } catch {
+      return true;
+    }
+  })();
+  if (!entered && location.pathname === '/') {
+    return <Navigate to="/welcome" replace />;
   }
 
   // Técnicos viven en /technician-portal pero pueden ir a /chat para
@@ -81,7 +103,13 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/welcome" element={<LandingHome />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/platform" element={
+          <ProtectedRoute><PlatformAdmin /></ProtectedRoute>
+        } />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -106,6 +134,7 @@ export default function App() {
           <Route path="projects/new" element={<ProtectedRoute><NewProjectWizard /></ProtectedRoute>} />
           <Route path="projects/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
           <Route path="purchasing" element={<ProtectedRoute><Purchasing /></ProtectedRoute>} />
+          <Route path="inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
           <Route path="design" element={<ProtectedRoute><Design /></ProtectedRoute>} />
           <Route path="production" element={<ProtectedRoute><Production /></ProtectedRoute>} />
           <Route path="production/wo/:id" element={<ProtectedRoute><WorkOrderDetails /></ProtectedRoute>} />
@@ -120,6 +149,7 @@ export default function App() {
           <Route path="chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute><CompanySettingsPage /></ProtectedRoute>} />
+          <Route path="subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
           
           {/* Universal Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />

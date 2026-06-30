@@ -418,6 +418,7 @@ ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS image_url            TEXT;
 -- Esta última es la que se muestra en Producción, Diseño y Calidad.
 -- Si es NULL, esos módulos hacen fallback a quantity.
 ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS production_quantity  NUMERIC;
+ALTER TABLE public.bom_items ADD COLUMN IF NOT EXISTS at_risk              BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- ---------------------------------------------------------------------------
 -- 7. COMPRAS — Requisiciones y POs
@@ -1028,6 +1029,47 @@ BEGIN
     END LOOP;
 END$$;
 
+-- Diseño (más Admin/PM) — los usuarios de Diseño suben planos 2D, modelos 3D
+-- e imágenes al Storage y necesitan actualizar bom_items.drawing_url y
+-- bom_items.image_url. Sin esta política, las subidas fallaban con
+-- "Supabase rechazó la subida por permisos".
+CREATE OR REPLACE FUNCTION public.is_design()
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND (
+            role       IN ('Diseñador','Diseño','Administrador','Administración / PM')
+            OR department IN ('Diseño','Administrador','Administración / PM')
+            OR role       ILIKE '%dise%'
+            OR department ILIKE '%dise%'
+        )
+    );
+$$;
+
+DROP POLICY IF EXISTS "design update bom" ON public.bom_items;
+CREATE POLICY "design update bom" ON public.bom_items
+    FOR UPDATE TO authenticated
+    USING (public.is_design())
+    WITH CHECK (public.is_design());
+
+-- Calidad y Producción pueden actualizar bom_items (cambian
+-- manufacturing_status durante el flujo: enviar a calidad, aprobar/liberar
+-- TERMINADO, rechazar). Sin esto, un usuario de Calidad daba click en
+-- "Aprobar" y la pieza no cambiaba de estatus (RLS bloqueaba el UPDATE).
+DROP POLICY IF EXISTS "quality update bom" ON public.bom_items;
+CREATE POLICY "quality update bom" ON public.bom_items
+    FOR UPDATE TO authenticated
+    USING (public.is_quality())
+    WITH CHECK (public.is_quality());
+
+DROP POLICY IF EXISTS "production update bom" ON public.bom_items;
+CREATE POLICY "production update bom" ON public.bom_items
+    FOR UPDATE TO authenticated
+    USING (public.is_production())
+    WITH CHECK (public.is_production());
+
 -- Cualquier autenticado puede mandar mensajes y abrir time entries
 DROP POLICY IF EXISTS "send chat" ON public.chat_messages;
 CREATE POLICY "send chat" ON public.chat_messages
@@ -1067,18 +1109,28 @@ CREATE POLICY "project-files read" ON storage.objects
     FOR SELECT TO authenticated
     USING (bucket_id = 'project-files');
 
--- Escritura: Administrador / PM (planos, modelos) y además Calidad para
--- subir imágenes/fotos de los reportes dimensionales.
+-- Escritura: Administrador / PM, Diseño (planos 2D y modelos 3D) y Calidad
+-- (fotos y planos del reporte dimensional). Sin esto, los usuarios de Diseño
+-- veían 'Supabase rechazó la subida por permisos' al subir un 2D.
 DROP POLICY IF EXISTS "project-files write" ON storage.objects;
 CREATE POLICY "project-files write" ON storage.objects
     FOR INSERT TO authenticated
-    WITH CHECK (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()));
+    WITH CHECK (
+        bucket_id = 'project-files'
+        AND (public.is_admin() OR public.is_design() OR public.is_quality())
+    );
 
 DROP POLICY IF EXISTS "project-files update" ON storage.objects;
 CREATE POLICY "project-files update" ON storage.objects
     FOR UPDATE TO authenticated
-    USING (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()))
-    WITH CHECK (bucket_id = 'project-files' AND (public.is_admin() OR public.is_quality()));
+    USING (
+        bucket_id = 'project-files'
+        AND (public.is_admin() OR public.is_design() OR public.is_quality())
+    )
+    WITH CHECK (
+        bucket_id = 'project-files'
+        AND (public.is_admin() OR public.is_design() OR public.is_quality())
+    );
 
 DROP POLICY IF EXISTS "project-files delete" ON storage.objects;
 CREATE POLICY "project-files delete" ON storage.objects

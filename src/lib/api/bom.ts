@@ -267,6 +267,7 @@ export interface UpdateBomItemInput {
   actual_delivery_date?: string | null;
   notes?: string | null;
   production_relevant?: boolean;
+  at_risk?: boolean;
 }
 
 /**

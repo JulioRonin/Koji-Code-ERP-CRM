@@ -15,11 +15,15 @@ import {
   Truck,
   FileBarChart,
   Calculator,
+  Boxes,
+  Layers,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useTenant } from '@/contexts/TenantContext';
+import { moduleKeyForPath } from '@/lib/saas';
 import { canAccessPath } from '@/lib/permissions';
 
 type NavItem = {
@@ -31,6 +35,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { name: 'Dashboard',    path: '/',            icon: LayoutDashboard },
   { name: 'Cotizaciones', path: '/quotes',      icon: Calculator },
+  { name: 'Inventario',   path: '/inventory',   icon: Boxes },
   { name: 'Proyectos',    path: '/projects',    icon: FolderKanban },
   { name: 'Diseño',       path: '/design',      icon: Ruler },
   { name: 'Compras',      path: '/purchasing',  icon: ShoppingCart },
@@ -52,6 +57,7 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { user } = useAuth();
   const { company } = useCompany();
+  const { isEnabled } = useTenant();
   const brandName = company.commercial_name || company.legal_name || 'Empresa';
   const brandInitial = brandName.trim().charAt(0).toUpperCase() || 'E';
 
@@ -59,6 +65,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   // dashboard administrativo de /technicians.
   const filteredNavItems = navItems
     .filter(item => canAccessPath(user?.role, item.path))
+    // Gating por módulos habilitados de la empresa (tenant). Si la ruta no
+    // mapea a un módulo, se muestra.
+    .filter(item => {
+      const mk = moduleKeyForPath(item.path);
+      return mk ? isEnabled(mk) : true;
+    })
     .map(item =>
       user?.role === 'Técnico' && item.path === '/technicians'
         ? { ...item, name: 'Mi portal', path: '/technician-portal' }
@@ -97,14 +109,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 className="h-8 w-8 rounded-md object-cover bg-white"
               />
             ) : (
-              <div className="h-8 w-8 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm shrink-0">
+              <div className="h-8 w-8 rounded-lg bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm shrink-0 font-display">
                 {brandInitial}
               </div>
             )}
             <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-sm font-semibold text-white truncate">{brandName}</span>
-              <span className="text-[10px] text-slate-400 truncate">
-                {company.tagline || 'ERP · Manufactura'}
+              <span className="text-sm font-semibold text-white truncate font-display">{brandName}</span>
+              <span className="text-[10px] text-slate-400 truncate uppercase tracking-wider font-mono">
+                {company.tagline || 'powered by KANRI'}
               </span>
             </div>
           </div>
@@ -150,8 +162,27 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        {canSeeSettings && (
-          <div className="px-2 py-3 border-t border-[var(--color-app-sidebar-hover)] shrink-0">
+        {(canSeeSettings || user?.isPlatformOwner) && (
+          <div className="px-2 py-3 border-t border-[var(--color-app-sidebar-hover)] shrink-0 space-y-1">
+            {/* Panel de plataforma: SOLO para el dueño de la plataforma (KANRI),
+                no para los admins de las empresas cliente. */}
+            {user?.isPlatformOwner && (
+              <NavLink
+                to="/platform"
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors',
+                    isActive
+                      ? 'bg-white/10 text-white'
+                      : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  )
+                }
+              >
+                <Layers className="h-4 w-4 text-slate-400" />
+                <span>Plataforma</span>
+              </NavLink>
+            )}
+            {canSeeSettings && (
             <NavLink
               to="/settings"
               className={({ isActive }) =>
@@ -166,6 +197,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <Settings className="h-4 w-4 text-slate-400" />
               <span>Configuración</span>
             </NavLink>
+            )}
           </div>
         )}
       </aside>

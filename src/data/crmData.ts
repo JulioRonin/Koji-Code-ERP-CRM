@@ -6,6 +6,10 @@ export interface StaffMember {
   avatar: string;
   email: string;
   password?: string; // New field for mock auth
+  /** Empresa (tenant) a la que pertenece el usuario. */
+  tenantId?: string | null;
+  /** Dueño de la plataforma KANRI: puede ver/gestionar todas las empresas. */
+  isPlatformOwner?: boolean;
   phone: string;
   status: 'Activo' | 'Inactivo' | 'Vacaciones';
   joinDate: string;
@@ -116,6 +120,7 @@ export const STAFF_MEMBERS: StaffMember[] = [
     avatar: 'AD',
     email: 'admin@imcdesign.com',
     password: 'admin',
+    isPlatformOwner: true,
     phone: '+52 555 000 1111',
     status: 'Activo',
     joinDate: '2020-01-01',
