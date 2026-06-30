@@ -66,17 +66,54 @@ function resolveRole(role: string): string {
   return role;
 }
 
-/** Devuelve true si el rol puede entrar a la ruta. */
-export function canAccessPath(role: string | undefined, path: string): boolean {
+/** Rutas siempre permitidas a cualquier usuario autenticado (no se restringen
+ *  ni con permisos por usuario). */
+const ALWAYS_ALLOWED = ['/', '/chat', '/subscription'];
+
+/**
+ * Devuelve true si el usuario puede entrar a la ruta.
+ *
+ * @param role          rol del usuario (matriz por rol, fallback).
+ * @param path          ruta a evaluar.
+ * @param overrides     permisos por usuario (rutas permitidas). Si se pasa una
+ *                      lista NO vacía, define el acceso en lugar del rol (más
+ *                      las rutas siempre permitidas). Vacío/undefined = usa rol.
+ */
+export function canAccessPath(role: string | undefined, path: string, overrides?: string[] | null): boolean {
   if (!role) return false;
   // La suscripción es accesible para cualquier usuario autenticado.
   if (path.startsWith('/subscription')) return true;
+
+  // Permisos por usuario: si existen, mandan sobre el rol.
+  if (overrides && overrides.length > 0) {
+    const list = [...ALWAYS_ALLOWED, ...overrides];
+    return list.some(a => path === a || (a !== '/' && path.startsWith(a + '/')));
+  }
+
   const resolved = resolveRole(role);
   const allowed = ROLE_ACCESS[resolved] ?? FALLBACK_ACCESS;
   if (allowed.includes('ALL')) return true;
   // Match exacto o prefijo (ej. /projects/123 cae bajo /projects)
   return allowed.some(a => path === a || (a !== '/' && path.startsWith(a + '/')));
 }
+
+/** Módulos asignables a un usuario (permisos por usuario). El Dashboard y el
+ *  Chat están siempre disponibles, por eso no se listan aquí. */
+export const ASSIGNABLE_MODULES: { path: string; label: string }[] = [
+  { path: '/customers',   label: 'Clientes' },
+  { path: '/quotes',      label: 'Cotizaciones' },
+  { path: '/inventory',   label: 'Inventario' },
+  { path: '/projects',    label: 'Proyectos' },
+  { path: '/design',      label: 'Diseño' },
+  { path: '/purchasing',  label: 'Compras' },
+  { path: '/production',  label: 'Producción' },
+  { path: '/quality',     label: 'Calidad' },
+  { path: '/shipping',    label: 'Embarques' },
+  { path: '/pmo',         label: 'PMO' },
+  { path: '/technicians', label: 'Técnicos' },
+  { path: '/personnel',   label: 'Personal' },
+  { path: '/billing',     label: 'Facturación' },
+];
 
 /** Ruta home / fallback adecuado para cada rol — la primera ruta accesible. */
 export function defaultRouteForRole(role: string | undefined): string {

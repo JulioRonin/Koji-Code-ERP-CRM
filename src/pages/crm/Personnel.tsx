@@ -36,6 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ROLES } from '@/data/crmData';
+import { ASSIGNABLE_MODULES } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { useProfiles, useUpdateProfile, useCreateStaffWithAuth, generateTempPassword } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,6 +78,8 @@ export function Personnel() {
     bio: string;
     salary: number;
     status: string;
+    permsEnabled: boolean;
+    permissions: string[];
   } | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [newStaff, setNewStaff] = useState({
@@ -109,6 +112,7 @@ export function Personnel() {
 
   const openEdit = (member: Profile) => {
     setEditError(null);
+    const perms = member.metadata?.permissions;
     setEditDraft({
       full_name: member.full_name,
       email: member.email,
@@ -118,6 +122,8 @@ export function Personnel() {
       bio: member.bio ?? '',
       salary: member.salary ?? 0,
       status: member.status,
+      permsEnabled: Array.isArray(perms) && perms.length > 0,
+      permissions: perms ?? [],
     });
   };
 
@@ -126,6 +132,11 @@ export function Personnel() {
     if (!editDraft || !selectedStaff) return;
     setEditError(null);
     try {
+      // Construye metadata preservando lo existente y aplicando los permisos.
+      const meta: Profile['metadata'] = { ...selectedStaff.metadata };
+      if (editDraft.permsEnabled) meta.permissions = editDraft.permissions;
+      else delete meta.permissions;
+
       await updateProfile(selectedStaff.id, {
         full_name: editDraft.full_name,
         email: editDraft.email,
@@ -135,6 +146,7 @@ export function Personnel() {
         bio: editDraft.bio || null,
         salary: editDraft.salary,
         status: editDraft.status,
+        metadata: meta,
       });
       await refetchStaff();
       setSelectedStaff(prev =>
@@ -149,6 +161,7 @@ export function Personnel() {
               bio: editDraft.bio || null,
               salary: editDraft.salary,
               status: editDraft.status,
+              metadata: meta,
             }
           : prev
       );
@@ -638,6 +651,45 @@ export function Personnel() {
                       className="w-full px-3 py-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
                     />
                   </div>
+                </div>
+
+                {/* Permisos por usuario */}
+                <div className="md:col-span-2 space-y-2 pt-2 border-t border-[var(--color-app-border)]">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={editDraft.permsEnabled}
+                      onChange={e => setEditDraft({ ...editDraft, permsEnabled: e.target.checked })}
+                    />
+                    Permisos personalizados de acceso
+                  </label>
+                  <p className="text-xs text-[var(--color-app-text-muted)]">
+                    {editDraft.permsEnabled
+                      ? 'Este usuario verá solo los módulos marcados (además de Dashboard y Chat).'
+                      : 'Acceso según su rol. Activa para definir módulos específicos para este usuario.'}
+                  </p>
+                  {editDraft.permsEnabled && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 pt-1">
+                      {ASSIGNABLE_MODULES.map(m => {
+                        const on = editDraft.permissions.includes(m.path);
+                        return (
+                          <label key={m.path} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={on}
+                              onChange={e => setEditDraft({
+                                ...editDraft,
+                                permissions: e.target.checked
+                                  ? [...editDraft.permissions, m.path]
+                                  : editDraft.permissions.filter(p => p !== m.path),
+                              })}
+                            />
+                            {m.label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </CardContent>
 

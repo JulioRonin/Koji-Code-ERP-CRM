@@ -10,6 +10,8 @@ export interface StaffMember {
   tenantId?: string | null;
   /** Dueño de la plataforma KANRI: puede ver/gestionar todas las empresas. */
   isPlatformOwner?: boolean;
+  /** Permisos de módulo específicos de este usuario (override del rol). */
+  permissions?: string[];
   phone: string;
   status: 'Activo' | 'Inactivo' | 'Vacaciones';
   joinDate: string;

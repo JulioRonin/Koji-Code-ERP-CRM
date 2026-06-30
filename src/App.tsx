@@ -93,7 +93,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   // Permisos por ruta — single source of truth en src/lib/permissions.ts
-  if (!canAccessPath(user?.role, location.pathname)) {
+  // (incluye overrides de permisos por usuario, si los tiene).
+  if (!canAccessPath(user?.role, location.pathname, user?.permissions)) {
     return <Navigate to={defaultRouteForRole(user?.role)} replace />;
   }
 

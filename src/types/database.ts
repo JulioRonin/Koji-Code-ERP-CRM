@@ -127,6 +127,9 @@ export interface ProfileMetadata {
   bonus?: number;
   efficiency?: number;
   shift?: string;
+  /** Rutas de módulos permitidas para ESTE usuario (override del rol). Si está
+   *  vacío o ausente, el acceso lo define el rol (permissions.ts). */
+  permissions?: string[];
 }
 
 export interface Profile {
