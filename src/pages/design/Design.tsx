@@ -28,30 +28,23 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DesignFileManager } from '@/components/design/DesignFileManager';
 import { DesignChecklist } from '@/components/design/DesignChecklist';
+import { useProjects } from '@/lib/api';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-const mockDesignTasks = [
-  { id: 'DSG-001', project: 'IMC-2026-042', part: 'Eje Principal',  designer: 'Miguel A.',  status: 'Aprobado',    camStatus: 'Completado', dueDate: '2026-03-30' },
-  { id: 'DSG-002', project: 'IMC-2026-045', part: 'Molde Base',     designer: 'Sofía L.',   status: 'En Revisión', camStatus: 'Pendiente',  dueDate: '2026-04-02' },
-  { id: 'DSG-003', project: 'IMC-2026-048', part: 'Soporte A',       designer: 'Miguel A.',  status: 'Borrador',    camStatus: 'Pendiente',  dueDate: '2026-04-05' },
-  { id: 'DSG-004', project: 'IMC-2026-050', part: 'Herramental 1',   designer: 'Roberto C.', status: 'Aprobado',    camStatus: 'En Proceso', dueDate: '2026-04-01' },
-];
-
-const cadVariant: Record<string, 'success' | 'warning' | 'secondary'> = {
-  Aprobado: 'success',
-  'En Revisión': 'warning',
-  Borrador: 'secondary',
-};
-
-const camVariant: Record<string, 'success' | 'default' | 'outline'> = {
-  Completado: 'success',
-  'En Proceso': 'default',
-  Pendiente: 'outline',
+const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'default' | 'outline'> = {
+  'Cotización': 'warning',
+  'Diseño': 'default',
+  'Compras': 'secondary',
+  'En Producción': 'default',
+  'Calidad': 'success',
+  'Embarque': 'success',
+  'Entregado': 'outline',
+  'Cancelado': 'outline',
 };
 
 const tabs = [
@@ -64,6 +57,31 @@ type Tab = (typeof tabs)[number]['id'];
 export function Design() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
+  const { data: projects } = useProjects();
+
+  // Diseños derivados de proyectos reales de la empresa (sin datos de ejemplo).
+  const designTasks = React.useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return projects
+      .filter(p => p.status !== 'Entregado' && p.status !== 'Cancelado')
+      .filter(p => !q || p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
+      .map(p => ({
+        id: p.id,
+        project: p.id,
+        part: p.name,
+        designer: p.client_name ?? '—',
+        status: p.status,
+        dueDate: p.deadline,
+      }));
+  }, [projects, searchTerm]);
+
+  const kpis = React.useMemo(() => {
+    const activos = projects.filter(p => p.status === 'Diseño').length;
+    const revision = projects.filter(p => p.status === 'Cotización').length;
+    const aprobados = projects.filter(p => ['Compras', 'En Producción', 'Calidad', 'Embarque'].includes(p.status)).length;
+    const entregados = projects.filter(p => p.status === 'Entregado').length;
+    return { activos, revision, aprobados, entregados };
+  }, [projects]);
 
   return (
     <div className="space-y-6">
@@ -103,10 +121,10 @@ export function Design() {
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {[
-              { title: 'Diseños activos',  value: '14', sub: 'En fase de modelado',         icon: PenTool },
-              { title: 'En revisión',      value: '5',  sub: 'Esperando aprobación cliente', icon: Clock },
-              { title: 'Aprobados (mes)',  value: '28', sub: 'Listos para manufactura',     icon: FileCheck },
-              { title: 'Programas CAM',    value: '8',  sub: 'En cola de programación',     icon: MonitorPlay },
+              { title: 'En diseño',        value: String(kpis.activos),    sub: 'Proyectos en fase de diseño',   icon: PenTool },
+              { title: 'En cotización',    value: String(kpis.revision),   sub: 'Por definir / aprobar',         icon: Clock },
+              { title: 'En manufactura',   value: String(kpis.aprobados),  sub: 'Compras, producción y calidad', icon: FileCheck },
+              { title: 'Entregados',       value: String(kpis.entregados), sub: 'Proyectos cerrados',            icon: MonitorPlay },
             ].map(k => (
               <Card key={k.title} className="p-0">
                 <CardContent className="p-5">
@@ -141,30 +159,26 @@ export function Design() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID diseño</TableHead>
                   <TableHead>Proyecto</TableHead>
-                  <TableHead>Pieza</TableHead>
-                  <TableHead>Diseñador</TableHead>
-                  <TableHead>Estado CAD</TableHead>
-                  <TableHead>Estado CAM</TableHead>
+                  <TableHead>Pieza / entregable</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Estado</TableHead>
                   <TableHead>Fecha límite</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockDesignTasks.map(task => (
+                {designTasks.map(task => (
                   <TableRow key={task.id}>
-                    <TableCell className="font-mono text-xs">{task.id}</TableCell>
                     <TableCell className="font-mono text-xs">{task.project}</TableCell>
                     <TableCell>{task.part}</TableCell>
                     <TableCell className="text-[var(--color-app-text-muted)]">{task.designer}</TableCell>
                     <TableCell>
-                      <Badge variant={cadVariant[task.status] ?? 'secondary'}>{task.status}</Badge>
+                      <Badge variant={statusVariant[task.status] ?? 'secondary'}>{task.status}</Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={camVariant[task.camStatus] ?? 'outline'}>{task.camStatus}</Badge>
+                    <TableCell className="text-[var(--color-app-text-muted)]">
+                      {task.dueDate ? format(new Date(task.dueDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)]">{task.dueDate}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -175,16 +189,21 @@ export function Design() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuItem>Ver archivos CAD</DropdownMenuItem>
-                          <DropdownMenuItem>Aprobar diseño</DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           <DropdownMenuItem className="gap-2">
-                            <FileCode2 className="h-4 w-4" /> Asignar a CAM
+                            <FileCode2 className="h-4 w-4" /> Planos 2D / 3D
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
+                {designTasks.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center text-[var(--color-app-text-muted)]">
+                      Aún no hay diseños. Crea un proyecto para verlo aquí.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>

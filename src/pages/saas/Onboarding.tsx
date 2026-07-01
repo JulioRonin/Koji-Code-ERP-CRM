@@ -50,6 +50,7 @@ export function Onboarding() {
   const [modules, setModules] = useState<ModuleKey[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [signupDone, setSignupDone] = useState<string | null>(null);
 
   const ceiling = useMemo(() => new Set(availableModulesForTenant({ plan })), [plan]);
   const recommended = industry ? getIndustry(industry).recommendedPlan : 'profesional';
@@ -97,7 +98,7 @@ export function Onboarding() {
       if (needsConfirmation) {
         // Supabase pide confirmar el correo antes de entrar.
         setCreating(false);
-        setCreateError(
+        setSignupDone(
           'Tu empresa fue creada. Te enviamos un correo para confirmar tu cuenta; ' +
             'confírmalo y luego inicia sesión.'
         );
@@ -115,6 +116,44 @@ export function Onboarding() {
   };
 
   const accountValid = !needsAccount || (/^\S+@\S+\.\S+$/.test(adminEmail) && adminPassword.length >= 8);
+
+  // Pantalla de confirmación tras crear la cuenta (con verificación de correo).
+  if (signupDone) {
+    return (
+      <div style={{ minHeight: '100vh', background: KANRI.paper, color: KANRI.ink }} className="flex flex-col">
+        <header style={{ borderBottom: `1px solid ${KANRI.steel}33` }}>
+          <div className="max-w-4xl mx-auto px-5 h-16 flex items-center">
+            <KanriLogo size={30} />
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center px-5">
+          <div className="w-full max-w-md text-center rounded-2xl bg-white p-8" style={{ border: `1px solid ${KANRI.steel}22` }}>
+            <div className="h-14 w-14 rounded-full mx-auto flex items-center justify-center" style={{ background: `${KANRI.accent}18` }}>
+              <Check className="h-7 w-7" style={{ color: KANRI.accent }} />
+            </div>
+            <h1 style={{ fontFamily: FONT_DISPLAY, fontWeight: 700 }} className="text-xl mt-4">¡Cuenta creada!</h1>
+            <p style={{ color: '#5a5e66' }} className="text-sm mt-2">{signupDone}</p>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full h-11 rounded-xl text-white text-sm font-medium"
+                style={{ background: KANRI.accent }}
+              >
+                Ir a iniciar sesión
+              </button>
+              <button
+                onClick={() => navigate('/welcome')}
+                className="w-full h-11 rounded-xl text-sm font-medium"
+                style={{ border: `1px solid ${KANRI.steel}33`, color: KANRI.ink }}
+              >
+                Volver al inicio
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: KANRI.paper, color: KANRI.ink }}>
