@@ -80,7 +80,24 @@ export function Projects() {
   const { remove: deleteProject, loading: deleting } = useDeleteProject();
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const data = projects;
+  const [statusFilter, setStatusFilter] = useState('');
+  const [clientFilter, setClientFilter] = useState('');
+
+  // Clientes únicos presentes en los proyectos (para el filtro).
+  const clientOptions = React.useMemo(
+    () => Array.from(new Set(projects.map(p => p.client_name).filter(Boolean))).sort(),
+    [projects]
+  );
+
+  // Aplica los filtros de estatus y cliente antes de la tabla (la búsqueda por
+  // texto la maneja el globalFilter de la tabla).
+  const data = React.useMemo(
+    () => projects.filter(p =>
+      (!statusFilter || p.status === statusFilter) &&
+      (!clientFilter || p.client_name === clientFilter)
+    ),
+    [projects, statusFilter, clientFilter]
+  );
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -240,7 +257,7 @@ export function Projects() {
         </div>
       </div>
 
-      <div className="flex items-center">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
           <Input
@@ -250,6 +267,43 @@ export function Projects() {
             className="pl-9"
           />
         </div>
+
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+        >
+          <option value="">Todos los estados</option>
+          {(Object.keys(statusVariant) as ProjectStatus[]).map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+
+        <select
+          value={clientFilter}
+          onChange={e => setClientFilter(e.target.value)}
+          className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 max-w-[220px]"
+        >
+          <option value="">Todos los clientes</option>
+          {clientOptions.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+
+        {(statusFilter || clientFilter) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9"
+            onClick={() => { setStatusFilter(''); setClientFilter(''); }}
+          >
+            Limpiar filtros
+          </Button>
+        )}
+
+        <span className="text-xs text-[var(--color-app-text-muted)] ml-auto">
+          {data.length} de {projects.length} proyecto{projects.length === 1 ? '' : 's'}
+        </span>
       </div>
 
       <Card className="p-0">
