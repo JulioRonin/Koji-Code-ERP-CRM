@@ -2,14 +2,25 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, Clock, AlertTriangle, CreditCard, ShieldCheck, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { Receipt, ExternalLink, FileText as FileIcon } from 'lucide-react';
 import { KanriLogo, KANRI } from '@/components/saas/KanriLogo';
 import { PromoBanner } from '@/components/saas/PromoCountdown';
-import { startCheckout, openBillingPortal } from '@/lib/api/billing';
+import { startCheckout, openBillingPortal, listInvoices, type StripeInvoice } from '@/lib/api/billing';
 import { PLANS, formatMxn, effectivePrice, getPlan, daysLeft, subState, type PlanKey, type PlanDef } from '@/lib/saas';
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-[var(--color-app-text-muted)]">{label}</p>
+      <p className="font-medium mt-0.5">{value}</p>
+    </div>
+  );
+}
 
 /** Página de suscripción. Con `blocked` se usa como pantalla bloqueante cuando
  *  la demo terminó (cubre toda la pantalla, fuera del AppShell). */
@@ -22,6 +33,15 @@ export function Subscription({ blocked = false }: { blocked?: boolean }) {
   const [busyPlan, setBusyPlan] = useState<PlanKey | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [invoices, setInvoices] = useState<StripeInvoice[]>([]);
+  const [loadingInv, setLoadingInv] = useState(true);
+
+  // Carga el historial de pagos del cliente (facturas de Stripe).
+  useEffect(() => {
+    let alive = true;
+    listInvoices().then(inv => { if (alive) { setInvoices(inv); setLoadingInv(false); } });
+    return () => { alive = false; };
+  }, []);
 
   // Al volver de Stripe: refresca el estado del tenant (el webhook ya lo activó)
   // y muestra confirmación. Reintenta unas veces por si el webhook tarda.
@@ -121,6 +141,82 @@ export function Subscription({ blocked = false }: { blocked?: boolean }) {
           {error}
         </div>
       )}
+
+      {/* Mi facturación: resumen + historial de pagos */}
+      <Card className="p-0">
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Mi facturación
+            </h2>
+            <Button variant="outline" size="sm" onClick={() => openBillingPortal().catch(e => setError((e as Error).message))}>
+              <CreditCard className="h-3.5 w-3.5 mr-1.5" /> Gestionar en Stripe
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <Detail label="Plan" value={plan.label} />
+            <Detail label="Ciclo" value={tenant.subscription.billingCycle === 'annual' ? 'Anual' : 'Mensual'} />
+            <Detail label="Estatus" value={state === 'active' ? 'Activa' : state === 'trial' ? 'Demo' : state === 'past_due' ? 'Pago pendiente' : 'Vencida'} />
+            <Detail
+              label={state === 'trial' ? 'Fin de la demo' : 'Próxima renovación'}
+              value={tenant.subscription.currentPeriodEnd ? new Date(tenant.subscription.currentPeriodEnd).toLocaleDateString('es-MX') : '—'}
+            />
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-[var(--color-app-text-muted)] mb-1.5">Historial de pagos</p>
+            {loadingInv ? (
+              <p className="text-sm text-[var(--color-app-text-muted)] py-3">Cargando…</p>
+            ) : invoices.length === 0 ? (
+              <p className="text-sm text-[var(--color-app-text-muted)] py-3">
+                Aún no hay pagos registrados. Aparecerán aquí automáticamente después de tu primer cobro.
+              </p>
+            ) : (
+              <div className="rounded-md border border-[var(--color-app-border)] overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-[var(--color-app-surface-alt)]/60 text-xs text-[var(--color-app-text-muted)]">
+                    <tr>
+                      <th className="text-left p-2.5 font-medium">Fecha</th>
+                      <th className="text-left p-2.5 font-medium">Factura</th>
+                      <th className="text-right p-2.5 font-medium">Monto</th>
+                      <th className="text-center p-2.5 font-medium">Estado</th>
+                      <th className="text-right p-2.5 font-medium">Recibo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map(inv => (
+                      <tr key={inv.id} className="border-t border-[var(--color-app-border)]">
+                        <td className="p-2.5">{new Date(inv.created * 1000).toLocaleDateString('es-MX')}</td>
+                        <td className="p-2.5 font-mono text-xs text-[var(--color-app-text-muted)]">{inv.number ?? inv.id.slice(-8)}</td>
+                        <td className="p-2.5 text-right tabular-nums">
+                          {(inv.amount_paid / 100).toLocaleString('es-MX', { style: 'currency', currency: (inv.currency || 'mxn').toUpperCase() })}
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <Badge variant={inv.status === 'paid' ? 'success' : inv.status === 'open' ? 'warning' : 'secondary'}>
+                            {inv.status === 'paid' ? 'Pagada' : inv.status === 'open' ? 'Pendiente' : inv.status ?? '—'}
+                          </Badge>
+                        </td>
+                        <td className="p-2.5 text-right">
+                          {inv.invoice_pdf ? (
+                            <a href={inv.invoice_pdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--color-app-primary)] hover:underline">
+                              <FileIcon className="h-3.5 w-3.5" /> PDF
+                            </a>
+                          ) : inv.hosted_invoice_url ? (
+                            <a href={inv.hosted_invoice_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--color-app-primary)] hover:underline">
+                              <ExternalLink className="h-3.5 w-3.5" /> Ver
+                            </a>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Oferta de lanzamiento con contador */}
       <PromoBanner />
