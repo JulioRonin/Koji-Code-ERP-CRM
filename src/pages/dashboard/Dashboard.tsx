@@ -40,6 +40,8 @@ import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLink
 import { useCompany } from '@/contexts/CompanyContext';
 import { useTenant } from '@/contexts/TenantContext';
 import { SalesDashboard } from './SalesDashboard';
+import { Combobox } from '@/components/ui/combobox';
+import { ProjectSpotlight } from '@/components/dashboard/ProjectSpotlight';
 
 /** Giros que por defecto usan el tablero de ventas (venden artículos). */
 const SALES_INDUSTRIES = ['herramientas', 'mro'];
@@ -89,6 +91,8 @@ function OperationsDashboard() {
   const { data: inspections } = useInspections();
   const { data: machines } = useMachines();
   const [shareProject, setShareProject] = useState<Project | null>(null);
+  const [spotlightId, setSpotlightId] = useState<string | null>(null);
+  const spotlight = projects.find(p => p.id === spotlightId) ?? null;
 
   // ── KPIs principales ──────────────────────────────────────────────────
   const kpis = useMemo(() => {
@@ -278,6 +282,30 @@ function OperationsDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Detalle de un proyecto específico */}
+      <Card className="p-0">
+        <CardHeader className="pb-3 flex-col sm:flex-row sm:items-center justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="text-base">Detalle de proyecto</CardTitle>
+            <CardDescription>Selecciona un proyecto para ver su avance por etapas.</CardDescription>
+          </div>
+          <div className="w-full sm:w-80">
+            <Combobox
+              options={projects.map(p => ({ value: p.id, label: p.name, hint: p.client_name }))}
+              value={spotlightId}
+              onChange={setSpotlightId}
+              placeholder="Selecciona un proyecto…"
+              searchPlaceholder="Buscar por nombre o cliente…"
+            />
+          </div>
+        </CardHeader>
+        {spotlight && (
+          <CardContent className="pt-0">
+            <ProjectSpotlight project={spotlight} />
+          </CardContent>
+        )}
+      </Card>
 
       {/* Fila de gráficas: tendencia + distribución */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
