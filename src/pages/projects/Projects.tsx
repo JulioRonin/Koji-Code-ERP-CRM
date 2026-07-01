@@ -69,6 +69,46 @@ const statusVariant: Record<ProjectStatus, 'default' | 'secondary' | 'success' |
 
 const columnHelper = createColumnHelper<Project>();
 
+/** Fila de proyecto reutilizable (usada en la vista agrupada). */
+function ProjectRow({ project, onOpen, onDelete }: { project: Project; onOpen: () => void; onDelete: () => void }) {
+  const date = new Date(project.deadline);
+  return (
+    <TableRow className="cursor-pointer" onClick={onOpen}>
+      <TableCell className="font-mono text-xs text-[var(--color-app-text-muted)]">{project.id}</TableCell>
+      <TableCell className="font-medium">{project.name}</TableCell>
+      <TableCell className="text-[var(--color-app-text-muted)]">{project.client_name}</TableCell>
+      <TableCell><Badge variant={statusVariant[project.status]}>{project.status}</Badge></TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2 w-32">
+          <Progress value={project.progress} className="h-1.5" />
+          <span className="text-xs text-[var(--color-app-text-muted)] tabular-nums w-9 text-right">{project.progress}%</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2 text-sm text-[var(--color-app-text-muted)]">
+          <Calendar className="h-3.5 w-3.5" />
+          {isValid(date) ? format(date, 'dd MMM yyyy', { locale: es }) : 'N/A'}
+        </div>
+      </TableCell>
+      <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onOpen}>Ver detalles</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(project.id)}>Copiar ID</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onDelete} className="text-[var(--color-app-danger)] focus:text-[var(--color-app-danger)] gap-2">
+              <Trash2 className="h-3.5 w-3.5" /> Eliminar proyecto
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export function Projects() {
   const { sendSystemMessage } = useChat();
   const navigate = useNavigate();
@@ -82,6 +122,7 @@ export function Projects() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [clientFilter, setClientFilter] = useState('');
+  const [groupBy, setGroupBy] = useState<'' | 'status' | 'client_name'>('');
 
   // Clientes únicos presentes en los proyectos (para el filtro).
   const clientOptions = React.useMemo(
@@ -200,6 +241,28 @@ export function Projects() {
     }),
   ];
 
+  // Grupos para la vista agrupada (respeta la búsqueda por texto + filtros).
+  const groups = React.useMemo(() => {
+    if (!groupBy) return [];
+    const q = (globalFilter ?? '').trim().toLowerCase();
+    const filtered = q
+      ? data.filter(p =>
+          p.name.toLowerCase().includes(q) ||
+          p.id.toLowerCase().includes(q) ||
+          (p.client_name ?? '').toLowerCase().includes(q))
+      : data;
+    const map = new Map<string, Project[]>();
+    filtered.forEach(p => {
+      const key = (groupBy === 'status' ? p.status : p.client_name) || '—';
+      const arr = map.get(key) ?? [];
+      arr.push(p);
+      map.set(key, arr);
+    });
+    return Array.from(map.entries())
+      .map(([key, items]) => ({ key, items: [...items].sort((a, b) => a.name.localeCompare(b.name)) }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+  }, [groupBy, data, globalFilter]);
+
   const table = useReactTable({
     data,
     columns,
@@ -290,6 +353,17 @@ export function Projects() {
           ))}
         </select>
 
+        <select
+          value={groupBy}
+          onChange={e => setGroupBy(e.target.value as typeof groupBy)}
+          className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+          title="Agrupar proyectos"
+        >
+          <option value="">Sin agrupar</option>
+          <option value="status">Agrupar por estado</option>
+          <option value="client_name">Agrupar por cliente</option>
+        </select>
+
         {(statusFilter || clientFilter) && (
           <Button
             variant="ghost"
@@ -306,6 +380,41 @@ export function Projects() {
         </span>
       </div>
 
+      {groupBy ? (
+        <div className="space-y-5">
+          {groups.map(group => (
+            <div key={group.key}>
+              <div className="flex items-center gap-2 mb-2">
+                {groupBy === 'status'
+                  ? <Badge variant={statusVariant[group.key as ProjectStatus] ?? 'secondary'}>{group.key}</Badge>
+                  : <span className="text-sm font-semibold">{group.key}</span>}
+                <span className="text-xs text-[var(--color-app-text-muted)]">({group.items.length})</span>
+              </div>
+              <Card className="p-0">
+                <Table>
+                  <TableBody>
+                    {group.items.map(p => (
+                      <ProjectRow
+                        key={p.id}
+                        project={p}
+                        onOpen={() => navigate(`/projects/${p.id}`)}
+                        onDelete={() => setDeleteTarget(p)}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            </div>
+          ))}
+          {groups.length === 0 && (
+            <Card className="p-0">
+              <div className="h-24 flex items-center justify-center text-sm text-[var(--color-app-text-muted)]">
+                No se encontraron resultados.
+              </div>
+            </Card>
+          )}
+        </div>
+      ) : (
       <Card className="p-0">
         <Table>
           <TableHeader>
@@ -346,15 +455,18 @@ export function Projects() {
           </TableBody>
         </Table>
       </Card>
+      )}
 
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-          Anterior
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-          Siguiente
-        </Button>
-      </div>
+      {!groupBy && (
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+            Anterior
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+            Siguiente
+          </Button>
+        </div>
+      )}
 
       <ProjectFormModal
         isOpen={isModalOpen}

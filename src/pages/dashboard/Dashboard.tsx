@@ -145,6 +145,7 @@ function OperationsDashboard() {
   }, [machines, workOrders]);
 
   // ── Proyectos próximos a vencer ────────────────────────────────────────
+  const [projStatus, setProjStatus] = useState('all');
   const upcoming = useMemo(() => {
     return [...projects]
       .filter(p => p.status !== 'Entregado' && p.status !== 'Cancelado')
@@ -152,9 +153,13 @@ function OperationsDashboard() {
         ...p,
         daysLeft: Math.ceil((new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
       }))
-      .sort((a, b) => a.daysLeft - b.daysLeft)
-      .slice(0, 5);
+      .sort((a, b) => a.daysLeft - b.daysLeft);
   }, [projects]);
+
+  const visibleUpcoming = useMemo(
+    () => (projStatus === 'all' ? upcoming : upcoming.filter(p => p.status === projStatus)).slice(0, 6),
+    [upcoming, projStatus]
+  );
 
   // ── Alertas críticas ──────────────────────────────────────────────────
   const alerts = useMemo(() => {
@@ -397,13 +402,25 @@ function OperationsDashboard() {
               </CardTitle>
               <CardDescription>Ordenado por urgencia</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/projects')} className="gap-1 hidden sm:flex">
-              Ver todos <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <select
+                value={projStatus}
+                onChange={e => setProjStatus(e.target.value)}
+                className="h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+              >
+                <option value="all">Todos los estados</option>
+                {Object.keys(statusBadge).map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/projects')} className="gap-1 hidden sm:flex">
+                Ver todos <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-[var(--color-app-border)]">
-              {upcoming.map(p => {
+              {visibleUpcoming.map(p => {
                 const badge = statusBadge[p.status] ?? { variant: 'secondary' as const, label: p.status };
                 const urgency =
                   p.daysLeft < 0 ? 'overdue' : p.daysLeft <= 7 ? 'critical' : p.daysLeft <= 14 ? 'warning' : 'ok';
@@ -460,10 +477,10 @@ function OperationsDashboard() {
                   </div>
                 );
               })}
-              {upcoming.length === 0 && (
+              {visibleUpcoming.length === 0 && (
                 <div className="py-10 text-center text-sm text-[var(--color-app-text-muted)]">
                   <CheckCircle2 className="h-6 w-6 mx-auto mb-2 text-[var(--color-app-success)]" />
-                  No hay proyectos activos con entregas próximas.
+                  {projStatus === 'all' ? 'No hay proyectos activos con entregas próximas.' : 'No hay proyectos en este estado.'}
                 </div>
               )}
             </div>
