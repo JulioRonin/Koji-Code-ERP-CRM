@@ -22,7 +22,13 @@ import {
   useClientPortalToken,
   useGenerateClientPortalToken,
 } from '@/lib/api';
+import { useCompany } from '@/contexts/CompanyContext';
 import type { Project } from '@/types/database';
+
+const STAGE_LABEL: Record<string, string> = {
+  'Cotización': 'Cotización', 'Diseño': 'Diseño', 'Compras': 'Procura', 'En Producción': 'Producción',
+  'Calidad': 'Control de calidad', 'Embarque': 'Embarque', 'Entregado': 'Entregado', 'Cancelado': 'Cancelado',
+};
 
 interface ShareClientLinkModalProps {
   project: Project;
@@ -37,6 +43,8 @@ interface ShareClientLinkModalProps {
 export function ShareClientLinkModal({ project, open, onClose }: ShareClientLinkModalProps) {
   const { data: existingToken, refetch } = useClientPortalToken(project.id);
   const { generate, loading: generating } = useGenerateClientPortalToken();
+  const { company } = useCompany();
+  const brand = company.commercial_name || company.legal_name || 'KANRI';
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -83,12 +91,13 @@ export function ShareClientLinkModal({ project, open, onClose }: ShareClientLink
     }
   };
 
-  const mailSubject = encodeURIComponent(`Avance del proyecto · ${project.name}`);
+  const stage = STAGE_LABEL[project.status] ?? project.status;
+  const mailSubject = encodeURIComponent(`Avance del proyecto ${project.name} · ${stage}`);
   const mailBody = encodeURIComponent(
     `Estimado equipo de ${project.client_name},\n\n` +
-      `Compartimos el enlace donde pueden seguir en tiempo real el avance del proyecto ${project.name} (${project.id}):\n\n` +
-      `${portalUrl}\n\n` +
-      `Saludos,\nKANRI`
+      `Le informamos que el proyecto ${project.name} (${project.id}) avanzó a la etapa: ${stage} (${project.progress}% de avance).\n\n` +
+      `Puede seguir el avance en tiempo real aquí:\n${portalUrl}\n\n` +
+      `Saludos cordiales,\n${brand}`
   );
   const mailtoUrl = `mailto:?subject=${mailSubject}&body=${mailBody}`;
 
