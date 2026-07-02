@@ -57,6 +57,9 @@ export interface SupplierInput {
   is_certified?: boolean;
   is_active?: boolean;
   notes?: string | null;
+  tier?: string | null;
+  category?: string | null;
+  lead_time_days?: number | null;
 }
 
 export function useUpsertSupplier() {
@@ -82,10 +85,15 @@ export function useUpsertSupplier() {
         setState({ loading: false, error: null });
         return created;
       }
-      const payload = { ...input, updated_at: now };
-      const { data, error } = input.id
-        ? await supabase.from('suppliers').update(payload).eq('id', input.id).select('*').single()
-        : await supabase.from('suppliers').insert(payload).select('*').single();
+      const payload: Record<string, unknown> = { ...input, updated_at: now };
+      const run = (body: Record<string, unknown>) => input.id
+        ? supabase!.from('suppliers').update(body).eq('id', input.id).select('*').single()
+        : supabase!.from('suppliers').insert(body).select('*').single();
+      let { data, error } = await run(payload);
+      if (error && /tier|category|lead_time_days/i.test(error.message)) {
+        const { tier: _t, category: _c, lead_time_days: _l, ...rest } = payload;
+        ({ data, error } = await run(rest));
+      }
       if (error) throw error;
       setState({ loading: false, error: null });
       return data as Supplier;

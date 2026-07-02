@@ -86,3 +86,18 @@ export function downloadInventoryTemplate(): void {
   XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
   XLSX.writeFile(wb, 'plantilla_inventario_kanri.xlsx');
 }
+
+/** Columnas de la plantilla de componentes para cotización. */
+export const COMPONENT_HEADERS = ['Name', 'Part Description', 'Qty', 'Material'] as const;
+
+/** Descarga la plantilla de componentes para importar en una cotización. */
+export function downloadComponentsTemplate(): void {
+  const rows = [
+    { Name: 'PZ-001', 'Part Description': 'Eje principal', Qty: 2, Material: 'Acero 4140' },
+    { Name: 'PZ-002', 'Part Description': 'Buje bronce', Qty: 4, Material: 'Bronce SAE 660' },
+  ];
+  const ws = XLSX.utils.json_to_sheet(rows, { header: [...COMPONENT_HEADERS] });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Componentes');
+  XLSX.writeFile(wb, 'plantilla_componentes_kanri.xlsx');
+}

@@ -86,6 +86,7 @@ export function CompanySettingsPage() {
       payment_notes: company.payment_notes ?? '',
       dashboard_mode: company.dashboard_mode ?? null,
       quote_simple: company.quote_simple ?? false,
+      inventory_mode: company.inventory_mode ?? null,
     });
   }, [company.id, company.updated_at]);
 
@@ -293,6 +294,22 @@ export function CompanySettingsPage() {
           <div className="text-xs text-[var(--color-app-text-muted)] flex items-end pb-2">
             Giros que venden artículos (herramientas, MRO) usan "Ventas" por defecto. Guarda para aplicarlo.
           </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Modo de inventario</label>
+            <select
+              value={form.inventory_mode ?? ''}
+              onChange={e => set({ inventory_mode: (e.target.value || null) as 'taller' | 'insumos' | null })}
+              disabled={!isAdmin}
+              className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 disabled:opacity-60"
+            >
+              <option value="">Taller (materia prima / refacciones)</option>
+              <option value="insumos">Insumos / venta (catálogo de productos)</option>
+            </select>
+            <p className="text-[11px] text-[var(--color-app-text-muted)]">
+              "Insumos" resalta precio de venta y tiempos de entrega; "Taller" resalta costos y ubicación.
+            </p>
+          </div>
+          <div className="hidden md:block" />
           <div className="md:col-span-2 pt-2 border-t border-[var(--color-app-border)]">
             <label className="flex items-center gap-2 text-sm font-medium">
               <input

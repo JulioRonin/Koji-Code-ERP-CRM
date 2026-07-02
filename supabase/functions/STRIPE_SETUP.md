@@ -92,3 +92,21 @@ En promo, si existe `STRIPE_PRICE_PROFESIONAL_PROMO_<CICLO>` se usa ese.
 2. Paga → Stripe redirige a `/subscription?checkout=success`.
 3. `stripe-webhook` recibe el evento y pone `tenants.status = 'active'` con
    `current_period_end`. La app refresca y desbloquea el acceso.
+
+## Correos de facturación al cliente (los envía Stripe)
+La app NO manda estos correos; los envía Stripe si los activas:
+- Stripe → **Settings → Emails** (Customer emails):
+  - Activa **"Successful payments"** → recibo por cada cobro.
+  - Activa **"Send finalized invoices and credit notes"** → factura de cada periodo.
+- El cliente debe tener email en su *Customer* de Stripe. `stripe-checkout` lo crea
+  con el correo del usuario, así que ya queda cubierto.
+- En cada renovación mensual/anual Stripe manda el correo automáticamente.
+
+## Prueba end-to-end (modo test)
+1. Activa **Test mode** en Stripe y usa `sk_test_...` como `STRIPE_SECRET_KEY`.
+2. En la app: Suscripción → Suscribirme → paga con `4242 4242 4242 4242`,
+   fecha futura, CVC y CP cualquiera, y un correo de prueba.
+3. Regresas a `?checkout=success`; el estatus pasa a **Activa** (lo hace el webhook).
+4. Verifica: Stripe → Developers → Webhooks → tu endpoint → el evento
+   `checkout.session.completed` entregado con **200**.
+5. En "Mi facturación" aparece el pago; si activaste los correos, llega el recibo.

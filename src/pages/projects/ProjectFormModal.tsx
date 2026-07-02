@@ -30,11 +30,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CyberDatePicker } from '@/components/ui/CyberDatePicker';
+import { Combobox } from '@/components/ui/combobox';
+import { useCustomers } from '@/lib/api';
 
 const projectSchema = z
   .object({
     name: z.string().min(3, { message: 'El nombre del proyecto debe tener al menos 3 caracteres.' }),
     client: z.string().min(2, { message: 'El nombre del cliente debe tener al menos 2 caracteres.' }),
+    customerId: z.string().optional(),
     description: z.string().optional(),
     manager: z.string({ message: 'Por favor selecciona un Project Manager.' }),
     startDate: z.date({ message: 'La fecha de inicio es requerida.' }),
@@ -54,11 +57,13 @@ interface ProjectFormModalProps {
 }
 
 export function ProjectFormModal({ isOpen, onClose, onSubmit }: ProjectFormModalProps) {
+  const { data: customers } = useCustomers();
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       name: '',
       client: '',
+      customerId: '',
       description: '',
       manager: '',
       startDate: undefined,
@@ -96,14 +101,32 @@ export function ProjectFormModal({ isOpen, onClose, onSubmit }: ProjectFormModal
                   </FormItem>
                 )}
               />
+              {customers.length > 0 && (
+                <FormItem className="col-span-2">
+                  <FormLabel>Cliente registrado (opcional)</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      options={customers.map(c => ({ value: c.id, label: c.name, hint: c.tax_id ?? undefined }))}
+                      value={form.watch('customerId') || null}
+                      onChange={id => {
+                        form.setValue('customerId', id ?? '');
+                        const c = id ? customers.find(x => x.id === id) : null;
+                        if (c) form.setValue('client', c.name, { shouldValidate: true });
+                      }}
+                      placeholder="Vincular a un cliente del CRM…"
+                      searchPlaceholder="Buscar cliente…"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
               <FormField
                 control={form.control}
                 name="client"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="col-span-2">
                     <FormLabel>Cliente</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej. BRP" {...field} />
+                      <Input placeholder="Ej. BRP (o elige uno registrado arriba)" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Boxes, Plus, ArrowDownUp, Search, AlertTriangle, PackageX, DollarSign,
   Bell, Pencil, Trash2, TrendingDown, TrendingUp, Upload, FileDown, Loader2, CheckCircle2,
+  Truck, Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,14 +19,31 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useTenant } from '@/contexts/TenantContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import {
   useInventoryItems, useUpsertInventoryItem, useDeleteInventoryItem, useRegisterMovement,
   useBulkInsertInventory, stockStatus,
 } from '@/lib/api';
 import { parseInventoryFile, downloadInventoryTemplate } from '@/lib/inventoryImport';
-import type { InventoryItem, InventoryMovementType, StockStatus } from '@/types/database';
+import type { InventoryItem, InventoryMovementType, StockStatus, RestockStatus } from '@/types/database';
 
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
+
+const RESTOCK_META: Record<RestockStatus, { label: string; variant: 'secondary' | 'warning' | 'default' }> = {
+  none: { label: 'No solicitado', variant: 'secondary' },
+  solicitado: { label: 'Solicitado', variant: 'warning' },
+  transito: { label: 'En tránsito', variant: 'default' },
+};
+
+/** Convierte un item a la entrada de guardado (sin tocar el stock). */
+function itemToInput(i: InventoryItem) {
+  return {
+    id: i.id, sku: i.sku, name: i.name, category: i.category, uom: i.uom,
+    min_stock: i.min_stock, max_stock: i.max_stock, unit_cost: i.unit_cost, unit_price: i.unit_price,
+    location: i.location, supplier_name: i.supplier_name, barcode: i.barcode, active: i.active, notes: i.notes,
+    lead_time_days: i.lead_time_days ?? null, restock_status: i.restock_status ?? null, restock_eta: i.restock_eta ?? null,
+  };
+}
 
 const STATUS_META: Record<StockStatus, { label: string; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
   ok: { label: 'OK', variant: 'success' },
@@ -36,6 +54,8 @@ const STATUS_META: Record<StockStatus, { label: string; variant: 'success' | 'wa
 
 export function Inventory() {
   const { tenant } = useTenant();
+  const { company } = useCompany();
+  const mode: 'taller' | 'insumos' = company.inventory_mode === 'insumos' ? 'insumos' : 'taller';
   const { data: items, refetch } = useInventoryItems();
   const { remove } = useDeleteInventoryItem();
 
@@ -43,6 +63,7 @@ export function Inventory() {
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [movItem, setMovItem] = useState<InventoryItem | null>(null);
+  const [restockItem, setRestockItem] = useState<InventoryItem | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   // Notificaciones automáticas: disponibles en planes superiores (no básico).
@@ -85,9 +106,17 @@ export function Inventory() {
       {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Inventario</h1>
+          <h1 className="text-xl font-semibold text-[var(--color-app-text)] flex items-center gap-2">
+            Inventario
+            <Badge variant="outline" className="font-normal">
+              {mode === 'insumos' ? 'Insumos / venta' : 'Taller'}
+            </Badge>
+          </h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
-            Control de stock en tiempo real, entradas/salidas y mínimos/máximos.
+            {mode === 'insumos'
+              ? 'Catálogo de productos para venta: stock, precios y tiempos de entrega.'
+              : 'Materia prima y refacciones: stock en tiempo real, mín/máx y costos.'}
+            {' '}Cambia el modo en Configuración.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -181,7 +210,8 @@ export function Inventory() {
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead className="text-center">Mín / Máx</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Entrega</TableHead>
+                  <TableHead className="text-right">{mode === 'insumos' ? 'Precio venta' : 'Valor'}</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -203,9 +233,30 @@ export function Inventory() {
                         {i.min_stock} / {i.max_stock ?? '—'}
                       </TableCell>
                       <TableCell><Badge variant={STATUS_META[st].variant}>{STATUS_META[st].label}</Badge></TableCell>
-                      <TableCell className="text-right tabular-nums">{MXN.format(i.stock * i.unit_cost)}</TableCell>
+                      <TableCell className="text-xs">
+                        {st === 'ok' || st === 'sobre' ? (
+                          <span className="text-[var(--color-app-success)] inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> En stock</span>
+                        ) : (i.restock_status && i.restock_status !== 'none') ? (
+                          <div className="space-y-0.5">
+                            <Badge variant={RESTOCK_META[i.restock_status].variant}>{RESTOCK_META[i.restock_status].label}</Badge>
+                            {i.restock_eta && <div className="text-[10px] text-[var(--color-app-text-muted)]">llega {i.restock_eta}</div>}
+                          </div>
+                        ) : i.lead_time_days ? (
+                          <span className="text-[var(--color-app-text-muted)] inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {i.lead_time_days} días</span>
+                        ) : (
+                          <span className="text-[var(--color-app-text-subtle)]">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {mode === 'insumos' ? MXN.format(i.unit_price) : MXN.format(i.stock * i.unit_cost)}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          {(st === 'bajo' || st === 'agotado') && (
+                            <Button variant="ghost" size="sm" className="h-8 text-[var(--color-app-warning)]" onClick={() => setRestockItem(i)} title="Solicitar resurtido / entrega">
+                              <Truck className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button variant="ghost" size="sm" className="h-8" onClick={() => setMovItem(i)} title="Entrada / salida / ajuste">
                             <ArrowDownUp className="h-3.5 w-3.5" />
                           </Button>
@@ -239,6 +290,13 @@ export function Inventory() {
           initial={movItem}
           onClose={() => setMovItem(null)}
           onSaved={async () => { setMovItem(null); await refetch(); }}
+        />
+      )}
+      {restockItem && (
+        <RestockModal
+          item={restockItem}
+          onClose={() => setRestockItem(null)}
+          onSaved={async () => { setRestockItem(null); await refetch(); }}
         />
       )}
       {importOpen && (
@@ -379,6 +437,7 @@ function ItemFormModal({ item, onClose, onSaved }: {
     stock: String(item?.stock ?? 0), min_stock: String(item?.min_stock ?? 0), max_stock: item?.max_stock != null ? String(item.max_stock) : '',
     unit_cost: String(item?.unit_cost ?? 0), unit_price: String(item?.unit_price ?? 0),
     location: item?.location ?? '', supplier_name: item?.supplier_name ?? '', notes: item?.notes ?? '',
+    lead_time_days: item?.lead_time_days != null ? String(item.lead_time_days) : '',
   });
   const [error, setError] = useState<string | null>(null);
   const num = (s: string) => (s.trim() === '' ? 0 : Number(s));
@@ -400,9 +459,12 @@ function ItemFormModal({ item, onClose, onSaved }: {
         unit_price: num(f.unit_price),
         location: f.location.trim() || null,
         supplier_name: f.supplier_name.trim() || null,
-        barcode: null,
-        active: true,
+        barcode: item?.barcode ?? null,
+        active: item?.active ?? true,
         notes: f.notes.trim() || null,
+        lead_time_days: f.lead_time_days.trim() === '' ? null : Number(f.lead_time_days),
+        restock_status: item?.restock_status ?? null,
+        restock_eta: item?.restock_eta ?? null,
       });
       onSaved();
     } catch (err) {
@@ -434,10 +496,67 @@ function ItemFormModal({ item, onClose, onSaved }: {
           <L label="Precio venta"><Input type="number" value={f.unit_price} onChange={set('unit_price')} /></L>
           <L label="Ubicación"><Input value={f.location} onChange={set('location')} placeholder="A-1, Almacén…" /></L>
           <L label="Proveedor"><Input value={f.supplier_name} onChange={set('supplier_name')} /></L>
+          <L label="Tiempo de entrega (días)" full>
+            <Input type="number" value={f.lead_time_days} onChange={set('lead_time_days')} placeholder="Días para surtir si está fuera de stock" />
+          </L>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
           <Button onClick={submit} disabled={loading}>{loading ? 'Guardando…' : item ? 'Guardar' : 'Crear producto'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Modal: resurtido / tiempo de entrega ──
+function RestockModal({ item, onClose, onSaved }: { item: InventoryItem; onClose: () => void; onSaved: () => void }) {
+  const { save, loading } = useUpsertInventoryItem();
+  const [status, setStatus] = useState<RestockStatus>((item.restock_status as RestockStatus) ?? 'solicitado');
+  const [eta, setEta] = useState(item.restock_eta ?? '');
+  const [lead, setLead] = useState(item.lead_time_days != null ? String(item.lead_time_days) : '');
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    setError(null);
+    try {
+      await save({
+        ...itemToInput(item),
+        restock_status: status,
+        restock_eta: eta || null,
+        lead_time_days: lead.trim() === '' ? null : Number(lead),
+      });
+      onSaved();
+    } catch (e) { setError((e as Error).message); }
+  };
+
+  return (
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Resurtido de {item.name}</DialogTitle>
+          <DialogDescription>Registra el estatus del pedido y la fecha estimada de entrega.</DialogDescription>
+        </DialogHeader>
+        {error && <div className="p-2.5 bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)] rounded-md text-sm">{error}</div>}
+        <div className="space-y-3">
+          <L label="Estatus" full>
+            <Select value={status} onValueChange={v => setStatus(v as RestockStatus)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No solicitado</SelectItem>
+                <SelectItem value="solicitado">Solicitado al proveedor</SelectItem>
+                <SelectItem value="transito">En tránsito</SelectItem>
+              </SelectContent>
+            </Select>
+          </L>
+          <div className="grid grid-cols-2 gap-3">
+            <L label="Fecha estimada de llegada"><Input type="date" value={eta} onChange={e => setEta(e.target.value)} /></L>
+            <L label="Tiempo de entrega (días)"><Input type="number" value={lead} onChange={e => setLead(e.target.value)} placeholder="Ej. 7" /></L>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={submit} disabled={loading}>{loading ? 'Guardando…' : 'Guardar'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

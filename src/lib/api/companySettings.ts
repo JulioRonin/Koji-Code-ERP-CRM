@@ -36,6 +36,7 @@ export const DEFAULT_COMPANY: CompanySettings = {
   payment_notes: null,
   dashboard_mode: null,
   quote_simple: null,
+  inventory_mode: null,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -130,6 +131,7 @@ export interface CompanySettingsInput {
   payment_notes?: string | null;
   dashboard_mode?: 'operations' | 'sales' | null;
   quote_simple?: boolean | null;
+  inventory_mode?: 'taller' | 'insumos' | null;
 }
 
 /**
@@ -165,8 +167,8 @@ export function useUpdateCompanySettings() {
             .select('*');
           // Resiliencia: si aún no se corrió la migración de datos bancarios,
           // reintenta sin esas columnas para no bloquear el guardado.
-          if (error && /bank_|payment_notes|dashboard_mode|quote_simple/i.test(error.message)) {
-            const { bank_name: _b, bank_account: _a, bank_clabe: _c2, bank_beneficiary: _be, payment_notes: _p, dashboard_mode: _dm, quote_simple: _qs, ...rest } = patch;
+          if (error && /bank_|payment_notes|dashboard_mode|quote_simple|inventory_mode/i.test(error.message)) {
+            const { bank_name: _b, bank_account: _a, bank_clabe: _c2, bank_beneficiary: _be, payment_notes: _p, dashboard_mode: _dm, quote_simple: _qs, inventory_mode: _im, ...rest } = patch;
             ({ data, error } = await supabase
               .from('company_settings')
               .update({ ...rest, updated_at: merged.updated_at })
