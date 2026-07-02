@@ -121,10 +121,16 @@ export function useUpsertInventoryItem() {
         setState({ loading: false, error: null });
         return created;
       }
-      const payload = { ...input, updated_at: now };
-      const { data, error } = input.id
-        ? await supabase.from('inventory_items').update(payload).eq('id', input.id).select('*').single()
-        : await supabase.from('inventory_items').insert(payload).select('*').single();
+      const payload: Record<string, unknown> = { ...input, updated_at: now };
+      const run = (body: Record<string, unknown>) => input.id
+        ? supabase!.from('inventory_items').update(body).eq('id', input.id).select('*').single()
+        : supabase!.from('inventory_items').insert(body).select('*').single();
+      let { data, error } = await run(payload);
+      // Resiliencia si faltan columnas nuevas (migración pendiente).
+      if (error && /lead_time_days|restock_status|restock_eta/i.test(error.message)) {
+        const { lead_time_days: _l, restock_status: _s, restock_eta: _e, ...rest } = payload;
+        ({ data, error } = await run(rest));
+      }
       if (error) throw error;
       setState({ loading: false, error: null });
       return data as InventoryItem;

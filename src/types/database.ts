@@ -110,6 +110,9 @@ export interface CompanySettings {
   /** Cotización simple (solo productos y precio): oculta margen, tarifa de
    *  máquina y el costeo por partida. Ideal para venta de insumos/herramientas. */
   quote_simple?: boolean | null;
+  /** Modo del inventario: 'taller' (materia prima/refacciones) o 'insumos'
+   *  (catálogo de productos para venta). */
+  inventory_mode?: 'taller' | 'insumos' | null;
   created_at: string;
   updated_at: string;
 }
@@ -873,9 +876,18 @@ export interface InventoryItem {
   barcode: string | null;
   active: boolean;
   notes: string | null;
+  /** Días de entrega si el producto está fuera de stock (surtido del proveedor). */
+  lead_time_days?: number | null;
+  /** Estatus de resurtido: none | solicitado | transito. */
+  restock_status?: RestockStatus | null;
+  /** Fecha estimada de llegada del resurtido. */
+  restock_eta?: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** Estatus de resurtido de un producto fuera de stock. */
+export type RestockStatus = 'none' | 'solicitado' | 'transito';
 
 export interface InventoryMovement {
   id: string;
