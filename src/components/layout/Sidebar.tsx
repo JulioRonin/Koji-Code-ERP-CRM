@@ -18,6 +18,7 @@ import {
   Boxes,
   Layers,
   Contact,
+  PiggyBank,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -49,6 +50,7 @@ const navItems: NavItem[] = [
   { name: 'Personal',     path: '/personnel',   icon: Users },
   { name: 'Chat',         path: '/chat',        icon: MessageSquare },
   { name: 'Facturación',  path: '/billing',     icon: FileText },
+  { name: 'Finanzas',     path: '/finance',     icon: PiggyBank },
 ];
 
 interface SidebarProps {
