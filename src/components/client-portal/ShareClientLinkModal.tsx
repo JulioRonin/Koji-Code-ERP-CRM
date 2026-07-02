@@ -21,8 +21,12 @@ import {
 import {
   useClientPortalToken,
   useGenerateClientPortalToken,
+  sendEmail,
+  brandedEmailHtml,
 } from '@/lib/api';
+import { Input } from '@/components/ui/input';
 import { useCompany } from '@/contexts/CompanyContext';
+import { cn } from '@/lib/utils';
 import type { Project } from '@/types/database';
 
 const STAGE_LABEL: Record<string, string> = {
@@ -48,6 +52,9 @@ export function ShareClientLinkModal({ project, open, onClose }: ShareClientLink
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [recipient, setRecipient] = useState((project as Project & { client_email?: string | null }).client_email ?? '');
+  const [sending, setSending] = useState(false);
+  const [sendMsg, setSendMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const portalUrl = existingToken ? `${baseUrl}/cliente/${existingToken}` : null;
@@ -106,6 +113,31 @@ export function ShareClientLinkModal({ project, open, onClose }: ShareClientLink
       `Sigue el avance en tiempo real:\n${portalUrl}`
   );
   const whatsappUrl = `https://wa.me/?text=${whatsappText}`;
+
+  const handleSendAuto = async () => {
+    if (!portalUrl || !recipient.trim()) { setSendMsg({ tone: 'err', text: 'Escribe el correo del cliente.' }); return; }
+    setSending(true);
+    setSendMsg(null);
+    try {
+      await sendEmail({
+        to: recipient.trim(),
+        subject: `Avance del proyecto ${project.name} · ${stage}`,
+        html: brandedEmailHtml({
+          brand,
+          accent: company.primary_color,
+          title: `Tu proyecto avanzó a: ${stage}`,
+          bodyHtml: `Estimado equipo de <b>${project.client_name}</b>,<br/><br/>El proyecto <b>${project.name}</b> (${project.id}) se encuentra en la etapa <b>${stage}</b> con <b>${project.progress}%</b> de avance. Puede seguir el detalle en tiempo real:`,
+          ctaLabel: 'Ver avance del proyecto',
+          ctaUrl: portalUrl,
+        }),
+      });
+      setSendMsg({ tone: 'ok', text: `Aviso enviado a ${recipient.trim()}.` });
+    } catch (e) {
+      setSendMsg({ tone: 'err', text: (e as Error).message });
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -168,11 +200,25 @@ export function ShareClientLinkModal({ project, open, onClose }: ShareClientLink
               </div>
             </div>
 
-            {/* Quick actions */}
+            {/* Notificación automática (Resend) */}
+            <div className="space-y-1.5 rounded-md border border-[var(--color-app-border)] p-3">
+              <label className="text-xs font-medium">Notificar avance por correo (automático)</label>
+              <div className="flex gap-2">
+                <Input type="email" placeholder="cliente@empresa.com" value={recipient} onChange={e => setRecipient(e.target.value)} className="h-9" />
+                <Button size="sm" className="h-9 shrink-0" disabled={sending} onClick={handleSendAuto}>
+                  <Mail className="h-3.5 w-3.5 mr-1.5" /> {sending ? 'Enviando…' : 'Enviar'}
+                </Button>
+              </div>
+              {sendMsg && (
+                <p className={cn('text-xs', sendMsg.tone === 'ok' ? 'text-[var(--color-app-success)]' : 'text-[var(--color-app-danger)]')}>{sendMsg.text}</p>
+              )}
+            </div>
+
+            {/* Quick actions (manual) */}
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" asChild>
                 <a href={mailtoUrl}>
-                  <Mail className="h-4 w-4 mr-1.5" /> Enviar por correo
+                  <Mail className="h-4 w-4 mr-1.5" /> Correo manual
                 </a>
               </Button>
               <Button variant="outline" asChild>
