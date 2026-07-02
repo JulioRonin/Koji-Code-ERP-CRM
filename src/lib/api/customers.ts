@@ -51,6 +51,10 @@ export interface CustomerInput {
   address?: string | null;
   notes?: string | null;
   is_active?: boolean;
+  stage?: string | null;
+  tier?: string | null;
+  industry?: string | null;
+  last_contact_at?: string | null;
 }
 
 export function useUpsertCustomer() {
@@ -69,35 +73,40 @@ export function useUpsertCustomer() {
         address: input.address ?? null,
         notes: input.notes ?? null,
         is_active: input.is_active ?? true,
+        stage: input.stage ?? null,
+        tier: input.tier ?? null,
+        industry: input.industry ?? null,
+        last_contact_at: input.last_contact_at ?? null,
+      };
+      // Columnas del CRM que podrían faltar si no se corrió db/2026_crm.sql.
+      const stripCrm = (p: typeof payload) => {
+        const { stage: _s, tier: _t, industry: _i, last_contact_at: _l, ...rest } = p;
+        return rest;
       };
 
       if (!supabase) {
         const all = read();
         if (input.id) {
           const idx = all.findIndex(c => c.id === input.id);
-          if (idx >= 0) all[idx] = { ...all[idx], ...payload, updated_at: now };
+          if (idx >= 0) all[idx] = { ...all[idx], ...payload, updated_at: now } as Customer;
           write(all);
           setState({ loading: false, error: null });
           return all[idx];
         }
-        const created: Customer = { id: newId(), ...payload, created_at: now, updated_at: now };
+        const created: Customer = { id: newId(), ...payload, created_at: now, updated_at: now } as Customer;
         write([created, ...all]);
         setState({ loading: false, error: null });
         return created;
       }
 
-      if (input.id) {
-        const { data, error } = await supabase
-          .from('customers')
-          .update({ ...payload, updated_at: now })
-          .eq('id', input.id)
-          .select('*')
-          .single();
-        if (error) throw error;
-        setState({ loading: false, error: null });
-        return data as Customer;
+      const runUpsert = async (body: Record<string, unknown>) => input.id
+        ? await supabase!.from('customers').update({ ...body, updated_at: now }).eq('id', input.id).select('*').single()
+        : await supabase!.from('customers').insert(body).select('*').single();
+
+      let { data, error } = await runUpsert(payload);
+      if (error && /stage|tier|industry|last_contact_at/i.test(error.message)) {
+        ({ data, error } = await runUpsert(stripCrm(payload)));
       }
-      const { data, error } = await supabase.from('customers').insert(payload).select('*').single();
       if (error) throw error;
       setState({ loading: false, error: null });
       return data as Customer;

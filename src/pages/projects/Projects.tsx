@@ -286,6 +286,7 @@ export function Projects() {
     const project = await createProject({
       name: newProject.name,
       client_name: newProject.client,
+      customer_id: newProject.customerId || null,
       manager_id: null,
       description: newProject.description ?? null,
       start_date: startDate,

@@ -157,6 +157,9 @@ export interface Profile {
 // TABLA: customers
 // ============================================================================
 
+/** Etapa en el embudo/roadmap del cliente (de prospecto a activo). */
+export type CustomerStage = 'prospecto' | 'contacto' | 'propuesta' | 'activo' | 'inactivo';
+
 export interface Customer {
   id: string;
   name: string;
@@ -167,6 +170,14 @@ export interface Customer {
   address: string | null;
   notes: string | null;
   is_active: boolean;
+  /** Etapa del embudo comercial / roadmap del cliente. */
+  stage?: CustomerStage | null;
+  /** Rango manual del cliente (A/B/C). Si es null se usa el score calculado. */
+  tier?: 'A' | 'B' | 'C' | null;
+  /** Giro / industria del cliente. */
+  industry?: string | null;
+  /** Última fecha de contacto/seguimiento. */
+  last_contact_at?: string | null;
   created_at: string;
   updated_at: string;
 }
