@@ -37,4 +37,5 @@ export * from './attendance';
 export * from './email';
 export * from './invoicing';
 export * from './finance';
+export * from './receivables';
 export * from './tenantScope';

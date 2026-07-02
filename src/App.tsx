@@ -36,6 +36,7 @@ import { LandingHome } from './pages/saas/LandingHome';
 import { Subscription } from './pages/saas/Subscription';
 import { Billing } from './pages/billing/Billing';
 import { Finance } from './pages/finance/Finance';
+import { Cobranza } from './pages/finance/Cobranza';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
 import { TechnicianDashboard } from './pages/technicians/TechnicianDashboard';
@@ -153,6 +154,7 @@ export default function App() {
           <Route path="chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
           <Route path="finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
+          <Route path="cobranza" element={<ProtectedRoute><Cobranza /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute><CompanySettingsPage /></ProtectedRoute>} />
           <Route path="subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
           

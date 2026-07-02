@@ -19,6 +19,7 @@ import {
   Layers,
   Contact,
   PiggyBank,
+  HandCoins,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,7 @@ const navItems: NavItem[] = [
   { name: 'Personal',     path: '/personnel',   icon: Users },
   { name: 'Chat',         path: '/chat',        icon: MessageSquare },
   { name: 'Facturación',  path: '/billing',     icon: FileText },
+  { name: 'Cobranza',     path: '/cobranza',    icon: HandCoins },
   { name: 'Finanzas',     path: '/finance',     icon: PiggyBank },
 ];
 

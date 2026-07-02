@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import {
-  useInvoices, usePurchaseOrders, usePayrollRuns, useQuotes,
+  useInvoices, usePurchaseOrders, usePayrollRuns, useQuotes, useReceivablePayments,
   useFinanceTransactions, useUpsertTransaction, useDeleteTransaction, type TxKind, type FinanceTransaction,
 } from '@/lib/api';
 
@@ -39,6 +39,7 @@ export function Finance() {
   const { data: pos } = usePurchaseOrders();
   const { data: payroll } = usePayrollRuns();
   const { data: quotes } = useQuotes();
+  const { data: cobranza } = useReceivablePayments();
   const { data: txs, refetch } = useFinanceTransactions();
   const { remove } = useDeleteTransaction();
 
@@ -49,6 +50,9 @@ export function Finance() {
   const inPeriod = (d: string | null | undefined) => !!d && new Date(d) >= start;
 
   const agg = useMemo(() => {
+    // Ingreso REAL = dinero cobrado (Cobranza) + ingresos manuales. La facturación
+    // se muestra aparte como referencia (no siempre = dinero recibido).
+    const cobrado = cobranza.filter(p => inPeriod(p.paid_date)).reduce((s, p) => s + (p.amount || 0), 0);
     const invIncome = invoices.filter(i => inPeriod(i.created_at)).reduce((s, i) => s + (i.total || 0), 0);
     const compras = pos.filter(p => inPeriod(p.created_at)).reduce((s, p) => s + (p.total_amount || 0), 0);
     const nomina = payroll.filter(p => inPeriod(p.created_at)).reduce((s, p) => s + (p.total_net || 0), 0);
@@ -56,7 +60,7 @@ export function Finance() {
     const manualExpense = txs.filter(t => t.kind === 'expense' && inPeriod(t.tx_date)).reduce((s, t) => s + t.amount, 0);
     const ventas = quotes.filter(q => (q.status === 'Aprobada' || q.status === 'Convertida') && inPeriod(q.updated_at)).reduce((s, q) => s + (q.total || 0), 0);
 
-    const income = invIncome + manualIncome;
+    const income = cobrado + manualIncome;
     const expenses = compras + nomina + manualExpense;
     const profit = income - expenses;
     const margin = income > 0 ? Math.round((profit / income) * 100) : 0;
@@ -71,8 +75,8 @@ export function Finance() {
     });
     const expenseByCat = Array.from(byCat.entries()).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }));
 
-    return { income, expenses, profit, margin, invIncome, compras, nomina, manualIncome, manualExpense, ventas, expenseByCat };
-  }, [invoices, pos, payroll, txs, quotes, period]);
+    return { income, expenses, profit, margin, cobrado, invIncome, compras, nomina, manualIncome, manualExpense, ventas, expenseByCat };
+  }, [invoices, pos, payroll, txs, quotes, cobranza, period]);
 
   // Serie mensual (últimos 6 meses): ingresos vs egresos
   const monthly = useMemo(() => {
@@ -80,20 +84,21 @@ export function Finance() {
     return Array.from({ length: 6 }, (_, idx) => {
       const d = subMonths(now, 5 - idx);
       const inMonth = (s: string | null | undefined) => !!s && isSameMonth(new Date(s), d);
-      const income = invoices.filter(i => inMonth(i.created_at)).reduce((s, i) => s + (i.total || 0), 0)
+      const income = cobranza.filter(p => inMonth(p.paid_date)).reduce((s, p) => s + (p.amount || 0), 0)
         + txs.filter(t => t.kind === 'income' && inMonth(t.tx_date)).reduce((s, t) => s + t.amount, 0);
       const expense = pos.filter(p => inMonth(p.created_at)).reduce((s, p) => s + (p.total_amount || 0), 0)
         + payroll.filter(p => inMonth(p.created_at)).reduce((s, p) => s + (p.total_net || 0), 0)
         + txs.filter(t => t.kind === 'expense' && inMonth(t.tx_date)).reduce((s, t) => s + t.amount, 0);
       return { label: format(d, 'MMM yy', { locale: es }), Ingresos: Math.round(income), Egresos: Math.round(expense) };
     });
-  }, [invoices, pos, payroll, txs]);
+  }, [cobranza, pos, payroll, txs]);
 
   const exportCsv = () => {
     const lines = [
       ['Concepto', 'Monto'].join(','),
-      ['Ingresos (facturas)', agg.invIncome.toFixed(2)].join(','),
+      ['Ingresos cobrados (cobranza)', agg.cobrado.toFixed(2)].join(','),
       ['Ingresos (otros)', agg.manualIncome.toFixed(2)].join(','),
+      ['Facturado (referencia)', agg.invIncome.toFixed(2)].join(','),
       ['Egresos (compras)', agg.compras.toFixed(2)].join(','),
       ['Egresos (nómina)', agg.nomina.toFixed(2)].join(','),
       ['Egresos (otros)', agg.manualExpense.toFixed(2)].join(','),
@@ -198,8 +203,9 @@ export function Finance() {
         <CardHeader className="pb-2"><CardTitle className="text-base">Estado de resultados (resumen)</CardTitle></CardHeader>
         <CardContent>
           <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm max-w-2xl">
-            <PL label="Ingresos por facturación" value={agg.invIncome} />
+            <PL label="Ingresos cobrados (cobranza)" value={agg.cobrado} />
             <PL label="Otros ingresos" value={agg.manualIncome} />
+            <PL label="Facturado (referencia)" value={agg.invIncome} muted />
             <PL label="Ventas ganadas (cotizaciones)" value={agg.ventas} muted />
             <div className="hidden sm:block" />
             <PL label="Egresos — Compras" value={-agg.compras} />
