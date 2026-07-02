@@ -31,3 +31,7 @@ export * from './pdfThumbnail';
 export * from './companySettings';
 export * from './dimensionalReports';
 export * from './inventory';
+export * from './customers';
+export * from './payroll';
+export * from './attendance';
+export * from './tenantScope';

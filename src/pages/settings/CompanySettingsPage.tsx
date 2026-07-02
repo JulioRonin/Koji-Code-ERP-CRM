@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Lock,
+  Landmark,
+  LayoutDashboard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,7 +49,9 @@ export function CompanySettingsPage() {
   const { company, refresh } = useCompany();
   const { user } = useAuth();
   const { update, loading } = useUpdateCompanySettings();
-  const isAdmin = !!user && ADMIN_ROLES.includes(user.role);
+  const isAdmin = !!user && (
+    ADMIN_ROLES.includes(user.role) || user.isPlatformOwner || /admin/i.test(user.role ?? '')
+  );
 
   const [form, setForm] = useState<CompanySettingsInput>({});
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
@@ -75,6 +79,13 @@ export function CompanySettingsPage() {
       website: company.website ?? '',
       logo_url: company.logo_url ?? '',
       primary_color: company.primary_color ?? '#0369a1',
+      bank_name: company.bank_name ?? '',
+      bank_account: company.bank_account ?? '',
+      bank_clabe: company.bank_clabe ?? '',
+      bank_beneficiary: company.bank_beneficiary ?? '',
+      payment_notes: company.payment_notes ?? '',
+      dashboard_mode: company.dashboard_mode ?? null,
+      quote_simple: company.quote_simple ?? false,
     });
   }, [company.id, company.updated_at]);
 
@@ -152,8 +163,8 @@ export function CompanySettingsPage() {
           <CardDescription>Nombre que verán tus usuarios y clientes en la app y reportes.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Razón social *" value={form.legal_name} onChange={v => set({ legal_name: v })} disabled={!isAdmin} placeholder="IMC Design S.A. de C.V." />
-          <Field label="Nombre comercial" value={form.commercial_name} onChange={v => set({ commercial_name: v })} disabled={!isAdmin} placeholder="IMC Design" />
+          <Field label="Razón social *" value={form.legal_name} onChange={v => set({ legal_name: v })} disabled={!isAdmin} placeholder="Mi Empresa S.A. de C.V." />
+          <Field label="Nombre comercial" value={form.commercial_name} onChange={v => set({ commercial_name: v })} disabled={!isAdmin} placeholder="Mi Empresa" />
           <Field label="Tagline / giro" value={form.tagline} onChange={v => set({ tagline: v })} disabled={!isAdmin} placeholder="Manufactura CNC de precisión" />
           <Field label="Logo (URL)" value={form.logo_url} onChange={v => set({ logo_url: v })} disabled={!isAdmin} placeholder="https://…/logo.png" />
         </CardContent>
@@ -232,6 +243,71 @@ export function CompanySettingsPage() {
           <Field label="Teléfono" value={form.phone} onChange={v => set({ phone: v })} disabled={!isAdmin} placeholder="+52 ..." />
           <Field label="Correo" value={form.email} onChange={v => set({ email: v })} disabled={!isAdmin} placeholder="contacto@empresa.com" />
           <Field label="Sitio web" value={form.website} onChange={v => set({ website: v })} disabled={!isAdmin} placeholder="https://empresa.com" />
+        </CardContent>
+      </Card>
+
+      {/* Datos de pago / transferencia */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Landmark className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Datos para pago (transferencia)
+          </CardTitle>
+          <CardDescription>Se muestran en la cotización para que el cliente sepa a dónde transferir.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Banco" value={form.bank_name} onChange={v => set({ bank_name: v })} disabled={!isAdmin} placeholder="BBVA, Banorte…" />
+          <Field label="Beneficiario / titular" value={form.bank_beneficiary} onChange={v => set({ bank_beneficiary: v })} disabled={!isAdmin} placeholder="Razón social del titular" />
+          <Field label="No. de cuenta" value={form.bank_account} onChange={v => set({ bank_account: v })} disabled={!isAdmin} mono placeholder="0123456789" />
+          <Field label="CLABE interbancaria" value={form.bank_clabe} onChange={v => set({ bank_clabe: v })} disabled={!isAdmin} mono placeholder="012180001234567890" />
+          <div className="md:col-span-2">
+            <Field label="Notas de pago" value={form.payment_notes} onChange={v => set({ payment_notes: v })} disabled={!isAdmin} placeholder="Ej. Anticipo 50%, referencia, moneda de pago…" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tipo de tablero (dashboard) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LayoutDashboard className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Tipo de tablero (dashboard)
+          </CardTitle>
+          <CardDescription>
+            Elige la vista del Dashboard según tu giro. "Ventas" muestra ventas por día/mes,
+            ventas por cliente y stock con mín/máx; "Operativo" muestra producción y proyectos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Tablero</label>
+            <select
+              value={form.dashboard_mode ?? ''}
+              onChange={e => set({ dashboard_mode: (e.target.value || null) as 'operations' | 'sales' | null })}
+              disabled={!isAdmin}
+              className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 disabled:opacity-60"
+            >
+              <option value="">Automático según el giro</option>
+              <option value="sales">Ventas (comercio / proveeduría)</option>
+              <option value="operations">Operativo (manufactura / proyectos)</option>
+            </select>
+          </div>
+          <div className="text-xs text-[var(--color-app-text-muted)] flex items-end pb-2">
+            Giros que venden artículos (herramientas, MRO) usan "Ventas" por defecto. Guarda para aplicarlo.
+          </div>
+          <div className="md:col-span-2 pt-2 border-t border-[var(--color-app-border)]">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={!!form.quote_simple}
+                onChange={e => set({ quote_simple: e.target.checked })}
+                disabled={!isAdmin}
+              />
+              Cotización simple (solo productos y precio)
+            </label>
+            <p className="text-xs text-[var(--color-app-text-muted)] mt-1">
+              Ideal para venta de insumos/herramientas. Oculta el margen, la tarifa de máquina
+              y el costeo por partida en el cotizador; cada partida usa precio directo.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

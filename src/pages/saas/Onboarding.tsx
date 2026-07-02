@@ -7,9 +7,10 @@ import { markEntered } from './LandingHome';
 import { signupTenant } from '@/lib/api/signup';
 import { useTenant } from '@/contexts/TenantContext';
 import { supabase } from '@/lib/supabase';
+import { PromoBanner } from '@/components/saas/PromoCountdown';
 import {
   INDUSTRIES, PLANS, MODULES, getModule, getPlan, getIndustry,
-  initialModules, availableModulesForTenant, formatMxn,
+  initialModules, availableModulesForTenant, formatMxn, effectivePrice,
   type IndustryKey, type PlanKey, type ModuleKey, type Tenant,
 } from '@/lib/saas';
 import { slugify, newTenantId } from '@/lib/saas/platformStore';
@@ -49,6 +50,7 @@ export function Onboarding() {
   const [modules, setModules] = useState<ModuleKey[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [signupDone, setSignupDone] = useState<string | null>(null);
 
   const ceiling = useMemo(() => new Set(availableModulesForTenant({ plan })), [plan]);
   const recommended = industry ? getIndustry(industry).recommendedPlan : 'profesional';
@@ -96,7 +98,7 @@ export function Onboarding() {
       if (needsConfirmation) {
         // Supabase pide confirmar el correo antes de entrar.
         setCreating(false);
-        setCreateError(
+        setSignupDone(
           'Tu empresa fue creada. Te enviamos un correo para confirmar tu cuenta; ' +
             'confírmalo y luego inicia sesión.'
         );
@@ -114,6 +116,44 @@ export function Onboarding() {
   };
 
   const accountValid = !needsAccount || (/^\S+@\S+\.\S+$/.test(adminEmail) && adminPassword.length >= 8);
+
+  // Pantalla de confirmación tras crear la cuenta (con verificación de correo).
+  if (signupDone) {
+    return (
+      <div style={{ minHeight: '100vh', background: KANRI.paper, color: KANRI.ink }} className="flex flex-col">
+        <header style={{ borderBottom: `1px solid ${KANRI.steel}33` }}>
+          <div className="max-w-4xl mx-auto px-5 h-16 flex items-center">
+            <KanriLogo size={30} />
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center px-5">
+          <div className="w-full max-w-md text-center rounded-2xl bg-white p-8" style={{ border: `1px solid ${KANRI.steel}22` }}>
+            <div className="h-14 w-14 rounded-full mx-auto flex items-center justify-center" style={{ background: `${KANRI.accent}18` }}>
+              <Check className="h-7 w-7" style={{ color: KANRI.accent }} />
+            </div>
+            <h1 style={{ fontFamily: FONT_DISPLAY, fontWeight: 700 }} className="text-xl mt-4">¡Cuenta creada!</h1>
+            <p style={{ color: '#5a5e66' }} className="text-sm mt-2">{signupDone}</p>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full h-11 rounded-xl text-white text-sm font-medium"
+                style={{ background: KANRI.accent }}
+              >
+                Ir a iniciar sesión
+              </button>
+              <button
+                onClick={() => navigate('/welcome')}
+                className="w-full h-11 rounded-xl text-sm font-medium"
+                style={{ border: `1px solid ${KANRI.steel}33`, color: KANRI.ink }}
+              >
+                Volver al inicio
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: KANRI.paper, color: KANRI.ink }}>
@@ -299,11 +339,14 @@ export function Onboarding() {
               </button>
             </div>
 
+            {showPlans && <PromoBanner className="mt-2" />}
+
             {showPlans && (
               <div className="grid sm:grid-cols-3 gap-3 mt-2">
                 {PLANS.map(p => {
                   const isRec = p.key === recommended;
                   const sel = !demoSelected && plan === p.key;
+                  const ep = effectivePrice(p, false);
                   return (
                     <button
                       key={p.key}
@@ -322,10 +365,20 @@ export function Onboarding() {
                           SUGERIDO
                         </span>
                       )}
+                      {ep.promo && (
+                        <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full" style={{ background: KANRI.accent, color: KANRI.paper, fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700 }}>
+                          −{ep.discountPct}%
+                        </span>
+                      )}
                       <p style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 14, color: sel ? KANRI.paper : KANRI.ink }}>{p.label}</p>
                       <p style={{ fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 18, color: sel ? KANRI.paper : KANRI.ink }} className="mt-1">
-                        {p.priceMxn == null ? 'A cotizar' : formatMxn(p.priceMxn)}
-                        {p.priceMxn != null && <span style={{ fontSize: 11, fontWeight: 400, color: KANRI.steel }}>/mes</span>}
+                        {ep.price == null ? 'A cotizar' : (
+                          <>
+                            {ep.promo && <span style={{ fontSize: 12, fontWeight: 400, color: KANRI.steel, textDecoration: 'line-through', marginRight: 6 }}>{formatMxn(ep.list!)}</span>}
+                            {formatMxn(ep.price)}
+                            <span style={{ fontSize: 11, fontWeight: 400, color: KANRI.steel }}>/mes</span>
+                          </>
+                        )}
                       </p>
                       <p style={{ fontSize: 11.5, color: sel ? '#C9CCD2' : '#6b6f77', lineHeight: 1.4 }} className="mt-1">{p.tagline}</p>
                     </button>

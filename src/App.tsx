@@ -21,6 +21,7 @@ import { WorkOrderDetails } from './pages/production/WorkOrderDetails';
 import { Quality } from './pages/quality/Quality';
 import { Technicians } from './pages/technicians/Technicians';
 import { Personnel } from './pages/crm/Personnel';
+import { Customers } from './pages/crm/Customers';
 import { Shipping } from './pages/shipping/Shipping';
 import { ClientPortal } from './pages/client-portal/ClientPortal';
 import { Pmo } from './pages/pmo/Pmo';
@@ -92,7 +93,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   // Permisos por ruta — single source of truth en src/lib/permissions.ts
-  if (!canAccessPath(user?.role, location.pathname)) {
+  // (incluye overrides de permisos por usuario, si los tiene).
+  if (!canAccessPath(user?.role, location.pathname, user?.permissions)) {
     return <Navigate to={defaultRouteForRole(user?.role)} replace />;
   }
 
@@ -140,6 +142,7 @@ export default function App() {
           <Route path="production/wo/:id" element={<ProtectedRoute><WorkOrderDetails /></ProtectedRoute>} />
           <Route path="shipping" element={<ProtectedRoute><Shipping /></ProtectedRoute>} />
           <Route path="pmo" element={<ProtectedRoute><Pmo /></ProtectedRoute>} />
+          <Route path="customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
           <Route path="quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
           <Route path="quotes/:id" element={<ProtectedRoute><QuoteBuilder /></ProtectedRoute>} />
           <Route path="settings/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />

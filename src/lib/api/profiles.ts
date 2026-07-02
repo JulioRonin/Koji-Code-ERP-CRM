@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import { MOCK_PROFILES } from './mocks';
 import type { Profile, ProfileMetadata } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
@@ -36,14 +37,16 @@ export function useProfiles(
       const matchMock = (p: Profile) =>
         (!role || p.role === role) && (!department || p.department === department);
       if (!supabase) return MOCK_PROFILES.filter(matchMock);
-      let query = supabase.from('profiles').select('*').order('full_name');
+      let query = scopeByTenant(supabase.from('profiles').select('*')).order('full_name');
       if (role) query = query.eq('role', role);
       if (department) query = query.eq('department', department);
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
-    MOCK_PROFILES.filter(p => (!role || p.role === role) && (!department || p.department === department)),
+    // En modo Supabase NO sembramos perfiles de demostración (evita ver gente de
+    // la demo como "Carlos Méndez" mientras carga). Solo en demo puro.
+    supabase ? [] : MOCK_PROFILES.filter(p => (!role || p.role === role) && (!department || p.department === department)),
     [role, department]
   );
 }
@@ -62,15 +65,15 @@ export function useTechnicians(): AsyncState<Profile[]> {
       if (!supabase) return MOCK_PROFILES.filter(matchesTech);
       // En Supabase usamos ILIKE para captar las variantes en una sola
       // query, sin asumir mayúsculas o acentos exactos.
-      const { data, error } = await supabase
+      const { data, error } = await scopeByTenant(supabase
         .from('profiles')
-        .select('*')
+        .select('*'))
         .or('role.ilike.Técnico%,role.ilike.Tecnico%')
         .order('full_name');
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
-    MOCK_PROFILES.filter(
+    supabase ? [] : MOCK_PROFILES.filter(
       p =>
         (p.role ?? '').toLowerCase().startsWith('técnico') ||
         (p.role ?? '').toLowerCase().startsWith('tecnico')
@@ -141,6 +144,29 @@ export function useUpdateProfile() {
   }, []);
 
   return { update, ...state };
+}
+
+/** Elimina el perfil (fila en profiles). La cuenta de auth, si existía, queda
+ *  huérfana; para perfiles de prueba/seed esto los quita de la lista. */
+export function useDeleteProfile() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+  const remove = useCallback(async (id: string): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) { setState({ loading: false, error: null }); return; }
+      const { data, error } = await supabase.from('profiles').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('No se pudo eliminar. Solo administradores pueden hacerlo (verifica tu rol).');
+      }
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const e = err as Error;
+      setState({ loading: false, error: e });
+      throw e;
+    }
+  }, []);
+  return { remove, ...state };
 }
 
 export interface CreateStaffInput {

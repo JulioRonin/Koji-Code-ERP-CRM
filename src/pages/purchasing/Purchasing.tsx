@@ -206,9 +206,6 @@ export function Purchasing() {
             Requisiciones, órdenes de compra y proveedores.
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-1.5" /> Nueva requisición
-        </Button>
       </div>
 
       {/* KPI cards — desglose por estatus de compra del BOM activo */}

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import type { AsyncState, MutationState } from './types';
 import type { InventoryItem, InventoryMovement, InventoryMovementType, StockStatus } from '@/types/database';
 
@@ -60,7 +61,7 @@ export function useInventoryItems(): AsyncState<InventoryItem[]> {
   return useAsync<InventoryItem[]>(
     async () => {
       if (!supabase) return readItems();
-      const { data, error } = await supabase.from('inventory_items').select('*').order('name');
+      const { data, error } = await scopeByTenant(supabase.from('inventory_items').select('*')).order('name');
       if (error) throw error;
       return (data ?? []) as InventoryItem[];
     },
@@ -76,7 +77,7 @@ export function useInventoryMovements(itemId?: string): AsyncState<InventoryMove
         const all = readMovs().sort((a, b) => b.created_at.localeCompare(a.created_at));
         return itemId ? all.filter(m => m.item_id === itemId) : all;
       }
-      let q = supabase.from('inventory_movements').select('*').order('created_at', { ascending: false }).limit(200);
+      let q = scopeByTenant(supabase.from('inventory_movements').select('*')).order('created_at', { ascending: false }).limit(200);
       if (itemId) q = q.eq('item_id', itemId);
       const { data, error } = await q;
       if (error) throw error;

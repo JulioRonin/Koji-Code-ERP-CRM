@@ -11,13 +11,16 @@ import {
   FileCode2,
   CheckCircle2,
   Send,
+  Mail,
   FolderKanban,
   ChevronDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Combobox } from '@/components/ui/combobox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -40,8 +43,10 @@ import {
   computeQuoteItem,
   computeQuoteTotals,
 } from '@/lib/api';
-import type { QuoteItem, QuoteStatus } from '@/types/database';
+import type { Quote, QuoteItem, QuoteStatus } from '@/types/database';
 import { QuoteDocument } from '@/components/quotes/QuoteDocument';
+import { useCompany } from '@/contexts/CompanyContext';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 const money = (n: number) =>
@@ -89,6 +94,7 @@ export function QuoteBuilder() {
   const { data: savedItems, loading: loadingItems } = useQuoteItems(id);
   const { data: materialPrices } = useMaterialPrices();
   const { data: inventory } = useInventoryItems();
+  const { company } = useCompany();
   const { update: updateQuote } = useUpdateQuote();
   const { save: saveItems, loading: saving } = useSaveQuoteItems();
   const { create: createProject } = useCreateProject();
@@ -99,6 +105,7 @@ export function QuoteBuilder() {
   const [dirty, setDirty] = useState(false);
   const [showDocument, setShowDocument] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Hidrata items guardados una sola vez
   useEffect(() => {
@@ -107,26 +114,29 @@ export function QuoteBuilder() {
     setHydrated(true);
   }, [loadingItems, savedItems, hydrated]);
 
-  const marginDefault = quote?.margin_pct ?? 30;
+  // Cotización simple (venta de insumos): sin margen/costeo; precio directo.
+  const simple = company.quote_simple === true;
+  const marginDefault = simple ? 0 : (quote?.margin_pct ?? 30);
   const machineRate = quote?.machine_rate_per_hour ?? 650;
   const taxPct = quote?.tax_pct ?? 16;
 
-  // Recalcula precios derivados de cada draft (en render, no en estado)
+  // Recalcula precios derivados de cada draft (en render, no en estado).
+  // En modo simple el precio unitario es el capturado (extra_cost) sin margen.
   const computedItems: DraftItem[] = useMemo(
     () =>
       items.map(it => {
         const { unitPrice, lineTotal } = computeQuoteItem({
-          material_qty: it.material_qty,
-          material_unit_cost: it.material_unit_cost,
-          machining_hours: it.machining_hours,
-          machine_rate: it.machine_rate,
+          material_qty: simple ? 0 : it.material_qty,
+          material_unit_cost: simple ? 0 : it.material_unit_cost,
+          machining_hours: simple ? 0 : it.machining_hours,
+          machine_rate: simple ? 0 : it.machine_rate,
           extra_cost: it.extra_cost,
-          margin_pct: it.margin_pct ?? marginDefault,
+          margin_pct: simple ? 0 : (it.margin_pct ?? marginDefault),
           quantity: it.quantity,
         });
         return { ...it, unit_price: unitPrice, line_total: lineTotal };
       }),
-    [items, marginDefault]
+    [items, marginDefault, simple]
   );
 
   const totals = useMemo(
@@ -172,17 +182,47 @@ export function QuoteBuilder() {
       inventory_item_id: invId,
       part_number: cur.part_number || it.sku || it.name,
       description: cur.description || it.name,
-      extra_cost: it.unit_cost,
+      // En modo simple el precio = precio de venta; en costeo = costo del producto.
+      extra_cost: simple ? it.unit_price : it.unit_cost,
     });
   };
 
   const handleSave = async () => {
     if (!quote) return;
-    await saveItems(quote.id, computedItems, taxPct);
-    await refetchQuote();
-    setDirty(false);
-    setSavedMsg(true);
-    setTimeout(() => setSavedMsg(false), 2000);
+    setSaveError(null);
+    try {
+      await saveItems(quote.id, computedItems, taxPct);
+      await refetchQuote();
+      setDirty(false);
+      setSavedMsg(true);
+      setTimeout(() => setSavedMsg(false), 2000);
+    } catch (e) {
+      setSaveError((e as Error).message || 'No se pudo guardar la cotización.');
+    }
+  };
+
+  const handleEmail = () => {
+    if (!quote) return;
+    const brand = company.commercial_name || company.legal_name || 'KANRI';
+    const subject = `Cotización ${quote.id} — ${brand}`;
+    const body = [
+      `Estimado(a) ${quote.client_name},`,
+      '',
+      `Le compartimos la cotización ${quote.id} correspondiente a "${quote.project_name}".`,
+      `Total: ${money(totals.total)} ${quote.currency} (IVA incluido).`,
+      quote.delivery_time ? `Tiempo de entrega: ${quote.delivery_time}.` : '',
+      `Vigencia: ${quote.valid_until ?? '30 días naturales'}.`,
+      '',
+      'Adjunte el PDF generado con el botón "Documento" antes de enviar.',
+      '',
+      'Saludos cordiales,',
+      brand,
+      company.phone ?? '',
+      company.email ?? '',
+    ].filter(Boolean).join('\n');
+    const to = quote.client_email ?? '';
+    window.location.href =
+      `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   const handleStatusChange = async (status: QuoteStatus) => {
@@ -221,7 +261,7 @@ export function QuoteBuilder() {
     await refetchQuote();
   };
 
-  const handleHeaderChange = async (patch: { margin_pct?: number; machine_rate_per_hour?: number; valid_until?: string | null; notes?: string | null }) => {
+  const handleHeaderChange = async (patch: Partial<Quote>) => {
     if (!quote) return;
     await updateQuote(quote.id, patch);
     await refetchQuote();
@@ -369,6 +409,9 @@ export function QuoteBuilder() {
           <Button variant="outline" onClick={() => setShowDocument(true)} disabled={computedItems.length === 0}>
             <Printer className="h-4 w-4 mr-1.5" /> Documento
           </Button>
+          <Button variant="outline" onClick={handleEmail} disabled={computedItems.length === 0} title={quote.client_email ? `Enviar a ${quote.client_email}` : 'Agrega el correo del cliente'}>
+            <Mail className="h-4 w-4 mr-1.5" /> Enviar por correo
+          </Button>
           {quote.status === 'Aprobada' && (
             <Button variant="outline" onClick={handleConvertToProject}>
               <FolderKanban className="h-4 w-4 mr-1.5" /> Convertir a proyecto
@@ -381,6 +424,58 @@ export function QuoteBuilder() {
         </div>
       </div>
 
+      {saveError && (
+        <div className="p-3 rounded-md bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)] text-sm flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{saveError}</span>
+        </div>
+      )}
+
+      {/* Cliente y entrega */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Cliente y condiciones</CardTitle>
+          <CardDescription>Aparecen en el documento PDF y el correo al cliente.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-[var(--color-app-text-muted)]">Cliente</label>
+              <Input
+                defaultValue={quote.client_name}
+                onBlur={e => handleHeaderChange({ client_name: e.target.value || quote.client_name })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-[var(--color-app-text-muted)]">Correo del cliente</label>
+              <Input
+                type="email"
+                placeholder="cliente@empresa.com"
+                defaultValue={quote.client_email ?? ''}
+                onBlur={e => handleHeaderChange({ client_email: e.target.value || null })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-[var(--color-app-text-muted)]">Tiempo de entrega</label>
+              <Input
+                placeholder="Ej. 15 días hábiles"
+                defaultValue={quote.delivery_time ?? ''}
+                onBlur={e => handleHeaderChange({ delivery_time: e.target.value || null })}
+              />
+            </div>
+            <div className="space-y-1.5 md:row-span-2">
+              <label className="text-xs text-[var(--color-app-text-muted)]">Notas de la cotización</label>
+              <Textarea
+                rows={4}
+                placeholder="Condiciones especiales, alcance, exclusiones…"
+                defaultValue={quote.notes ?? ''}
+                onBlur={e => handleHeaderChange({ notes: e.target.value || null })}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Parámetros */}
       <Card>
         <CardHeader className="pb-3">
@@ -389,22 +484,26 @@ export function QuoteBuilder() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs text-[var(--color-app-text-muted)]">Margen (%)</label>
-              <Input
-                type="number"
-                defaultValue={quote.margin_pct}
-                onBlur={e => handleHeaderChange({ margin_pct: Number(e.target.value) || 30 })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs text-[var(--color-app-text-muted)]">Tarifa máquina ($/hr)</label>
-              <Input
-                type="number"
-                defaultValue={quote.machine_rate_per_hour}
-                onBlur={e => handleHeaderChange({ machine_rate_per_hour: Number(e.target.value) || 650 })}
-              />
-            </div>
+            {!simple && (
+              <div className="space-y-1.5">
+                <label className="text-xs text-[var(--color-app-text-muted)]">Margen (%)</label>
+                <Input
+                  type="number"
+                  defaultValue={quote.margin_pct}
+                  onBlur={e => handleHeaderChange({ margin_pct: Number(e.target.value) || 30 })}
+                />
+              </div>
+            )}
+            {!simple && (
+              <div className="space-y-1.5">
+                <label className="text-xs text-[var(--color-app-text-muted)]">Tarifa máquina ($/hr)</label>
+                <Input
+                  type="number"
+                  defaultValue={quote.machine_rate_per_hour}
+                  onBlur={e => handleHeaderChange({ machine_rate_per_hour: Number(e.target.value) || 650 })}
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <label className="text-xs text-[var(--color-app-text-muted)]">Vigencia hasta</label>
               <Input
@@ -415,9 +514,15 @@ export function QuoteBuilder() {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs text-[var(--color-app-text-muted)]">IVA</label>
-              <div className="h-9 px-3 rounded-md border border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)] flex items-center text-sm">
-                {taxPct}%
-              </div>
+              <select
+                value={taxPct}
+                onChange={e => handleHeaderChange({ tax_pct: Number(e.target.value) })}
+                className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+              >
+                <option value={16}>16% (general)</option>
+                <option value={8}>8% (región fronteriza)</option>
+                <option value={0}>0% (exento / exportación)</option>
+              </select>
             </div>
           </div>
         </CardContent>
@@ -519,18 +624,18 @@ export function QuoteBuilder() {
                       <label className="text-[10px] text-[var(--color-app-text-muted)] uppercase shrink-0">
                         Inventario
                       </label>
-                      <select
-                        value={it.inventory_item_id ?? ''}
-                        onChange={e => selectInventory(i, e.target.value)}
-                        className="h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 min-w-[220px]"
-                      >
-                        <option value="">Sin componente de inventario</option>
-                        {inventory.map(inv => (
-                          <option key={inv.id} value={inv.id}>
-                            {inv.name} · stock {inv.stock} {inv.uom}
-                          </option>
-                        ))}
-                      </select>
+                      <Combobox
+                        className="min-w-[240px]"
+                        options={inventory.map(inv => ({
+                          value: inv.id,
+                          label: inv.sku ? `${inv.name} · ${inv.sku}` : inv.name,
+                          hint: `stock ${inv.stock} ${inv.uom}`,
+                        }))}
+                        value={it.inventory_item_id ?? null}
+                        onChange={v => selectInventory(i, v ?? '')}
+                        placeholder="Sin componente de inventario"
+                        searchPlaceholder="Buscar producto o SKU…"
+                      />
                       {it.inventory_item_id && (() => {
                         const inv = inventory.find(x => x.id === it.inventory_item_id);
                         if (!inv) return null;
@@ -551,7 +656,24 @@ export function QuoteBuilder() {
                     </div>
                   )}
 
-                  {/* Fila 2: costos */}
+                  {/* Fila 2: precio directo (modo simple) */}
+                  {simple && (
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-2 pl-8">
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-[10px] text-[var(--color-app-text-muted)] uppercase">Precio unitario</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="h-8 text-xs"
+                          value={it.extra_cost || ''}
+                          onChange={e => patchItem(i, { extra_cost: Number(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fila 2: costos (modo costeo / manufactura) */}
+                  {!simple && (
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-2 pl-8">
                     <div className="space-y-1 col-span-2">
                       <label className="text-[10px] text-[var(--color-app-text-muted)] uppercase">Material</label>
@@ -611,6 +733,7 @@ export function QuoteBuilder() {
                       />
                     </div>
                   </div>
+                  )}
 
                   {/* Fila 3: plano + resultados */}
                   <div className="flex items-center justify-between gap-3 pl-8 flex-wrap">
@@ -669,6 +792,7 @@ export function QuoteBuilder() {
           quote={{ ...quote, subtotal: totals.subtotal, total: totals.total }}
           items={computedItems as QuoteItem[]}
           onClose={() => setShowDocument(false)}
+          onEmail={handleEmail}
         />
       )}
     </div>

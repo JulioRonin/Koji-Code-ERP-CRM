@@ -6,21 +6,33 @@ import { Header } from './Header';
 import { PwaInstallPrompt } from '@/components/pwa/PwaInstallPrompt';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { isBlocked, isOnTrial, daysLeft } from '@/lib/saas';
+import { isBlocked, isOnTrial } from '@/lib/saas';
 import { Subscription } from '@/pages/saas/Subscription';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { tenant } = useTenant();
+  const { tenant, loading: tenantLoading } = useTenant();
   const { user } = useAuth();
 
   // Gating de suscripción: si la demo terminó (o el pago está vencido) y no es
   // el dueño de plataforma, se bloquea el acceso con la pantalla de planes.
   const blocked = isBlocked(tenant) && !user?.isPlatformOwner;
   const onTrial = isOnTrial(tenant);
-  const left = daysLeft(tenant);
+
+  // Contador en vivo de la demo: refresca cada minuto para que SÍ se vea bajar.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!onTrial) return;
+    const id = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [onTrial]);
+
+  const end = tenant.subscription.currentPeriodEnd;
+  const remainingMs = end ? Math.max(0, new Date(end).getTime() - Date.now()) : 0;
+  const trialDays = Math.floor(remainingMs / 86_400_000);
+  const trialHours = Math.floor((remainingMs % 86_400_000) / 3_600_000);
 
   // Cierra el drawer al navegar
   useEffect(() => {
@@ -38,6 +50,17 @@ export function AppShell() {
       document.body.style.overflow = '';
     };
   }, [sidebarOpen]);
+
+  // Espera a resolver la empresa activa antes de montar los módulos: así los
+  // hooks de datos ya filtran por la empresa correcta (evita ver, por un
+  // instante, datos/marca de otra empresa al entrar).
+  if (tenantLoading) {
+    return (
+      <div className="h-[100dvh] w-screen flex items-center justify-center bg-[var(--color-app-bg)]">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--color-app-primary)]" />
+      </div>
+    );
+  }
 
   // Demo terminada → pantalla de suscripción a pantalla completa.
   if (blocked) {
@@ -59,7 +82,13 @@ export function AppShell() {
             className="shrink-0 w-full flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium bg-[var(--color-app-primary-soft)] text-[var(--color-app-primary)] hover:brightness-95 transition"
           >
             <Clock className="h-3.5 w-3.5" />
-            Demo · te quedan <strong>{left} día{left === 1 ? '' : 's'}</strong> · <span className="underline">Elegir un plan</span>
+            Demo · te quedan{' '}
+            <strong>
+              {trialDays > 0
+                ? `${trialDays} día${trialDays === 1 ? '' : 's'} ${trialHours} h`
+                : `${trialHours} h`}
+            </strong>{' '}
+            · <span className="underline">Elegir un plan</span>
           </button>
         )}
 

@@ -35,8 +35,32 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useProjects, useWorkOrders, useNcrs, useInspections, useMachines } from '@/lib/api';
-import type { Project, ProjectStatus } from '@/types/database';
+import type { DashboardMode, Project, ProjectStatus } from '@/types/database';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useTenant } from '@/contexts/TenantContext';
+import { SalesDashboard } from './SalesDashboard';
+import { Combobox } from '@/components/ui/combobox';
+import { ProjectSpotlight } from '@/components/dashboard/ProjectSpotlight';
+
+/** Giros que por defecto usan el tablero de ventas (venden artículos). */
+const SALES_INDUSTRIES = ['herramientas', 'mro'];
+
+export function resolveDashboardMode(
+  mode: DashboardMode | null | undefined,
+  industry: string | undefined,
+): DashboardMode {
+  if (mode) return mode;
+  return industry && SALES_INDUSTRIES.includes(industry) ? 'sales' : 'operations';
+}
+
+/** Selecciona la variante de tablero según el giro / la configuración. */
+export function Dashboard() {
+  const { company } = useCompany();
+  const { tenant } = useTenant();
+  const mode = resolveDashboardMode(company.dashboard_mode, tenant?.industry);
+  return mode === 'sales' ? <SalesDashboard /> : <OperationsDashboard />;
+}
 
 const statusBadge: Partial<Record<ProjectStatus, { variant: 'default' | 'success' | 'warning' | 'secondary' | 'outline'; label: string }>> = {
   'En Producción': { variant: 'default',   label: 'En producción' },
@@ -59,7 +83,7 @@ const STATUS_COLORS: Record<string, string> = {
   'Entregado':      '#94a3b8',
 };
 
-export function Dashboard() {
+function OperationsDashboard() {
   const navigate = useNavigate();
   const { data: projects } = useProjects();
   const { data: workOrders } = useWorkOrders();
@@ -67,6 +91,8 @@ export function Dashboard() {
   const { data: inspections } = useInspections();
   const { data: machines } = useMachines();
   const [shareProject, setShareProject] = useState<Project | null>(null);
+  const [spotlightId, setSpotlightId] = useState<string | null>(null);
+  const spotlight = projects.find(p => p.id === spotlightId) ?? null;
 
   // ── KPIs principales ──────────────────────────────────────────────────
   const kpis = useMemo(() => {
@@ -123,6 +149,7 @@ export function Dashboard() {
   }, [machines, workOrders]);
 
   // ── Proyectos próximos a vencer ────────────────────────────────────────
+  const [projStatus, setProjStatus] = useState('all');
   const upcoming = useMemo(() => {
     return [...projects]
       .filter(p => p.status !== 'Entregado' && p.status !== 'Cancelado')
@@ -130,9 +157,13 @@ export function Dashboard() {
         ...p,
         daysLeft: Math.ceil((new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
       }))
-      .sort((a, b) => a.daysLeft - b.daysLeft)
-      .slice(0, 5);
+      .sort((a, b) => a.daysLeft - b.daysLeft);
   }, [projects]);
+
+  const visibleUpcoming = useMemo(
+    () => (projStatus === 'all' ? upcoming : upcoming.filter(p => p.status === projStatus)).slice(0, 6),
+    [upcoming, projStatus]
+  );
 
   // ── Alertas críticas ──────────────────────────────────────────────────
   const alerts = useMemo(() => {
@@ -251,6 +282,30 @@ export function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Detalle de un proyecto específico */}
+      <Card className="p-0">
+        <CardHeader className="pb-3 flex-col sm:flex-row sm:items-center justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="text-base">Detalle de proyecto</CardTitle>
+            <CardDescription>Selecciona un proyecto para ver su avance por etapas.</CardDescription>
+          </div>
+          <div className="w-full sm:w-80">
+            <Combobox
+              options={projects.map(p => ({ value: p.id, label: p.name, hint: p.client_name }))}
+              value={spotlightId}
+              onChange={setSpotlightId}
+              placeholder="Selecciona un proyecto…"
+              searchPlaceholder="Buscar por nombre o cliente…"
+            />
+          </div>
+        </CardHeader>
+        {spotlight && (
+          <CardContent className="pt-0">
+            <ProjectSpotlight project={spotlight} />
+          </CardContent>
+        )}
+      </Card>
 
       {/* Fila de gráficas: tendencia + distribución */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
@@ -375,13 +430,25 @@ export function Dashboard() {
               </CardTitle>
               <CardDescription>Ordenado por urgencia</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/projects')} className="gap-1 hidden sm:flex">
-              Ver todos <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <select
+                value={projStatus}
+                onChange={e => setProjStatus(e.target.value)}
+                className="h-8 px-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+              >
+                <option value="all">Todos los estados</option>
+                {Object.keys(statusBadge).map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/projects')} className="gap-1 hidden sm:flex">
+                Ver todos <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-[var(--color-app-border)]">
-              {upcoming.map(p => {
+              {visibleUpcoming.map(p => {
                 const badge = statusBadge[p.status] ?? { variant: 'secondary' as const, label: p.status };
                 const urgency =
                   p.daysLeft < 0 ? 'overdue' : p.daysLeft <= 7 ? 'critical' : p.daysLeft <= 14 ? 'warning' : 'ok';
@@ -438,10 +505,10 @@ export function Dashboard() {
                   </div>
                 );
               })}
-              {upcoming.length === 0 && (
+              {visibleUpcoming.length === 0 && (
                 <div className="py-10 text-center text-sm text-[var(--color-app-text-muted)]">
                   <CheckCircle2 className="h-6 w-6 mx-auto mb-2 text-[var(--color-app-success)]" />
-                  No hay proyectos activos con entregas próximas.
+                  {projStatus === 'all' ? 'No hay proyectos activos con entregas próximas.' : 'No hay proyectos en este estado.'}
                 </div>
               )}
             </div>

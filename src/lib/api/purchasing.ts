@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import { applyInventoryMovement } from './inventory';
 import { MOCK_REQUISITIONS, MOCK_SUPPLIERS } from './mocks';
 import type {
@@ -34,7 +35,7 @@ export function useSuppliers(): AsyncState<Supplier[]> {
   return useAsync<Supplier[]>(
     async () => {
       if (!supabase) return read(SUP_KEY, MOCK_SUPPLIERS);
-      const { data, error } = await supabase.from('suppliers').select('*').order('name');
+      const { data, error } = await scopeByTenant(supabase.from('suppliers').select('*')).order('name');
       if (error) throw error;
       return (data ?? []) as Supplier[];
     },
@@ -116,7 +117,7 @@ export function useRequisitions(): AsyncState<Requisition[]> {
   return useAsync<Requisition[]>(
     async () => {
       if (!supabase) return read(REQ_KEY, MOCK_REQUISITIONS);
-      const { data, error } = await supabase.from('requisitions').select('*').order('created_at', { ascending: false });
+      const { data, error } = await scopeByTenant(supabase.from('requisitions').select('*')).order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as Requisition[];
     },
@@ -180,7 +181,7 @@ export function usePurchaseOrders(): AsyncState<PurchaseOrder[]> {
   return useAsync<PurchaseOrder[]>(
     async () => {
       if (!supabase) return read<PurchaseOrder>(PO_KEY, []);
-      const { data, error } = await supabase.from('purchase_orders').select('*').order('created_at', { ascending: false });
+      const { data, error } = await scopeByTenant(supabase.from('purchase_orders').select('*')).order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as PurchaseOrder[];
     },
@@ -247,10 +248,15 @@ export function useCreatePurchaseOrder() {
       }
       const { error: e1 } = await supabase.from('purchase_orders').insert(po);
       if (e1) throw e1;
+      // line_total es columna GENERATED en la BD: NO se inserta (la calcula sola).
       const { error: e2 } = await supabase.from('purchase_order_items').insert(
-        items.map(({ id: _i, ...rest }) => rest) // dejar que la BD genere el uuid
+        items.map(({ id: _i, line_total: _lt, ...rest }) => rest)
       );
-      if (e2) throw e2;
+      if (e2) {
+        // Evita dejar una OC huérfana (sin partidas) si fallan las partidas.
+        await supabase.from('purchase_orders').delete().eq('id', id);
+        throw e2;
+      }
       setState({ loading: false, error: null });
       return po;
     } catch (err) { const e = err as Error; setState({ loading: false, error: e }); throw e; }
@@ -276,6 +282,28 @@ export function useUpdatePoStatus() {
     } catch (err) { const e = err as Error; setState({ loading: false, error: e }); throw e; }
   }, []);
   return { update, ...state };
+}
+
+/** Elimina una OC y sus partidas. */
+export function useDeletePurchaseOrder() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+  const remove = useCallback(async (poId: string): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        write(POI_KEY, read<PurchaseOrderItem>(POI_KEY, []).filter(i => i.purchase_order_id !== poId));
+        write(PO_KEY, read<PurchaseOrder>(PO_KEY, []).filter(p => p.id !== poId));
+        setState({ loading: false, error: null });
+        return;
+      }
+      // Borra partidas primero por si la FK no tiene ON DELETE CASCADE.
+      await supabase.from('purchase_order_items').delete().eq('purchase_order_id', poId);
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', poId);
+      if (error) throw error;
+      setState({ loading: false, error: null });
+    } catch (err) { const e = err as Error; setState({ loading: false, error: e }); throw e; }
+  }, []);
+  return { remove, ...state };
 }
 
 /** Recibe una OC: marca recibida, fija received_qty y SUMA al inventario. */

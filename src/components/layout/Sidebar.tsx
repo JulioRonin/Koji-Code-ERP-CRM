@@ -17,6 +17,7 @@ import {
   Calculator,
   Boxes,
   Layers,
+  Contact,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { name: 'Dashboard',    path: '/',            icon: LayoutDashboard },
+  { name: 'Clientes',     path: '/customers',   icon: Contact },
   { name: 'Cotizaciones', path: '/quotes',      icon: Calculator },
   { name: 'Inventario',   path: '/inventory',   icon: Boxes },
   { name: 'Proyectos',    path: '/projects',    icon: FolderKanban },
@@ -64,7 +66,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   // Para técnicos, "Técnicos" apunta a su portal exclusivo en lugar del
   // dashboard administrativo de /technicians.
   const filteredNavItems = navItems
-    .filter(item => canAccessPath(user?.role, item.path))
+    .filter(item => canAccessPath(user?.role, item.path, user?.permissions))
     // Gating por módulos habilitados de la empresa (tenant). Si la ruta no
     // mapea a un módulo, se muestra.
     .filter(item => {

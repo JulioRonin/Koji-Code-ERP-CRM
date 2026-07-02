@@ -3,6 +3,7 @@ import {
   Users,
   Briefcase,
   Wallet,
+  Clock,
   Search,
   Plus,
   ChevronRight,
@@ -21,6 +22,7 @@ import {
   CheckCircle2,
   RefreshCw,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,8 +38,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ROLES } from '@/data/crmData';
+import { ASSIGNABLE_MODULES } from '@/lib/permissions';
+import { PayrollTab } from '@/components/personnel/PayrollTab';
+import { AttendanceTab } from '@/components/personnel/AttendanceTab';
 import { cn } from '@/lib/utils';
-import { useProfiles, useUpdateProfile, useCreateStaffWithAuth, generateTempPassword } from '@/lib/api';
+import { useProfiles, useUpdateProfile, useCreateStaffWithAuth, useDeleteProfile, generateTempPassword } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Profile } from '@/types/database';
 
@@ -53,9 +58,10 @@ function initialsFor(name: string): string {
 }
 
 const tabs = [
-  { id: 'directory', label: 'Directorio',         icon: Users },
-  { id: 'roles',     label: 'Roles y facultades',  icon: Briefcase },
-  { id: 'payroll',   label: 'Nómina',              icon: Wallet },
+  { id: 'directory',  label: 'Directorio',        icon: Users },
+  { id: 'roles',      label: 'Roles y facultades', icon: Briefcase },
+  { id: 'attendance', label: 'Checador',          icon: Clock },
+  { id: 'payroll',    label: 'Nómina',            icon: Wallet },
 ] as const;
 type Tab = (typeof tabs)[number]['id'];
 
@@ -67,6 +73,18 @@ export function Personnel() {
   const [searchTerm, setSearchTerm] = useState('');
   const { data: staff, refetch: refetchStaff } = useProfiles();
   const { update: updateProfile, loading: savingProfile } = useUpdateProfile();
+  const { remove: deleteProfile } = useDeleteProfile();
+
+  const handleDeleteStaff = async (member: Profile) => {
+    if (!window.confirm(`¿Eliminar a "${member.full_name}" del personal? Esta acción no se puede deshacer.`)) return;
+    try {
+      await deleteProfile(member.id);
+      if (selectedStaff?.id === member.id) setSelectedStaff(null);
+      await refetchStaff();
+    } catch (e) {
+      window.alert((e as Error).message);
+    }
+  };
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [editDraft, setEditDraft] = useState<{
     full_name: string;
@@ -77,6 +95,8 @@ export function Personnel() {
     bio: string;
     salary: number;
     status: string;
+    permsEnabled: boolean;
+    permissions: string[];
   } | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [newStaff, setNewStaff] = useState({
@@ -109,6 +129,7 @@ export function Personnel() {
 
   const openEdit = (member: Profile) => {
     setEditError(null);
+    const perms = member.metadata?.permissions;
     setEditDraft({
       full_name: member.full_name,
       email: member.email,
@@ -118,6 +139,8 @@ export function Personnel() {
       bio: member.bio ?? '',
       salary: member.salary ?? 0,
       status: member.status,
+      permsEnabled: Array.isArray(perms) && perms.length > 0,
+      permissions: perms ?? [],
     });
   };
 
@@ -126,6 +149,11 @@ export function Personnel() {
     if (!editDraft || !selectedStaff) return;
     setEditError(null);
     try {
+      // Construye metadata preservando lo existente y aplicando los permisos.
+      const meta: Profile['metadata'] = { ...selectedStaff.metadata };
+      if (editDraft.permsEnabled) meta.permissions = editDraft.permissions;
+      else delete meta.permissions;
+
       await updateProfile(selectedStaff.id, {
         full_name: editDraft.full_name,
         email: editDraft.email,
@@ -135,6 +163,7 @@ export function Personnel() {
         bio: editDraft.bio || null,
         salary: editDraft.salary,
         status: editDraft.status,
+        metadata: meta,
       });
       await refetchStaff();
       setSelectedStaff(prev =>
@@ -149,6 +178,7 @@ export function Personnel() {
               bio: editDraft.bio || null,
               salary: editDraft.salary,
               status: editDraft.status,
+              metadata: meta,
             }
           : prev
       );
@@ -265,9 +295,18 @@ export function Personnel() {
             {filteredStaff.map(member => (
               <Card
                 key={member.id}
-                className="p-0 cursor-pointer hover:border-[var(--color-app-primary)]/40 hover:shadow-md transition-all"
+                className="p-0 cursor-pointer hover:border-[var(--color-app-primary)]/40 hover:shadow-md transition-all relative"
                 onClick={() => setSelectedStaff(member)}
               >
+                {isAdmin && member.id !== user?.id && (
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDeleteStaff(member); }}
+                    className="absolute top-3 right-3 z-10 h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--color-app-text-subtle)] hover:text-[var(--color-app-danger)] hover:bg-[var(--color-app-danger-soft)]"
+                    title="Eliminar del personal"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center font-medium">
@@ -317,13 +356,6 @@ export function Personnel() {
                   <h2 className="text-lg font-semibold">{selectedStaff.full_name}</h2>
                   <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">{selectedStaff.role}</p>
                   <p className="text-xs text-[var(--color-app-text-muted)] mt-1">{selectedStaff.department}</p>
-                </div>
-                <div className="w-full space-y-1.5 pt-3 border-t border-[var(--color-app-border)]">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-[var(--color-app-text-muted)]">Eficiencia general</span>
-                    <span className="font-medium">{selectedStaff.metadata.efficiency ?? 90}%</span>
-                  </div>
-                  <Progress value={selectedStaff.metadata.efficiency ?? 90} className="h-1.5" />
                 </div>
                 {isAdmin ? (
                   <Button variant="outline" className="w-full" onClick={() => openEdit(selectedStaff)}>
@@ -441,93 +473,11 @@ export function Personnel() {
         </Card>
       )}
 
-      {/* Payroll */}
-      {activeTab === 'payroll' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Costo total nómina', value: '$105,000',  icon: TrendingUp },
-              { label: 'Próximo pago',        value: '15 abr 2026', icon: CreditCard },
-              { label: 'Bonos proyectados',   value: '$12,500',   icon: Zap },
-              { label: 'Colaboradores pagados', value: '24 / 25', icon: BadgeCheck },
-            ].map(s => (
-              <Card key={s.label} className="p-0">
-                <CardContent className="p-5 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-[var(--color-app-text-muted)]">{s.label}</p>
-                    <p className="text-xl font-semibold mt-1">{s.value}</p>
-                  </div>
-                  <s.icon className="h-5 w-5 text-[var(--color-app-text-muted)]" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      {/* Checador / asistencia */}
+      {activeTab === 'attendance' && <AttendanceTab staff={staff} isAdmin={isAdmin} />}
 
-          <Card className="p-0">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Nómina del periodo</CardTitle>
-                <CardDescription>Salarios base y bonos de eficiencia.</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <Download className="h-3.5 w-3.5 mr-1.5" /> Reporte bancario
-                </Button>
-                <Button size="sm">Dispersar nómina</Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead>Sueldo base</TableHead>
-                    <TableHead>Bono</TableHead>
-                    <TableHead>Total bruto</TableHead>
-                    <TableHead>Estatus</TableHead>
-                    <TableHead className="text-right">Acción</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {staff.map(member => {
-                    const bonus = member.metadata.bonus ?? 0;
-                    return (
-                      <TableRow key={member.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-[var(--color-app-primary)] text-white flex items-center justify-center text-xs font-medium">
-                              {initialsFor(member.full_name)}
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">{member.full_name}</p>
-                              <p className="text-xs text-[var(--color-app-text-muted)] font-mono">{member.id.slice(0, 8)}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="tabular-nums">
-                          ${member.salary.toLocaleString()} MXN
-                        </TableCell>
-                        <TableCell className="tabular-nums text-[var(--color-app-success)]">
-                          +${bonus.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="font-semibold tabular-nums">
-                          ${(member.salary + bonus).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="success">Depósito listo</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm">Recibo</Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {/* Payroll */}
+      {activeTab === 'payroll' && <PayrollTab staff={staff} isAdmin={isAdmin} />}
 
       {/* Edit modal (sólo administradores) */}
       {editDraft && selectedStaff && (
@@ -638,6 +588,45 @@ export function Personnel() {
                       className="w-full px-3 py-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
                     />
                   </div>
+                </div>
+
+                {/* Permisos por usuario */}
+                <div className="md:col-span-2 space-y-2 pt-2 border-t border-[var(--color-app-border)]">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={editDraft.permsEnabled}
+                      onChange={e => setEditDraft({ ...editDraft, permsEnabled: e.target.checked })}
+                    />
+                    Permisos personalizados de acceso
+                  </label>
+                  <p className="text-xs text-[var(--color-app-text-muted)]">
+                    {editDraft.permsEnabled
+                      ? 'Este usuario verá solo los módulos marcados (además de Dashboard y Chat).'
+                      : 'Acceso según su rol. Activa para definir módulos específicos para este usuario.'}
+                  </p>
+                  {editDraft.permsEnabled && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 pt-1">
+                      {ASSIGNABLE_MODULES.map(m => {
+                        const on = editDraft.permissions.includes(m.path);
+                        return (
+                          <label key={m.path} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={on}
+                              onChange={e => setEditDraft({
+                                ...editDraft,
+                                permissions: e.target.checked
+                                  ? [...editDraft.permissions, m.path]
+                                  : editDraft.permissions.filter(p => p !== m.path),
+                              })}
+                            />
+                            {m.label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </CardContent>
 

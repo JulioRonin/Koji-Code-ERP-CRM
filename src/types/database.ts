@@ -101,9 +101,22 @@ export interface CompanySettings {
   logo_url: string | null;
   primary_color: string | null;
   currency: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  bank_clabe?: string | null;
+  bank_beneficiary?: string | null;
+  payment_notes?: string | null;
+  dashboard_mode?: DashboardMode | null;
+  /** Cotización simple (solo productos y precio): oculta margen, tarifa de
+   *  máquina y el costeo por partida. Ideal para venta de insumos/herramientas. */
+  quote_simple?: boolean | null;
   created_at: string;
   updated_at: string;
 }
+
+/** Variante de tablero según el giro: operativo (manufactura/proyectos) o
+ *  ventas (comercio/proveeduría que vende artículos). */
+export type DashboardMode = 'operations' | 'sales';
 
 // ============================================================================
 // TABLA: profiles
@@ -117,6 +130,9 @@ export interface ProfileMetadata {
   bonus?: number;
   efficiency?: number;
   shift?: string;
+  /** Rutas de módulos permitidas para ESTE usuario (override del rol). Si está
+   *  vacío o ausente, el acceso lo define el rol (permissions.ts). */
+  permissions?: string[];
 }
 
 export interface Profile {
@@ -207,6 +223,7 @@ export interface Quote {
   id: string;
   customer_id: string | null;
   client_name: string;
+  client_email?: string | null;
   project_name: string;
   status: QuoteStatus;
   currency: string;
@@ -214,6 +231,7 @@ export interface Quote {
   tax_pct: number;
   machine_rate_per_hour: number;
   valid_until: string | null;
+  delivery_time?: string | null;
   notes: string | null;
   subtotal: number;
   total: number;

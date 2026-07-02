@@ -11,6 +11,7 @@ import {
   type Tenant,
 } from '@/lib/saas';
 import { getMyTenant, getTenantById, saveTenant as persistTenant } from '@/lib/api/tenants';
+import { setActiveTenant } from '@/lib/api/tenantScope';
 
 const CACHE_KEY = 'kanri_tenant';                 // última empresa resuelta (cache/branding)
 const OVERRIDE_KEY = 'kanri_active_tenant_id';     // "entrar como" (solo dueño de plataforma)
@@ -51,11 +52,15 @@ function writeCache(t: Tenant) {
 }
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
-  const [tenant, setTenant] = useState<Tenant>(() => readCache());
+  // IMPORTANTE: no sembramos desde el cache (puede ser de OTRO usuario y filtrar
+  // su marca/empresa por un instante). Arrancamos en el genérico KANRI y
+  // resolvemos la empresa real del usuario autenticado.
+  const [tenant, setTenant] = useState<Tenant>(DEFAULT_TENANT);
   const [loading, setLoading] = useState(true);
 
   const apply = useCallback((t: Tenant) => {
     setTenant(t);
+    setActiveTenant(t.id);
     writeCache(t);
   }, []);
 
@@ -64,7 +69,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!supabase) {
         // Modo demo: usa el cache local (lo escribe onboarding/super-admin).
-        setTenant(readCache());
+        const cached = readCache();
+        setTenant(cached);
+        setActiveTenant(cached.id);
         return;
       }
       const override = (() => {
@@ -78,7 +85,14 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       // si no, cae a la empresa propia.
       let resolved: Tenant | null = override ? await getTenantById(override) : null;
       if (!resolved) resolved = await getMyTenant();
-      if (resolved) apply(resolved);
+      if (resolved) {
+        apply(resolved);
+      } else {
+        // Sin empresa resuelta (p. ej. tras cerrar sesión): vuelve al genérico y
+        // limpia el alcance para no arrastrar datos de la sesión anterior.
+        setTenant(DEFAULT_TENANT);
+        setActiveTenant(null);
+      }
     } catch (err) {
       console.warn('No se pudo resolver la empresa activa', err);
     } finally {

@@ -18,6 +18,8 @@ import {
 } from '@/lib/saas';
 import { useTenant } from '@/contexts/TenantContext';
 import { listTenants, saveTenant, deleteTenant } from '@/lib/api/tenants';
+import { listInvoices, type StripeInvoice } from '@/lib/api/billing';
+import { Receipt } from 'lucide-react';
 
 const STATUS_VARIANT: Record<SubscriptionStatus, 'success' | 'warning' | 'destructive' | 'secondary'> = {
   active: 'success',
@@ -38,6 +40,7 @@ export function PlatformAdmin() {
 
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [editing, setEditing] = useState<Tenant | null>(null);
+  const [billing, setBilling] = useState<Tenant | null>(null);
 
   const refresh = async () => {
     try {
@@ -138,7 +141,9 @@ export function PlatformAdmin() {
                   <th className="text-left p-3 font-medium">Empresa</th>
                   <th className="text-left p-3 font-medium">Giro</th>
                   <th className="text-left p-3 font-medium">Plan</th>
+                  <th className="text-left p-3 font-medium">Ciclo</th>
                   <th className="text-left p-3 font-medium">Estatus</th>
+                  <th className="text-left p-3 font-medium">Vence / renueva</th>
                   <th className="text-center p-3 font-medium">Módulos</th>
                   <th className="text-right p-3 font-medium">Acciones</th>
                 </tr>
@@ -157,16 +162,30 @@ export function PlatformAdmin() {
                       </span>
                     </td>
                     <td className="p-3">
-                      <Badge variant={t.plan === 'enterprise' ? 'default' : 'secondary'}>{getPlan(t.plan).label}</Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={t.plan === 'enterprise' ? 'default' : 'secondary'}>{getPlan(t.plan).label}</Badge>
+                        {getPlan(t.plan).priceMxn != null && (
+                          <span className="text-xs text-[var(--color-app-text-subtle)]">${getPlan(t.plan).priceMxn!.toLocaleString('es-MX')}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 text-[var(--color-app-text-muted)]">
+                      {t.subscription.billingCycle === 'annual' ? 'Anual' : 'Mensual'}
                     </td>
                     <td className="p-3">
                       <Badge variant={STATUS_VARIANT[t.subscription.status]}>{STATUS_LABEL[t.subscription.status]}</Badge>
+                    </td>
+                    <td className="p-3 text-[var(--color-app-text-muted)] text-xs">
+                      {t.subscription.currentPeriodEnd ? new Date(t.subscription.currentPeriodEnd).toLocaleDateString('es-MX') : '—'}
                     </td>
                     <td className="p-3 text-center tabular-nums text-[var(--color-app-text-muted)]">
                       {t.enabledModules.length}
                     </td>
                     <td className="p-3">
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" className="h-8" onClick={() => setBilling(t)} title="Suscripción y pagos">
+                          <Receipt className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="ghost" size="sm" className="h-8" onClick={() => handleEnter(t)} title="Entrar como esta empresa">
                           <LogIn className="h-3.5 w-3.5" />
                         </Button>
@@ -189,6 +208,101 @@ export function PlatformAdmin() {
       {editing && (
         <EditTenantModal tenant={editing} onClose={() => setEditing(null)} onSave={handleSaveEdit} />
       )}
+      {billing && (
+        <TenantBillingModal tenant={billing} onClose={() => setBilling(null)} />
+      )}
+    </div>
+  );
+}
+
+function TenantBillingModal({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
+  const [invoices, setInvoices] = useState<StripeInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const sub = tenant.subscription;
+
+  useEffect(() => {
+    let alive = true;
+    listInvoices(tenant.id).then(inv => { if (alive) { setInvoices(inv); setLoading(false); } });
+    return () => { alive = false; };
+  }, [tenant.id]);
+
+  const money = (cents: number, currency: string) =>
+    (cents / 100).toLocaleString('es-MX', { style: 'currency', currency: (currency || 'mxn').toUpperCase() });
+
+  return (
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Receipt className="h-4 w-4" /> {tenant.name}</DialogTitle>
+          <DialogDescription>Suscripción e historial de pagos.</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+          <Field2 label="Plan" value={getPlan(tenant.plan).label} />
+          <Field2 label="Estatus" value={STATUS_LABEL[sub.status]} />
+          <Field2 label="Ciclo" value={sub.billingCycle === 'annual' ? 'Anual' : 'Mensual'} />
+          <Field2 label="Precio" value={getPlan(tenant.plan).priceMxn != null ? `$${getPlan(tenant.plan).priceMxn!.toLocaleString('es-MX')}` : 'A cotizar'} />
+          <Field2 label="Vence / renueva" value={sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString('es-MX') : '—'} />
+          <Field2 label="Cliente Stripe" value={sub.stripeCustomerId ?? 'Sin conectar'} mono />
+        </div>
+
+        <div className="mt-2">
+          <p className="text-xs font-medium mb-2">Historial de pagos</p>
+          {loading ? (
+            <p className="text-sm text-[var(--color-app-text-muted)] py-3">Cargando…</p>
+          ) : invoices.length === 0 ? (
+            <p className="text-sm text-[var(--color-app-text-muted)] py-3">
+              Sin pagos registrados. Aparecen aquí cuando Stripe está configurado y la empresa realiza cobros.
+            </p>
+          ) : (
+            <div className="rounded-md border border-[var(--color-app-border)] overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--color-app-surface-alt)]/60 text-xs text-[var(--color-app-text-muted)]">
+                  <tr>
+                    <th className="text-left p-2.5 font-medium">Fecha</th>
+                    <th className="text-left p-2.5 font-medium">Factura</th>
+                    <th className="text-right p-2.5 font-medium">Monto</th>
+                    <th className="text-center p-2.5 font-medium">Estado</th>
+                    <th className="text-right p-2.5 font-medium">Recibo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map(inv => (
+                    <tr key={inv.id} className="border-t border-[var(--color-app-border)]">
+                      <td className="p-2.5">{new Date(inv.created * 1000).toLocaleDateString('es-MX')}</td>
+                      <td className="p-2.5 font-mono text-xs text-[var(--color-app-text-muted)]">{inv.number ?? inv.id.slice(-8)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(inv.amount_paid, inv.currency)}</td>
+                      <td className="p-2.5 text-center">
+                        <Badge variant={inv.status === 'paid' ? 'success' : inv.status === 'open' ? 'warning' : 'secondary'}>
+                          {inv.status === 'paid' ? 'Pagada' : inv.status === 'open' ? 'Pendiente' : inv.status ?? '—'}
+                        </Badge>
+                      </td>
+                      <td className="p-2.5 text-right">
+                        {(inv.invoice_pdf || inv.hosted_invoice_url) ? (
+                          <a href={(inv.invoice_pdf || inv.hosted_invoice_url)!} target="_blank" rel="noreferrer" className="text-[var(--color-app-primary)] hover:underline">Ver</a>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Field2({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-[var(--color-app-text-muted)]">{label}</p>
+      <p className={cn('font-medium mt-0.5 truncate', mono && 'font-mono text-xs')} title={value}>{value}</p>
     </div>
   );
 }
