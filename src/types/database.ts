@@ -202,6 +202,12 @@ export interface Supplier {
   is_certified: boolean;
   is_active: boolean;
   notes: string | null;
+  /** Rango manual del proveedor (A/B/C). Si es null se usa el score calculado. */
+  tier?: 'A' | 'B' | 'C' | null;
+  /** Categoría de suministro (materia prima, herramienta, servicio…). */
+  category?: string | null;
+  /** Tiempo de entrega típico en días. */
+  lead_time_days?: number | null;
   created_at: string;
   updated_at: string;
 }
