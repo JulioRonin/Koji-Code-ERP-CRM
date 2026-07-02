@@ -28,13 +28,31 @@ const PRICES: Record<string, { monthly: number; annual: number; label: string }>
 };
 const PROMO = { plan: 'profesional', monthly: 8500, annual: 85000, endsAt: '2026-07-25T23:59:59' };
 
+function inPromo(plan: string): boolean {
+  return plan === PROMO.plan && Date.now() < new Date(PROMO.endsAt).getTime();
+}
+
 function amountFor(plan: string, cycle: 'monthly' | 'annual'): number | null {
   const base = PRICES[plan];
   if (!base) return null;
-  if (plan === PROMO.plan && Date.now() < new Date(PROMO.endsAt).getTime()) {
-    return cycle === 'annual' ? PROMO.annual : PROMO.monthly;
-  }
+  if (inPromo(plan)) return cycle === 'annual' ? PROMO.annual : PROMO.monthly;
   return cycle === 'annual' ? base.annual : base.monthly;
+}
+
+/**
+ * Price ID de Stripe para un plan/ciclo, tomado de los secrets (si existe).
+ * Nombres esperados:
+ *   STRIPE_PRICE_BASICO_MONTHLY / STRIPE_PRICE_BASICO_ANNUAL
+ *   STRIPE_PRICE_PROFESIONAL_MONTHLY / STRIPE_PRICE_PROFESIONAL_ANNUAL
+ *   (opcional promo) STRIPE_PRICE_PROFESIONAL_PROMO_MONTHLY / _ANNUAL
+ */
+function priceIdFor(plan: string, cycle: 'monthly' | 'annual'): string | undefined {
+  const suffix = cycle === 'annual' ? 'ANNUAL' : 'MONTHLY';
+  if (inPromo(plan)) {
+    const promo = Deno.env.get(`STRIPE_PRICE_${plan.toUpperCase()}_PROMO_${suffix}`);
+    if (promo) return promo;
+  }
+  return Deno.env.get(`STRIPE_PRICE_${plan.toUpperCase()}_${suffix}`);
 }
 
 Deno.serve(async (req) => {
@@ -45,8 +63,9 @@ Deno.serve(async (req) => {
   if (!stripeKey) return json({ error: 'Stripe no está configurado (falta STRIPE_SECRET_KEY).' }, 500);
 
   const { plan, cycle = 'monthly', returnUrl } = await req.json().catch(() => ({}));
-  const amount = amountFor(plan, cycle);
-  if (amount == null) return json({ error: 'Plan no válido para pago en línea.' }, 400);
+  if (!PRICES[plan]) return json({ error: 'Plan no válido para pago en línea.' }, 400);
+  const priceId = priceIdFor(plan, cycle);        // tu Price ID de Stripe (si lo configuraste)
+  const amount = amountFor(plan, cycle);          // respaldo: monto calculado
 
   // 1) Identifica al usuario por su JWT y resuelve su tenant.
   const authHeader = req.headers.get('Authorization') ?? '';
@@ -79,20 +98,24 @@ Deno.serve(async (req) => {
     await admin.from('tenants').update({ stripe_customer_id: customerId }).eq('id', tenantId);
   }
 
-  // 3) Sesión de checkout (suscripción) con precio calculado en el servidor.
+  // 3) Sesión de checkout (suscripción). Usa tu Price ID de Stripe si está
+  //    configurado; si no, cae al precio calculado en el servidor.
   const base = returnUrl || `${req.headers.get('origin') ?? ''}/subscription`;
+  const lineItem = priceId
+    ? { price: priceId, quantity: 1 }
+    : {
+        quantity: 1,
+        price_data: {
+          currency: 'mxn',
+          product_data: { name: `${PRICES[plan].label} (${cycle === 'annual' ? 'anual' : 'mensual'})` },
+          unit_amount: (amount ?? 0) * 100,
+          recurring: { interval: cycle === 'annual' ? 'year' : 'month' },
+        },
+      };
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
-    line_items: [{
-      quantity: 1,
-      price_data: {
-        currency: 'mxn',
-        product_data: { name: `${PRICES[plan].label} (${cycle === 'annual' ? 'anual' : 'mensual'})` },
-        unit_amount: amount * 100,
-        recurring: { interval: cycle === 'annual' ? 'year' : 'month' },
-      },
-    }],
+    line_items: [lineItem],
     allow_promotion_codes: true,
     success_url: `${base}?checkout=success`,
     cancel_url: `${base}?checkout=cancel`,
