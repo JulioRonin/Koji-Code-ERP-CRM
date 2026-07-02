@@ -114,10 +114,29 @@ export function DesignFileManager() {
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !selectedProjectId) return;
+
+    // Validación: los 3D solo aceptan PIEZAS en .STP/.STEP (no ensambles) y con
+    // límite de peso para no saturar la base de datos.
+    const MAX_MB = kind === 'model' ? 25 : kind === 'drawing' ? 15 : 5;
+    const rejected: string[] = [];
+    const valid = Array.from(files).filter(f => {
+      if (kind === 'model' && !/\.(stp|step)$/i.test(f.name)) { rejected.push(`${f.name} — solo .STP/.STEP (piezas)`); return false; }
+      if (f.size > MAX_MB * 1024 * 1024) { rejected.push(`${f.name} — supera ${MAX_MB} MB`); return false; }
+      return true;
+    });
+    if (rejected.length > 0) {
+      flash(`Rechazado(s): ${rejected.join(' · ')}`, 'error');
+    }
+    if (valid.length === 0) {
+      if (drawingInputRef.current) drawingInputRef.current.value = '';
+      if (modelInputRef.current) modelInputRef.current.value = '';
+      return;
+    }
+
     try {
       const result = await attach({
         projectId: selectedProjectId,
-        files: Array.from(files),
+        files: valid,
         kind,
         bomItems: parts.map(p => ({ id: p.id, part_number: p.part_number })),
       });
@@ -270,10 +289,10 @@ export function DesignFileManager() {
           busy={attaching}
         />
         <DropZone
-          accept=".step,.stp,.igs,.iges,.x_t,.x_b,.sldprt,.f3d,.stl"
+          accept=".step,.stp"
           inputRef={modelInputRef}
-          title="Modelos 3D"
-          subtitle="STEP, IGS, SLDPRT — match por nombre."
+          title="Modelos 3D (piezas)"
+          subtitle="Solo .STP/.STEP de piezas, máx. 25 MB. No ensambles."
           icon={Box}
           onFiles={e => handleBulkUpload(e, 'model')}
           busy={attaching}

@@ -17,11 +17,17 @@ import {
   Inbox,
   Wrench,
   RefreshCw,
+  Pencil,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -36,6 +42,9 @@ import {
   useInspections,
   useNcrs,
   useInstruments,
+  useUpsertInstrument,
+  useDeleteInstrument,
+  calibrationState,
   useProjects,
   useBomItems,
   useTechnicians,
@@ -44,7 +53,7 @@ import {
   getFileDownloadUrl,
 } from '@/lib/api';
 import { DimensionalModal } from '@/components/quality/DimensionalModal';
-import type { BomItem, ManufacturingStatus } from '@/types/database';
+import type { BomItem, ManufacturingStatus, MeasurementInstrument, InstrumentStatus } from '@/types/database';
 
 const severityVariant: Record<string, 'destructive' | 'warning' | 'secondary'> = {
   Alta: 'destructive',
@@ -131,8 +140,21 @@ export function Quality() {
   const { data: technicians } = useTechnicians();
   const { data: inspections } = useInspections();
   const { data: ncrs } = useNcrs();
-  const { data: instruments } = useInstruments();
+  const { data: instruments, refetch: refetchInstruments } = useInstruments();
   const { update: updateMfg } = useUpdateManufacturingStatus();
+  const { remove: deleteInstrument } = useDeleteInstrument();
+  const [instrModal, setInstrModal] = useState<{ open: boolean; edit: MeasurementInstrument | null }>({ open: false, edit: null });
+
+  const calibAlerts = useMemo(() => {
+    const overdue = instruments.filter(i => calibrationState(i.next_calibration) === 'overdue');
+    const dueSoon = instruments.filter(i => calibrationState(i.next_calibration) === 'due_soon');
+    return { overdue, dueSoon };
+  }, [instruments]);
+
+  const removeInstrument = async (i: MeasurementInstrument) => {
+    if (!window.confirm(`¿Eliminar el instrumento "${i.name}"?`)) return;
+    try { await deleteInstrument(i.id); await refetchInstruments(); } catch (e) { window.alert((e as Error).message); }
+  };
 
   React.useEffect(() => {
     if (projects.length > 0 && !selectedProjectId) {
@@ -597,57 +619,89 @@ export function Quality() {
       )}
 
       {activeTab === 'instruments' && (
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Maestro de instrumentos</CardTitle>
-            <Button size="sm">
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Registrar instrumento
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Instrumento</TableHead>
-                  <TableHead>Marca</TableHead>
-                  <TableHead>Última calibración</TableHead>
-                  <TableHead>Vencimiento</TableHead>
-                  <TableHead className="text-right">Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {instruments.map(tool => (
-                  <TableRow key={tool.id}>
-                    <TableCell className="font-mono text-xs">{tool.id}</TableCell>
-                    <TableCell className="font-medium">{tool.name}</TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)]">
-                      {tool.brand ?? '—'}
-                    </TableCell>
-                    <TableCell className="text-[var(--color-app-text-muted)]">
-                      {tool.last_calibration ?? '—'}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        'text-sm',
-                        tool.status === 'Vencido'
-                          ? 'text-[var(--color-app-danger)] font-medium'
-                          : 'text-[var(--color-app-text-muted)]'
-                      )}
-                    >
-                      {tool.next_calibration ?? '—'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant={tool.status === 'Calibrado' ? 'success' : 'destructive'}>
-                        {tool.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
+        <div className="space-y-4">
+          {(calibAlerts.overdue.length > 0 || calibAlerts.dueSoon.length > 0) && (
+            <Card className={cn('p-4', calibAlerts.overdue.length > 0 ? 'border-[var(--color-app-danger)]/40 bg-[var(--color-app-danger-soft)]/20' : 'border-[var(--color-app-warning)]/40 bg-[var(--color-app-warning-soft)]/20')}>
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <AlertTriangle className={cn('h-4 w-4', calibAlerts.overdue.length > 0 ? 'text-[var(--color-app-danger)]' : 'text-[var(--color-app-warning)]')} />
+                Calibraciones: {calibAlerts.overdue.length} vencida(s) · {calibAlerts.dueSoon.length} por vencer (30 días)
+              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {[...calibAlerts.overdue, ...calibAlerts.dueSoon].map(i => (
+                  <button key={i.id} onClick={() => setInstrModal({ open: true, edit: i })} className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-app-border)] bg-white hover:border-[var(--color-app-primary)]">
+                    <span className="font-medium">{i.name}</span> <span className="text-[var(--color-app-text-muted)]">· {i.next_calibration ?? 's/f'}</span>
+                  </button>
                 ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </div>
+            </Card>
+          )}
+          <Card className="p-0">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Maestro de instrumentos</CardTitle>
+                <CardDescription>Control de calibraciones (ISO 9001) con avisos de vencimiento.</CardDescription>
+              </div>
+              <Button size="sm" onClick={() => setInstrModal({ open: true, edit: null })}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Registrar instrumento
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Instrumento</TableHead>
+                    <TableHead>Marca / serie</TableHead>
+                    <TableHead>Última calibración</TableHead>
+                    <TableHead>Próxima</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {instruments.map(tool => {
+                    const cs = calibrationState(tool.next_calibration);
+                    const days = tool.next_calibration ? Math.ceil((new Date(tool.next_calibration).getTime() - Date.now()) / 86_400_000) : null;
+                    return (
+                      <TableRow key={tool.id}>
+                        <TableCell className="font-medium">{tool.name}</TableCell>
+                        <TableCell className="text-[var(--color-app-text-muted)] text-sm">
+                          {tool.brand ?? '—'}{tool.serial_number ? <span className="block text-[11px] font-mono">{tool.serial_number}</span> : null}
+                        </TableCell>
+                        <TableCell className="text-[var(--color-app-text-muted)] text-sm">{tool.last_calibration ?? '—'}</TableCell>
+                        <TableCell className={cn('text-sm', cs === 'overdue' ? 'text-[var(--color-app-danger)] font-medium' : cs === 'due_soon' ? 'text-[var(--color-app-warning)] font-medium' : 'text-[var(--color-app-text-muted)]')}>
+                          {tool.next_calibration ?? '—'}
+                          {days != null && <span className="block text-[10px]">{days < 0 ? `vencida hace ${Math.abs(days)}d` : `en ${days}d`}</span>}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={cs === 'overdue' ? 'destructive' : cs === 'due_soon' ? 'warning' : 'success'}>
+                            {cs === 'overdue' ? 'Vencido' : cs === 'due_soon' ? 'Por calibrar' : cs === 'unknown' ? 'Sin fecha' : 'Calibrado'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="sm" className="h-8" onClick={() => setInstrModal({ open: true, edit: tool })}><Pencil className="h-3.5 w-3.5" /></Button>
+                            <Button variant="ghost" size="sm" className="h-8 text-[var(--color-app-danger)]" onClick={() => removeInstrument(tool)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {instruments.length === 0 && (
+                    <TableRow><TableCell colSpan={6} className="h-24 text-center text-[var(--color-app-text-muted)]">Sin instrumentos. Registra el primero.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {instrModal.open && (
+        <InstrumentModal
+          instrument={instrModal.edit}
+          onClose={() => setInstrModal({ open: false, edit: null })}
+          onSaved={async () => { setInstrModal({ open: false, edit: null }); await refetchInstruments(); }}
+        />
       )}
 
       {dimItem && (
@@ -815,3 +869,71 @@ function QualityRow({ item, technicianName, busy, dimensionalCount, onOpenDimens
   );
 }
 
+
+// ── Modal: alta / edición de instrumento de medición ──
+function InstrumentModal({ instrument, onClose, onSaved }: {
+  instrument: MeasurementInstrument | null; onClose: () => void; onSaved: () => void;
+}) {
+  const { save, loading } = useUpsertInstrument();
+  const [f, setF] = useState({
+    name: instrument?.name ?? '', brand: instrument?.brand ?? '', serial_number: instrument?.serial_number ?? '',
+    last_calibration: instrument?.last_calibration ?? '', next_calibration: instrument?.next_calibration ?? '',
+    status: (instrument?.status ?? '') as '' | InstrumentStatus, notes: instrument?.notes ?? '',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(p => ({ ...p, [k]: e.target.value }));
+
+  // Sugerencia: próxima calibración = última + 12 meses.
+  const suggestNext = () => {
+    if (!f.last_calibration) return;
+    const d = new Date(f.last_calibration);
+    d.setFullYear(d.getFullYear() + 1);
+    setF(p => ({ ...p, next_calibration: d.toISOString().slice(0, 10) }));
+  };
+
+  const submit = async () => {
+    if (!f.name.trim()) return setError('El nombre es obligatorio.');
+    try {
+      await save({
+        id: instrument?.id, name: f.name.trim(), brand: f.brand || null, serial_number: f.serial_number || null,
+        last_calibration: f.last_calibration || null, next_calibration: f.next_calibration || null,
+        status: f.status || undefined, notes: f.notes || null,
+      });
+      onSaved();
+    } catch (e) { setError((e as Error).message); }
+  };
+
+  return (
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{instrument ? 'Editar instrumento' : 'Registrar instrumento'}</DialogTitle>
+          <DialogDescription>Control de calibración (ISO 9001). El estado se calcula de la próxima fecha.</DialogDescription>
+        </DialogHeader>
+        {error && <div className="p-2.5 bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)] rounded-md text-sm">{error}</div>}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 space-y-1.5"><label className="text-xs font-medium">Nombre</label><Input value={f.name} onChange={set('name')} autoFocus placeholder="Vernier digital 6''" /></div>
+          <div className="space-y-1.5"><label className="text-xs font-medium">Marca</label><Input value={f.brand} onChange={set('brand')} placeholder="Mitutoyo" /></div>
+          <div className="space-y-1.5"><label className="text-xs font-medium">No. de serie</label><Input value={f.serial_number} onChange={set('serial_number')} className="font-mono" /></div>
+          <div className="space-y-1.5"><label className="text-xs font-medium">Última calibración</label><Input type="date" value={f.last_calibration} onChange={set('last_calibration')} onBlur={suggestNext} /></div>
+          <div className="space-y-1.5"><label className="text-xs font-medium">Próxima calibración</label><Input type="date" value={f.next_calibration} onChange={set('next_calibration')} /></div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Estado (opcional)</label>
+            <select value={f.status} onChange={e => setF(p => ({ ...p, status: e.target.value as typeof f.status }))} className="w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40">
+              <option value="">Automático (por fecha)</option>
+              <option value="Calibrado">Calibrado</option>
+              <option value="Por Calibrar">Por Calibrar</option>
+              <option value="Vencido">Vencido</option>
+              <option value="Fuera de Servicio">Fuera de Servicio</option>
+            </select>
+          </div>
+          <div className="col-span-2 space-y-1.5"><label className="text-xs font-medium">Notas</label><Input value={f.notes} onChange={set('notes')} placeholder="Laboratorio, certificado…" /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={submit} disabled={loading}>{loading ? 'Guardando…' : 'Guardar'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
