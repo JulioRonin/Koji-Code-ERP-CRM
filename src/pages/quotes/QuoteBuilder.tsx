@@ -15,6 +15,7 @@ import {
   FolderKanban,
   ChevronDown,
   AlertTriangle,
+  FileDown,
 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ import type { Quote, QuoteItem, QuoteStatus } from '@/types/database';
 import { QuoteDocument } from '@/components/quotes/QuoteDocument';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Textarea } from '@/components/ui/textarea';
+import { downloadComponentsTemplate } from '@/lib/inventoryImport';
 import { cn } from '@/lib/utils';
 
 const money = (n: number) =>
@@ -540,9 +542,16 @@ export function QuoteBuilder() {
           <div className="h-10 w-10 rounded-md bg-[var(--color-app-primary-soft)] flex items-center justify-center shrink-0">
             <Upload className="h-4 w-4 text-[var(--color-app-primary)]" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Importar listado de componentes</p>
             <p className="text-xs text-[var(--color-app-text-muted)]">Excel: Name, Description, Qty, Material</p>
+            <button
+              type="button"
+              onClick={e => { e.preventDefault(); e.stopPropagation(); downloadComponentsTemplate(); }}
+              className="text-xs text-[var(--color-app-primary)] hover:underline mt-1 inline-flex items-center gap-1"
+            >
+              <FileDown className="h-3 w-3" /> Descargar plantilla
+            </button>
           </div>
         </label>
 
@@ -640,16 +649,17 @@ export function QuoteBuilder() {
                         const inv = inventory.find(x => x.id === it.inventory_item_id);
                         if (!inv) return null;
                         const insufficient = inv.stock < it.quantity;
+                        if (!insufficient) {
+                          return <span className="text-xs text-[var(--color-app-text-muted)]">Se descontarán {it.quantity} {inv.uom} al aprobar</span>;
+                        }
+                        // Fuera de stock: muestra entrega y estatus de resurtido.
+                        const restockLabel = inv.restock_status === 'solicitado' ? 'Solicitado'
+                          : inv.restock_status === 'transito' ? 'En tránsito' : 'No solicitado';
                         return (
-                          <span
-                            className={cn(
-                              'text-xs inline-flex items-center gap-1',
-                              insufficient ? 'text-[var(--color-app-danger)]' : 'text-[var(--color-app-text-muted)]'
-                            )}
-                          >
-                            {insufficient
-                              ? `Stock insuficiente (${inv.stock} disp. / ${it.quantity} req.)`
-                              : `Se descontarán ${it.quantity} ${inv.uom} al aprobar`}
+                          <span className="text-xs inline-flex items-center gap-1.5 flex-wrap text-[var(--color-app-danger)]">
+                            Stock insuficiente ({inv.stock} disp. / {it.quantity} req.)
+                            {inv.lead_time_days != null && <span className="text-[var(--color-app-text-muted)]">· entrega ~{inv.lead_time_days} días</span>}
+                            <span className="text-[var(--color-app-text-muted)]">· {restockLabel}{inv.restock_eta ? ` (llega ${inv.restock_eta})` : ''}</span>
                           </span>
                         );
                       })()}

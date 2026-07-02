@@ -77,7 +77,7 @@ export function Quotes() {
   const { data: customers } = useCustomers();
 
   const [showNew, setShowNew] = useState(false);
-  const [draft, setDraft] = useState({ client: '', project: '', email: '', customerId: '', delivery: '' });
+  const [draft, setDraft] = useState({ client: '', project: '', email: '', customerId: '', delivery: '', publicSale: false });
 
   const stats = useMemo(() => {
     const open = quotes.filter(q => q.status === 'Borrador' || q.status === 'Enviada');
@@ -97,7 +97,7 @@ export function Quotes() {
       delivery_time: draft.delivery || null,
     });
     setShowNew(false);
-    setDraft({ client: '', project: '', email: '', customerId: '', delivery: '' });
+    setDraft({ client: '', project: '', email: '', customerId: '', delivery: '', publicSale: false });
     await refetchQuotes();
     navigate(`/quotes/${quote.id}`);
   };
@@ -218,7 +218,20 @@ export function Quotes() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            {customers.length > 0 && (
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={draft.publicSale}
+                onChange={e => setDraft(d => ({
+                  ...d,
+                  publicSale: e.target.checked,
+                  client: e.target.checked ? 'Público en general' : '',
+                  customerId: '', email: '',
+                }))}
+              />
+              Venta a público en general
+            </label>
+            {!draft.publicSale && customers.length > 0 && (
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Cliente registrado</label>
                 <Combobox
