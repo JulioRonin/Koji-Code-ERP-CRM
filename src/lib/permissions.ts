@@ -84,15 +84,20 @@ export function canAccessPath(role: string | undefined, path: string, overrides?
   // La suscripción es accesible para cualquier usuario autenticado.
   if (path.startsWith('/subscription')) return true;
 
-  // Permisos por usuario: si existen, mandan sobre el rol.
+  const resolved = resolveRole(role);
+  const allowed = ROLE_ACCESS[resolved] ?? FALLBACK_ACCESS;
+
+  // Los roles con acceso TOTAL (Administrador / Admin PM) NUNCA se restringen por
+  // permisos por usuario — así un admin siempre llega a Configuración/Plataforma
+  // aunque tenga permisos personalizados guardados por error.
+  if (allowed.includes('ALL')) return true;
+
+  // Permisos por usuario: si existen, mandan sobre el rol (solo roles no-admin).
   if (overrides && overrides.length > 0) {
     const list = [...ALWAYS_ALLOWED, ...overrides];
     return list.some(a => path === a || (a !== '/' && path.startsWith(a + '/')));
   }
 
-  const resolved = resolveRole(role);
-  const allowed = ROLE_ACCESS[resolved] ?? FALLBACK_ACCESS;
-  if (allowed.includes('ALL')) return true;
   // Match exacto o prefijo (ej. /projects/123 cae bajo /projects)
   return allowed.some(a => path === a || (a !== '/' && path.startsWith(a + '/')));
 }
