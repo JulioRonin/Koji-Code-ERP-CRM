@@ -39,8 +39,11 @@ function applyTheme(primary: string | null | undefined) {
 }
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
-  const { data: company, loading, refetch } = useCompanySettings();
-  const { tenant } = useTenant();
+  const { tenant, loading: tenantLoading } = useTenant();
+  // Mientras la empresa no se resuelve pasamos `undefined` (no consulta). Una vez
+  // resuelta, pasamos su id para traer SOLO la configuración de esa empresa.
+  const activeTenantId = tenant.id && tenant.id !== 'tenant-default' ? tenant.id : null;
+  const { data: company, loading, refetch } = useCompanySettings(tenantLoading ? undefined : activeTenantId);
 
   // Si la empresa aún no configuró su marca (company_settings = default), usamos
   // el nombre de su empresa (tenant) para no mostrar el del primer cliente.

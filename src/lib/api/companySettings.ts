@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
-import { scopeByTenant } from './tenantScope';
 import type { CompanySettings } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
 
@@ -59,20 +58,30 @@ function writeDemo(c: CompanySettings): void {
 }
 
 /**
- * Carga la configuración de la empresa. Resiliente: si la tabla aún no existe
- * o la consulta falla, cae al valor de localStorage y, en última instancia,
- * al default — para que la marca de la app nunca quede vacía.
+ * Carga la configuración de la EMPRESA ACTIVA.
+ *
+ * IMPORTANTE (multi-tenant): se filtra explícitamente por `tenantId`. Mientras
+ * la empresa aún no se resuelve (`tenantId === undefined`) NO consulta y devuelve
+ * el genérico KANRI — así NUNCA se alcanza a ver, por un instante, la marca de
+ * otra empresa (era la causa del "IMC Design" en cuentas ajenas).
+ *
+ * @param tenantId  id de la empresa activa; `null` = genérico; `undefined` = aún
+ *                  sin resolver (no consulta).
  */
-export function useCompanySettings(): AsyncState<CompanySettings> {
+export function useCompanySettings(tenantId?: string | null): AsyncState<CompanySettings> {
   return useAsync<CompanySettings>(
     async () => {
       if (!supabase) {
         return readDemo() ?? DEFAULT_COMPANY;
       }
+      // Sin empresa resuelta o genérica: no consultamos (evita traer la fila de
+      // otra empresa por una condición de carrera).
+      if (!tenantId) return DEFAULT_COMPANY;
       try {
-        const { data, error } = await scopeByTenant(supabase
+        const { data, error } = await supabase
           .from('company_settings')
-          .select('*'))
+          .select('*')
+          .eq('tenant_id', tenantId)
           .order('created_at', { ascending: true })
           .limit(1);
         if (error) throw error;
@@ -81,18 +90,15 @@ export function useCompanySettings(): AsyncState<CompanySettings> {
           writeDemo(row); // cache local para login/offline
           return row;
         }
-        // Con backend real la RLS ya filtra por empresa: si esta empresa aún no
-        // configuró su marca, usamos el DEFAULT (el branding cae al nombre del
-        // tenant). NO usamos el cache local para no mostrar la marca de otra
-        // empresa que se haya visto antes en este navegador.
+        // Empresa sin marca configurada → DEFAULT (el branding cae al nombre del
+        // tenant en CompanyContext). No usamos cache para no mostrar otra marca.
         return DEFAULT_COMPANY;
       } catch {
-        // Tabla inexistente o sin permisos → no rompemos la app
         return DEFAULT_COMPANY;
       }
     },
     DEFAULT_COMPANY,
-    []
+    [tenantId]
   );
 }
 
