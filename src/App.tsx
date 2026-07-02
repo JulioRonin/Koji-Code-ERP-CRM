@@ -34,7 +34,7 @@ import { Onboarding } from './pages/saas/Onboarding';
 import { PlatformAdmin } from './pages/saas/PlatformAdmin';
 import { LandingHome } from './pages/saas/LandingHome';
 import { Subscription } from './pages/saas/Subscription';
-import { Billing } from './pages/Placeholders';
+import { Billing } from './pages/billing/Billing';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
 import { TechnicianDashboard } from './pages/technicians/TechnicianDashboard';
