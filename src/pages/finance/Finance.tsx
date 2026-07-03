@@ -14,9 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import {
-  useInvoices, usePurchaseOrders, usePayrollRuns, useQuotes, useReceivablePayments,
+  useInvoices, usePurchaseOrders, usePayrollRuns, useQuotes, useReceivablePayments, useProjects,
   useFinanceTransactions, useUpsertTransaction, useDeleteTransaction, type TxKind, type FinanceTransaction,
 } from '@/lib/api';
+import { Combobox } from '@/components/ui/combobox';
+import { Profitability } from './Profitability';
+import { cn } from '@/lib/utils';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 const money2 = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
@@ -45,6 +48,7 @@ export function Finance() {
 
   const [period, setPeriod] = useState<Period>('6m');
   const [showTx, setShowTx] = useState(false);
+  const [tab, setTab] = useState<'resumen' | 'rentabilidad'>('resumen');
 
   const start = periodStart(period);
   const inPeriod = (d: string | null | undefined) => !!d && new Date(d) >= start;
@@ -129,14 +133,37 @@ export function Finance() {
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">P&L, ingresos, egresos y utilidad — combina facturas, compras, nómina y movimientos.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <select value={period} onChange={e => setPeriod(e.target.value as Period)} className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40">
-            {(Object.keys(PERIOD_LABEL) as Period[]).map(p => <option key={p} value={p}>{PERIOD_LABEL[p]}</option>)}
-          </select>
-          <Button variant="outline" onClick={exportCsv}><Download className="h-4 w-4 mr-1.5" /> Exportar</Button>
-          <Button onClick={() => setShowTx(true)}><Plus className="h-4 w-4 mr-1.5" /> Movimiento</Button>
+          {tab === 'resumen' && (
+            <>
+              <select value={period} onChange={e => setPeriod(e.target.value as Period)} className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40">
+                {(Object.keys(PERIOD_LABEL) as Period[]).map(p => <option key={p} value={p}>{PERIOD_LABEL[p]}</option>)}
+              </select>
+              <Button variant="outline" onClick={exportCsv}><Download className="h-4 w-4 mr-1.5" /> Exportar</Button>
+              <Button onClick={() => setShowTx(true)}><Plus className="h-4 w-4 mr-1.5" /> Movimiento</Button>
+            </>
+          )}
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit">
+        {([['resumen', 'Resumen (P&L)'], ['rentabilidad', 'Rentabilidad por proyecto']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={cn(
+              'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+              tab === id ? 'bg-white text-[var(--color-app-text)] shadow-sm' : 'text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]'
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'rentabilidad' && <Profitability />}
+
+      {tab === 'resumen' && (<>
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={TrendingUp} label="Ingresos" value={money(agg.income)} tone="success" />
@@ -249,6 +276,8 @@ export function Finance() {
         </CardContent>
       </Card>
 
+      </>)}
+
       {showTx && <TxModal onClose={() => setShowTx(false)} onSaved={async () => { setShowTx(false); await refetch(); }} />}
     </div>
   );
@@ -256,17 +285,19 @@ export function Finance() {
 
 function TxModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { save, loading } = useUpsertTransaction();
+  const { data: projects } = useProjects();
   const [kind, setKind] = useState<TxKind>('expense');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!(Number(amount) > 0)) return setError('El monto debe ser mayor a 0.');
     try {
-      await save({ kind, category: category || null, description: description || null, amount: Number(amount), tx_date: date });
+      await save({ kind, category: category || null, description: description || null, amount: Number(amount), tx_date: date, project_id: projectId });
       onSaved();
     } catch (e) { setError((e as Error).message); }
   };
@@ -286,6 +317,18 @@ function TxModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => voi
           <div className="space-y-1.5"><label className="text-xs font-medium">Categoría</label><Input value={category} onChange={e => setCategory(e.target.value)} placeholder="Renta, servicios…" /></div>
           <div className="space-y-1.5"><label className="text-xs font-medium">Monto (MXN)</label><Input type="number" value={amount} onChange={e => setAmount(e.target.value)} /></div>
           <div className="col-span-2 space-y-1.5"><label className="text-xs font-medium">Descripción</label><Input value={description} onChange={e => setDescription(e.target.value)} /></div>
+          {projects.length > 0 && (
+            <div className="col-span-2 space-y-1.5">
+              <label className="text-xs font-medium">Proyecto (opcional — para el margen por proyecto)</label>
+              <Combobox
+                options={projects.map(p => ({ value: p.id, label: p.name, hint: p.client_name }))}
+                value={projectId}
+                onChange={setProjectId}
+                placeholder="Sin proyecto asignado"
+                searchPlaceholder="Buscar proyecto…"
+              />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
