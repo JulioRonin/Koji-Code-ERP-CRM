@@ -43,9 +43,14 @@ import {
   applyInventoryMovement,
   computeQuoteItem,
   computeQuoteTotals,
+  sendEmail,
 } from '@/lib/api';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import type { Quote, QuoteItem, QuoteStatus } from '@/types/database';
 import { QuoteDocument } from '@/components/quotes/QuoteDocument';
+import { quoteEmailHtml } from '@/lib/quoteEmail';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Textarea } from '@/components/ui/textarea';
 import { downloadComponentsTemplate } from '@/lib/inventoryImport';
@@ -108,6 +113,10 @@ export function QuoteBuilder() {
   const [showDocument, setShowDocument] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [sending, setSending] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
 
   // Hidrata items guardados una sola vez
   useEffect(() => {
@@ -203,28 +212,50 @@ export function QuoteBuilder() {
     }
   };
 
-  const handleEmail = () => {
+  const brand = company.commercial_name || company.legal_name || 'KANRI';
+
+  const openEmail = () => {
+    setEmailMsg(null);
+    setEmailTo(quote?.client_email ?? '');
+    setEmailOpen(true);
+  };
+
+  /** Envía la cotización COMPLETA por correo (partidas, totales, datos de pago y
+   *  términos) vía Resend. */
+  const sendQuoteEmail = async () => {
     if (!quote) return;
-    const brand = company.commercial_name || company.legal_name || 'KANRI';
+    if (!emailTo.trim()) { setEmailMsg({ tone: 'err', text: 'Escribe el correo del cliente.' }); return; }
+    setSending(true); setEmailMsg(null);
+    try {
+      const html = quoteEmailHtml(
+        { ...quote, subtotal: totals.subtotal, total: totals.total },
+        computedItems as QuoteItem[],
+        company,
+        { subtotal: totals.subtotal, tax: totals.tax, total: totals.total },
+      );
+      await sendEmail({ to: emailTo.trim(), subject: `Cotización ${quote.id} — ${brand}`, html, replyTo: company.email ?? undefined });
+      setEmailMsg({ tone: 'ok', text: `Cotización enviada a ${emailTo.trim()}.` });
+    } catch (e) {
+      setEmailMsg({ tone: 'err', text: (e as Error).message });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  /** Fallback: abre el cliente de correo con un resumen (sin Resend). */
+  const openMailto = () => {
+    if (!quote) return;
     const subject = `Cotización ${quote.id} — ${brand}`;
     const body = [
-      `Estimado(a) ${quote.client_name},`,
-      '',
+      `Estimado(a) ${quote.client_name},`, '',
       `Le compartimos la cotización ${quote.id} correspondiente a "${quote.project_name}".`,
       `Total: ${money(totals.total)} ${quote.currency} (IVA incluido).`,
       quote.delivery_time ? `Tiempo de entrega: ${quote.delivery_time}.` : '',
-      `Vigencia: ${quote.valid_until ?? '30 días naturales'}.`,
-      '',
-      'Adjunte el PDF generado con el botón "Documento" antes de enviar.',
-      '',
-      'Saludos cordiales,',
-      brand,
-      company.phone ?? '',
-      company.email ?? '',
+      `Vigencia: ${quote.valid_until ?? '30 días naturales'}.`, '',
+      'Adjunte el PDF generado con el botón "Documento".', '',
+      'Saludos cordiales,', brand, company.phone ?? '', company.email ?? '',
     ].filter(Boolean).join('\n');
-    const to = quote.client_email ?? '';
-    window.location.href =
-      `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:${encodeURIComponent(emailTo || quote.client_email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   const handleStatusChange = async (status: QuoteStatus) => {
@@ -411,7 +442,7 @@ export function QuoteBuilder() {
           <Button variant="outline" onClick={() => setShowDocument(true)} disabled={computedItems.length === 0}>
             <Printer className="h-4 w-4 mr-1.5" /> Documento
           </Button>
-          <Button variant="outline" onClick={handleEmail} disabled={computedItems.length === 0} title={quote.client_email ? `Enviar a ${quote.client_email}` : 'Agrega el correo del cliente'}>
+          <Button variant="outline" onClick={openEmail} disabled={computedItems.length === 0} title={quote.client_email ? `Enviar a ${quote.client_email}` : 'Agrega el correo del cliente'}>
             <Mail className="h-4 w-4 mr-1.5" /> Enviar por correo
           </Button>
           {quote.status === 'Aprobada' && (
@@ -849,9 +880,40 @@ export function QuoteBuilder() {
           quote={{ ...quote, subtotal: totals.subtotal, total: totals.total }}
           items={computedItems as QuoteItem[]}
           onClose={() => setShowDocument(false)}
-          onEmail={handleEmail}
+          onEmail={openEmail}
         />
       )}
+
+      {/* Enviar cotización por correo (Resend, con partidas/pago/términos) */}
+      <Dialog open={emailOpen} onOpenChange={o => !o && setEmailOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enviar cotización por correo</DialogTitle>
+            <DialogDescription>
+              Se envía la cotización completa (partidas, totales, datos de pago{company.quote_terms_enabled ? ' y términos' : ''}) al cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Correo del cliente</label>
+            <Input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="cliente@empresa.com" />
+          </div>
+          {emailMsg && (
+            <div className={cn('text-sm p-2.5 rounded-md', emailMsg.tone === 'ok' ? 'bg-[var(--color-app-success-soft)] text-[var(--color-app-success)]' : 'bg-[var(--color-app-danger-soft)] text-[var(--color-app-danger)]')}>
+              {emailMsg.text}
+            </div>
+          )}
+          <p className="text-[11px] text-[var(--color-app-text-muted)]">
+            El envío automático usa Resend. Si no está configurado, usa "Correo manual" y adjunta el PDF (botón Documento).
+          </p>
+          <DialogFooter className="flex-wrap gap-2">
+            <Button variant="ghost" className="mr-auto" onClick={openMailto}>
+              <Mail className="h-4 w-4 mr-1.5" /> Correo manual
+            </Button>
+            <Button variant="outline" onClick={() => setEmailOpen(false)} disabled={sending}>Cerrar</Button>
+            <Button onClick={sendQuoteEmail} disabled={sending}>{sending ? 'Enviando…' : 'Enviar'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
