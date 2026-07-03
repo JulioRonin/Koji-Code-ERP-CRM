@@ -721,7 +721,7 @@ export function QuoteBuilder() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-[var(--color-app-text-muted)] uppercase">Extras/pza</label>
+                      <label className="text-[10px] text-[var(--color-app-text-muted)] uppercase" title="Costo unitario directo (además de material y maquinado)">Costo directo/pza</label>
                       <Input
                         type="number"
                         step="0.01"
@@ -755,10 +755,57 @@ export function QuoteBuilder() {
                         <span className="italic">Sin plano 2D</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 text-sm shrink-0">
-                      <span className="text-xs text-[var(--color-app-text-muted)]">
-                        Unitario: <span className="font-semibold text-[var(--color-app-text)]">{money(it.unit_price)}</span>
-                      </span>
+                    <div className="flex items-center gap-4 text-sm shrink-0 flex-wrap">
+                      {!simple && (() => {
+                        const baseCost = it.material_qty * it.material_unit_cost
+                          + it.machining_hours * it.machine_rate + it.extra_cost;
+                        const effMargin = baseCost > 0
+                          ? ((it.unit_price / baseCost) - 1) * 100
+                          : (it.margin_pct ?? marginDefault);
+                        return (
+                          <>
+                            <span className="text-xs text-[var(--color-app-text-muted)]">
+                              Costo/pza: <span className="font-medium text-[var(--color-app-text)] tabular-nums">{money(baseCost)}</span>
+                            </span>
+                            <span className={cn(
+                              'text-xs font-semibold tabular-nums',
+                              effMargin < 0 ? 'text-[var(--color-app-danger)]'
+                                : effMargin < 15 ? 'text-[var(--color-app-warning)]'
+                                : 'text-[var(--color-app-success)]'
+                            )}>
+                              Margen: {effMargin.toFixed(1)}%
+                            </span>
+                            <span className="text-xs text-[var(--color-app-text-muted)] inline-flex items-center gap-1.5">
+                              Unitario:
+                              <Input
+                                key={`up-${i}-${it.unit_price.toFixed(2)}`}
+                                type="number"
+                                step="0.01"
+                                defaultValue={it.unit_price ? Number(it.unit_price.toFixed(2)) : ''}
+                                title="Escribe el precio unitario y calculo el margen"
+                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                onBlur={e => {
+                                  const price = Number(e.target.value);
+                                  if (!(price > 0) || Math.abs(price - it.unit_price) < 0.005) return;
+                                  if (baseCost > 0) {
+                                    // Precio deseado → margen implícito.
+                                    patchItem(i, { margin_pct: Number((((price / baseCost) - 1) * 100).toFixed(2)) });
+                                  } else {
+                                    // Sin costos capturados: el precio se vuelve el costo directo con margen 0.
+                                    patchItem(i, { extra_cost: price, margin_pct: 0 });
+                                  }
+                                }}
+                                className="h-8 w-28 text-right text-xs font-semibold"
+                              />
+                            </span>
+                          </>
+                        );
+                      })()}
+                      {simple && (
+                        <span className="text-xs text-[var(--color-app-text-muted)]">
+                          Unitario: <span className="font-semibold text-[var(--color-app-text)]">{money(it.unit_price)}</span>
+                        </span>
+                      )}
                       <span className="font-semibold tabular-nums">{money(it.line_total)}</span>
                     </div>
                   </div>
