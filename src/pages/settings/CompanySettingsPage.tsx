@@ -87,6 +87,10 @@ export function CompanySettingsPage() {
       dashboard_mode: company.dashboard_mode ?? null,
       quote_simple: company.quote_simple ?? false,
       inventory_mode: company.inventory_mode ?? null,
+      quote_terms_enabled: company.quote_terms_enabled ?? false,
+      terms_payment: company.terms_payment ?? '',
+      terms_advance: company.terms_advance ?? '',
+      terms_special: company.terms_special ?? '',
     });
   }, [company.id, company.updated_at]);
 
@@ -266,6 +270,54 @@ export function CompanySettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Términos y condiciones (anexo de cotización) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileText className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Términos y condiciones (anexo de cotización)
+          </CardTitle>
+          <CardDescription>
+            Se imprimen como hoja adicional en cada cotización, junto con tus datos bancarios
+            para transferencias y depósitos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={!!form.quote_terms_enabled}
+              onChange={e => set({ quote_terms_enabled: e.target.checked })}
+              disabled={!isAdmin}
+            />
+            Anexar hoja de términos y condiciones a las cotizaciones
+          </label>
+          <TermsArea
+            label="Términos de pago"
+            value={form.terms_payment}
+            onChange={v => set({ terms_payment: v })}
+            disabled={!isAdmin}
+            placeholder={'Ej. Crédito 30 días a partir de la entrega. Pagos en MXN vía transferencia electrónica a la cuenta indicada. Facturamos CFDI 4.0 contra orden de compra.'}
+          />
+          <TermsArea
+            label="Términos de anticipo"
+            value={form.terms_advance}
+            onChange={v => set({ terms_advance: v })}
+            disabled={!isAdmin}
+            placeholder={'Ej. Anticipo del 50% para iniciar fabricación; 50% restante contra aviso de embarque. El anticipo no es reembolsable una vez iniciada la producción.'}
+          />
+          <TermsArea
+            label="Condiciones especiales (NDA / confidencialidad, garantías…)"
+            value={form.terms_special}
+            onChange={v => set({ terms_special: v })}
+            disabled={!isAdmin}
+            placeholder={'Ej. La información técnica, planos y modelos intercambiados se consideran confidenciales (NDA). Garantía de 30 días contra defectos de fabricación. Penalizaciones y cancelaciones según contrato.'}
+          />
+          <p className="text-[11px] text-[var(--color-app-text-muted)]">
+            Los datos bancarios del anexo se toman de la sección "Datos para pago (transferencia)".
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Tipo de tablero (dashboard) */}
       <Card>
         <CardHeader>
@@ -385,6 +437,24 @@ export function CompanySettingsPage() {
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+function TermsArea({ label, value, onChange, disabled, placeholder }: {
+  label: string; value?: string | null; onChange: (v: string) => void; disabled?: boolean; placeholder?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium">{label}</label>
+      <textarea
+        rows={3}
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 disabled:opacity-60"
+      />
     </div>
   );
 }

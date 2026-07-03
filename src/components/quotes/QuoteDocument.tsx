@@ -235,8 +235,87 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
           <p className="text-center text-[10px] text-[#94a3b8] mt-10">
             {company.legal_name || brand} · {new Date().getFullYear()}
           </p>
+
+          {/* ── ANEXO: Términos y condiciones (hoja 2, configurable) ── */}
+          {company.quote_terms_enabled && (
+            <div style={{ breakBefore: 'page', pageBreakBefore: 'always' }} className="pt-8">
+              {/* Membrete compacto */}
+              <div className="flex justify-between items-center border-b-2 pb-3 mb-6" style={{ borderColor: accent }}>
+                <div className="flex items-center gap-2">
+                  {company.logo_url ? (
+                    <img src={company.logo_url} alt={brand} className="h-8 w-8 rounded object-contain border border-[#e2e8f0]" />
+                  ) : (
+                    <div className="h-8 w-8 rounded flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: accent }}>{initial}</div>
+                  )}
+                  <p className="font-bold text-sm">{company.legal_name || brand}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold" style={{ color: accent }}>TÉRMINOS Y CONDICIONES</p>
+                  <p className="text-[11px] font-mono text-[#475569]">Anexo de la cotización {quote.id}</p>
+                </div>
+              </div>
+
+              <div className="space-y-5 text-sm">
+                {company.terms_payment && (
+                  <TermsSection n={1} title="Términos de pago" body={company.terms_payment} accent={accent} />
+                )}
+                {company.terms_advance && (
+                  <TermsSection n={2} title="Anticipo" body={company.terms_advance} accent={accent} />
+                )}
+
+                {(company.bank_name || company.bank_clabe || company.bank_account) && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: accent }}>
+                      {(company.terms_payment ? 1 : 0) + (company.terms_advance ? 1 : 0) + 1}. Cuenta para transferencias y depósitos
+                    </p>
+                    <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
+                      {company.bank_beneficiary && <p><span className="text-[#475569]">Beneficiario:</span> <span className="font-medium">{company.bank_beneficiary}</span></p>}
+                      {company.bank_name && <p><span className="text-[#475569]">Banco:</span> <span className="font-medium">{company.bank_name}</span></p>}
+                      {company.bank_account && <p><span className="text-[#475569]">Cuenta:</span> <span className="font-mono font-medium">{company.bank_account}</span></p>}
+                      {company.bank_clabe && <p><span className="text-[#475569]">CLABE:</span> <span className="font-mono font-medium">{company.bank_clabe}</span></p>}
+                      {company.payment_notes && <p className="col-span-2 text-[#475569] text-xs">{company.payment_notes}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {company.terms_special && (
+                  <TermsSection
+                    n={(company.terms_payment ? 1 : 0) + (company.terms_advance ? 1 : 0) + ((company.bank_name || company.bank_clabe || company.bank_account) ? 1 : 0) + 1}
+                    title="Condiciones especiales y confidencialidad"
+                    body={company.terms_special}
+                    accent={accent}
+                  />
+                )}
+              </div>
+
+              {/* Aceptación del anexo */}
+              <div className="grid grid-cols-2 gap-16 mt-14">
+                <div className="border-t border-[#cbd5e1] pt-2 text-center">
+                  <p className="text-xs text-[#475569]">Por {company.legal_name || brand}</p>
+                  <p className="text-sm font-medium mt-1">{company.legal_rep || 'Nombre y firma'}</p>
+                </div>
+                <div className="border-t border-[#cbd5e1] pt-2 text-center">
+                  <p className="text-xs text-[#475569]">Acepto los términos y condiciones · {quote.client_name}</p>
+                  <p className="text-sm font-medium mt-1">Nombre, firma y fecha</p>
+                </div>
+              </div>
+
+              <p className="text-center text-[10px] text-[#94a3b8] mt-8">
+                Este anexo forma parte integral de la cotización {quote.id} · {company.legal_name || brand} · {new Date().getFullYear()}
+              </p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TermsSection({ n, title, body, accent }: { n: number; title: string; body: string; accent: string }) {
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: accent }}>{n}. {title}</p>
+      <p className="text-[#334155] leading-relaxed whitespace-pre-line">{body}</p>
+    </div>
   );
 }
