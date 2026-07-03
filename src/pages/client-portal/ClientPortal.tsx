@@ -1,17 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
-  Factory,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  ShieldCheck,
-  Package,
-  FileText,
-  Calendar,
-  Lock,
+  Factory, CheckCircle2, Clock, ShieldCheck, Package, FileText, Calendar, Lock, QrCode,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,164 +13,126 @@ import { useClientPortalData } from '@/lib/api';
 import type { ProjectStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 
-const stageOrder: ProjectStatus[] = [
-  'Cotización',
-  'Diseño',
-  'Compras',
-  'En Producción',
-  'Calidad',
-  'Embarque',
-  'Entregado',
-];
-
+const stageOrder: ProjectStatus[] = ['Cotización', 'Diseño', 'Compras', 'En Producción', 'Calidad', 'Embarque', 'Entregado'];
 const stageLabels: Record<ProjectStatus, string> = {
-  Cotización:     'Cotización',
-  Diseño:         'Diseño',
-  Compras:        'Procura',
-  'En Producción': 'Producción',
-  Calidad:        'Control de calidad',
-  Embarque:       'Embarque',
-  Entregado:      'Entregado',
-  Cancelado:      'Cancelado',
+  Cotización: 'Cotización', Diseño: 'Diseño', Compras: 'Procura', 'En Producción': 'Producción',
+  Calidad: 'Calidad', Embarque: 'Embarque', Entregado: 'Entregado', Cancelado: 'Cancelado',
 };
+
+const KANRI_INK = '#16181D';
+const KANRI_ACCENT = '#E2401F';
 
 export function ClientPortal() {
   const { token } = useParams<{ token: string }>();
   const { data, loading } = useClientPortalData(token);
+  const { project, parts, inspections, visibleFiles, brand } = data;
 
-  const { project, parts, inspections, visibleFiles } = data;
+  const accent = brand?.primary_color && /^#[0-9a-fA-F]{6}$/.test(brand.primary_color) ? brand.primary_color : KANRI_ACCENT;
+  const brandName = brand?.name || 'KANRI';
 
   const currentStageIndex = useMemo(() => {
-    if (!project) return -1;
-    if (project.status === 'Cancelado') return -1;
+    if (!project || project.status === 'Cancelado') return -1;
     return stageOrder.indexOf(project.status);
   }, [project]);
 
   const inspectionsPassed = inspections.filter(i => i.result === 'Aprobado').length;
-  const inspectionsTotal = inspections.length;
+
+  const [qr, setQr] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    QRCode.toDataURL(window.location.href, { width: 220, margin: 1, errorCorrectionLevel: 'M' })
+      .then(setQr).catch(() => setQr(null));
+  }, []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[var(--color-app-bg)] flex items-center justify-center">
-        <div className="text-sm text-[var(--color-app-text-muted)]">Cargando...</div>
-      </div>
-    );
+    return <div className="min-h-screen bg-[#F7F5F0] flex items-center justify-center text-sm text-[#8A9099]">Cargando…</div>;
   }
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-[var(--color-app-bg)] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F7F5F0] flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="p-10 flex flex-col items-center text-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-[var(--color-app-warning-soft)] flex items-center justify-center">
-              <Lock className="h-5 w-5 text-[var(--color-app-warning)]" />
+            <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
+              <Lock className="h-5 w-5 text-amber-600" />
             </div>
             <h2 className="text-lg font-semibold">Enlace inválido o expirado</h2>
-            <p className="text-sm text-[var(--color-app-text-muted)]">
-              Este enlace de seguimiento ya no es válido. Contacta a tu representante
-              para que te envíe uno nuevo.
-            </p>
+            <p className="text-sm text-[#8A9099]">Este enlace de seguimiento ya no es válido. Contacta a tu representante para obtener uno nuevo.</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
+  const daysLeft = Math.max(0, Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86_400_000));
+
   return (
-    <div className="min-h-screen bg-[var(--color-app-bg)]">
-      {/* Brand bar */}
-      <header className="bg-white border-b border-[var(--color-app-border)]">
+    <div className="min-h-screen bg-[#F7F5F0] text-[#16181D]">
+      {/* Brand bar (empresa emisora) */}
+      <header style={{ background: KANRI_INK }} className="text-white">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-semibold">
-              K
-            </div>
+            {brand?.logo_url ? (
+              <img src={brand.logo_url} alt={brandName} className="h-10 w-10 rounded-md object-contain bg-white p-0.5" />
+            ) : (
+              <div className="h-10 w-10 rounded-md flex items-center justify-center text-white font-bold" style={{ background: accent }}>
+                {brandName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
-              <p className="font-semibold text-sm">KANRI</p>
-              <p className="text-xs text-[var(--color-app-text-muted)]">Portal de seguimiento</p>
+              <p className="font-semibold text-sm leading-tight">{brandName}</p>
+              <p className="text-[11px] text-white/60">{brand?.tagline || 'Portal de seguimiento'}</p>
             </div>
           </div>
-          <div className="text-xs text-[var(--color-app-text-muted)] hidden sm:block">
-            Acceso seguro · cliente
-          </div>
+          <span className="text-[11px] text-white/60 hidden sm:inline-flex items-center gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5" /> Acceso seguro · solo lectura
+          </span>
         </div>
       </header>
 
+      {/* Hero con acento de la empresa */}
+      <div style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)` }} className="text-white">
+        <div className="max-w-5xl mx-auto px-6 py-8">
+          <p className="text-xs uppercase tracking-widest text-white/70">Seguimiento de proyecto</p>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mt-1">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">{project.name}</h1>
+              <p className="text-sm text-white/80 mt-1 font-mono">{project.id} · {project.client_name}</p>
+            </div>
+            <div className="text-left md:text-right">
+              <Badge className="bg-white/20 text-white border-0">{stageLabels[project.status]}</Badge>
+              <p className="text-xs text-white/70 mt-1.5">Entrega estimada</p>
+              <p className="font-semibold">{format(new Date(project.deadline), "dd 'de' MMM yyyy", { locale: es })}</p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <div className="flex justify-between text-sm mb-1.5"><span className="text-white/80">Avance global</span><span className="font-bold">{project.progress}%</span></div>
+            <div className="h-2.5 rounded-full bg-white/25 overflow-hidden">
+              <div className="h-full rounded-full bg-white transition-all" style={{ width: `${project.progress}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-        {/* Hero / proyecto */}
+        {/* Timeline */}
         <Card>
           <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-              <div>
-                <p className="text-xs text-[var(--color-app-text-muted)] uppercase tracking-wide">
-                  Proyecto activo
-                </p>
-                <h1 className="text-2xl font-semibold mt-1">{project.name}</h1>
-                <p className="text-sm text-[var(--color-app-text-muted)] mt-1 font-mono">{project.id}</p>
-                {project.description && (
-                  <p className="text-sm mt-3 max-w-xl leading-relaxed">{project.description}</p>
-                )}
-              </div>
-              <div className="text-left md:text-right space-y-2 shrink-0">
-                <Badge variant="default">{stageLabels[project.status]}</Badge>
-                <div className="text-sm">
-                  <p className="text-[var(--color-app-text-muted)] text-xs">Entrega estimada</p>
-                  <p className="font-semibold">
-                    {format(new Date(project.deadline), 'dd MMM yyyy', { locale: es })}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--color-app-text-muted)]">Avance global</span>
-                <span className="font-semibold">{project.progress}%</span>
-              </div>
-              <Progress value={project.progress} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Timeline de etapas */}
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-sm font-semibold text-[var(--color-app-text-muted)] uppercase tracking-wide mb-4">
-              Línea de tiempo
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            <h2 className="text-sm font-semibold text-[#8A9099] uppercase tracking-wide mb-4">Etapas del proyecto</h2>
+            <div className="flex items-center">
               {stageOrder.map((stage, i) => {
-                const isDone = i < currentStageIndex;
-                const isCurrent = i === currentStageIndex;
+                const done = i < currentStageIndex;
+                const current = i === currentStageIndex;
                 return (
-                  <div
-                    key={stage}
-                    className={cn(
-                      'p-3 rounded-md border text-center',
-                      isDone && 'bg-[var(--color-app-success-soft)] border-[var(--color-app-success)]/30',
-                      isCurrent && 'bg-[var(--color-app-primary-soft)] border-[var(--color-app-primary)]/30',
-                      !isDone && !isCurrent && 'bg-white border-[var(--color-app-border)]'
-                    )}
-                  >
-                    <div className="flex justify-center mb-1.5">
-                      {isDone ? (
-                        <CheckCircle2 className="h-5 w-5 text-[var(--color-app-success)]" />
-                      ) : isCurrent ? (
-                        <Clock className="h-5 w-5 text-[var(--color-app-primary)]" />
-                      ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-[var(--color-app-border-strong)]" />
-                      )}
-                    </div>
-                    <p
-                      className={cn(
-                        'text-xs font-medium',
-                        isDone && 'text-[var(--color-app-success)]',
-                        isCurrent && 'text-[var(--color-app-primary)]',
-                        !isDone && !isCurrent && 'text-[var(--color-app-text-muted)]'
-                      )}
-                    >
+                  <div key={stage} className="flex-1 flex flex-col items-center relative">
+                    {i > 0 && <span className="absolute top-3.5 right-1/2 w-full h-0.5" style={{ background: done || current ? accent : '#e2e2e2' }} />}
+                    <span className="relative z-10 h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold"
+                      style={done ? { background: accent, color: '#fff' } : current ? { background: '#fff', border: `2px solid ${accent}`, color: accent } : { background: '#efefef', color: '#aaa' }}>
+                      {done ? <CheckCircle2 className="h-4 w-4" /> : current ? <Clock className="h-4 w-4" /> : i + 1}
+                    </span>
+                    <span className={cn('text-[10px] mt-1.5 text-center leading-tight', current ? 'font-semibold' : 'text-[#8A9099]')} style={current ? { color: accent } : undefined}>
                       {stageLabels[stage]}
-                    </p>
+                    </span>
                   </div>
                 );
               })}
@@ -187,75 +142,59 @@ export function ClientPortal() {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <PortalKpi icon={Factory}      label="Partes en el proyecto" value={String(parts.length)} />
-          <PortalKpi icon={Package}      label="Inspecciones realizadas" value={String(inspectionsTotal)} />
-          <PortalKpi icon={ShieldCheck}  label="Inspecciones aprobadas"  value={String(inspectionsPassed)} />
-          <PortalKpi
-            icon={Calendar}
-            label="Días para entrega"
-            value={String(
-              Math.max(
-                0,
-                Math.ceil((new Date(project.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-              )
-            )}
-          />
+          <PortalKpi icon={Factory} label="Partes del proyecto" value={String(parts.length)} accent={accent} />
+          <PortalKpi icon={Package} label="Inspecciones" value={String(inspections.length)} accent={accent} />
+          <PortalKpi icon={ShieldCheck} label="Aprobadas" value={String(inspectionsPassed)} accent={accent} />
+          <PortalKpi icon={Calendar} label="Días para entrega" value={String(daysLeft)} accent={accent} />
         </div>
 
-        {/* Inspecciones recientes */}
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-sm font-semibold text-[var(--color-app-text-muted)] uppercase tracking-wide mb-4">
-              Inspecciones recientes
-            </h2>
-            {inspections.length === 0 ? (
-              <p className="text-sm text-[var(--color-app-text-muted)]">
-                Aún no hay inspecciones registradas.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {inspections.slice(0, 5).map(insp => (
-                  <div
-                    key={insp.id}
-                    className="flex items-center justify-between p-3 border border-[var(--color-app-border)] rounded-md"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{insp.inspection_type}</p>
-                      <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
-                        {format(new Date(insp.inspection_date), 'dd MMM yyyy', { locale: es })}
-                      </p>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Inspecciones */}
+          <Card className="lg:col-span-2">
+            <CardContent className="p-6">
+              <h2 className="text-sm font-semibold text-[#8A9099] uppercase tracking-wide mb-4">Inspecciones recientes</h2>
+              {inspections.length === 0 ? (
+                <p className="text-sm text-[#8A9099]">Aún no hay inspecciones registradas.</p>
+              ) : (
+                <div className="space-y-2">
+                  {inspections.slice(0, 6).map(insp => (
+                    <div key={insp.id} className="flex items-center justify-between p-3 border border-[#eee] rounded-md">
+                      <div>
+                        <p className="text-sm font-medium">{insp.inspection_type}</p>
+                        <p className="text-xs text-[#8A9099] mt-0.5">{format(new Date(insp.inspection_date), 'dd MMM yyyy', { locale: es })}</p>
+                      </div>
+                      <Badge variant={insp.result === 'Aprobado' ? 'success' : 'destructive'}>{insp.result}</Badge>
                     </div>
-                    <Badge variant={insp.result === 'Aprobado' ? 'success' : 'destructive'}>
-                      {insp.result}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Documentos compartidos */}
+          {/* QR para guardar el enlace */}
+          <Card>
+            <CardContent className="p-6 flex flex-col items-center text-center">
+              <h2 className="text-sm font-semibold text-[#8A9099] uppercase tracking-wide mb-3 flex items-center gap-1.5"><QrCode className="h-4 w-4" /> Guarda tu enlace</h2>
+              {qr ? <img src={qr} alt="QR del portal" className="w-36 h-36" /> : <div className="w-36 h-36 bg-[#eee] rounded" />}
+              <p className="text-xs text-[#8A9099] mt-3 leading-relaxed">Escanea con tu celular para volver a este seguimiento cuando quieras.</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Documentos */}
         {visibleFiles.length > 0 && (
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-sm font-semibold text-[var(--color-app-text-muted)] uppercase tracking-wide mb-4">
-                Documentos compartidos
-              </h2>
-              <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-[#8A9099] uppercase tracking-wide mb-4">Documentos compartidos</h2>
+              <div className="grid sm:grid-cols-2 gap-2">
                 {visibleFiles.map(file => (
-                  <div
-                    key={file.id}
-                    className="flex items-center gap-3 p-3 border border-[var(--color-app-border)] rounded-md"
-                  >
-                    <div className="h-9 w-9 rounded-md bg-[var(--color-app-primary-soft)] flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-[var(--color-app-primary)]" />
+                  <div key={file.id} className="flex items-center gap-3 p-3 border border-[#eee] rounded-md">
+                    <div className="h-9 w-9 rounded-md flex items-center justify-center" style={{ background: `${accent}18` }}>
+                      <FileText className="h-4 w-4" style={{ color: accent }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{file.file_name}</p>
-                      <p className="text-xs text-[var(--color-app-text-muted)] capitalize">
-                        {file.category.replace('_', ' ')}
-                      </p>
+                      <p className="text-xs text-[#8A9099] capitalize">{file.category.replace('_', ' ')}</p>
                     </div>
                   </div>
                 ))}
@@ -264,32 +203,28 @@ export function ClientPortal() {
           </Card>
         )}
 
-        <p className="text-center text-xs text-[var(--color-app-text-muted)] py-4">
-          KANRI · {new Date().getFullYear()}
+        <p className="text-center text-xs text-[#8A9099] py-4">
+          {brandName} · {new Date().getFullYear()} · <span className="opacity-70">powered by KANRI</span>
         </p>
       </main>
     </div>
   );
 }
 
-function PortalKpi({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
+function PortalKpi({ icon: Icon, label, value, accent }: {
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; value: string; accent: string;
 }) {
   return (
     <Card className="p-0">
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs text-[var(--color-app-text-muted)]">{label}</p>
+            <p className="text-xs text-[#8A9099]">{label}</p>
             <p className="text-2xl font-semibold mt-1">{value}</p>
           </div>
-          <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
+          <div className="h-8 w-8 rounded-md flex items-center justify-center" style={{ background: `${accent}18` }}>
+            <Icon className="h-4 w-4" style={{ color: accent }} />
+          </div>
         </div>
       </CardContent>
     </Card>

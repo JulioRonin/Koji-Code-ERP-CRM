@@ -104,9 +104,11 @@ export function useUpsertInstrument() {
         status: derived, notes: input.notes ?? null, updated_at: now,
       };
       if (!supabase) { setState({ loading: false, error: null }); return null; }
+      // El id de measurement_instruments es TEXT sin default: se genera al crear.
+      const newId = `INS-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
       const { data, error } = input.id
         ? await supabase.from('measurement_instruments').update(payload).eq('id', input.id).select('*').single()
-        : await supabase.from('measurement_instruments').insert(payload).select('*').single();
+        : await supabase.from('measurement_instruments').insert({ id: newId, ...payload }).select('*').single();
       if (error) throw error;
       setState({ loading: false, error: null });
       return data as MeasurementInstrument;

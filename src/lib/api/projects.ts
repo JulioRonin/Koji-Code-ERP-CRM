@@ -109,6 +109,38 @@ export function useCreateProject() {
 /**
  * Cambia el estado de un proyecto.
  */
+/**
+ * Fija el monto de VENTA del proyecto (projects.quote_amount). Se usa desde
+ * Finanzas → Rentabilidad (solo administradores llegan ahí); la RLS de
+ * escritura de projects ya exige rol admin/PM.
+ */
+export function useSetProjectSaleAmount() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const setAmount = useCallback(async (projectId: string, amount: number | null): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) { setState({ loading: false, error: null }); return; }
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ quote_amount: amount, updated_at: new Date().toISOString() })
+        .eq('id', projectId)
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('No se guardó la venta. Solo administradores pueden editar montos.');
+      }
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const e = err as Error;
+      setState({ loading: false, error: e });
+      throw e;
+    }
+  }, []);
+
+  return { setAmount, ...state };
+}
+
 export function useUpdateProjectStatus() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
 
