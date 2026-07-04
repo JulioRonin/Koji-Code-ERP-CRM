@@ -113,6 +113,14 @@ export interface CompanySettings {
   /** Modo del inventario: 'taller' (materia prima/refacciones) o 'insumos'
    *  (catálogo de productos para venta). */
   inventory_mode?: 'taller' | 'insumos' | null;
+  /** Anexo de Términos y Condiciones en cotizaciones (hoja adicional). */
+  quote_terms_enabled?: boolean | null;
+  /** Términos de pago (crédito, plazos, moneda…). */
+  terms_payment?: string | null;
+  /** Términos de anticipo (porcentaje, contra qué se libera…). */
+  terms_advance?: string | null;
+  /** Condiciones especiales (NDA/confidencialidad, garantías, penalizaciones…). */
+  terms_special?: string | null;
   created_at: string;
   updated_at: string;
 }

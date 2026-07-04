@@ -37,6 +37,10 @@ export const DEFAULT_COMPANY: CompanySettings = {
   dashboard_mode: null,
   quote_simple: null,
   inventory_mode: null,
+  quote_terms_enabled: null,
+  terms_payment: null,
+  terms_advance: null,
+  terms_special: null,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -132,6 +136,10 @@ export interface CompanySettingsInput {
   dashboard_mode?: 'operations' | 'sales' | null;
   quote_simple?: boolean | null;
   inventory_mode?: 'taller' | 'insumos' | null;
+  quote_terms_enabled?: boolean | null;
+  terms_payment?: string | null;
+  terms_advance?: string | null;
+  terms_special?: string | null;
 }
 
 /**
@@ -167,8 +175,13 @@ export function useUpdateCompanySettings() {
             .select('*');
           // Resiliencia: si aún no se corrió la migración de datos bancarios,
           // reintenta sin esas columnas para no bloquear el guardado.
-          if (error && /bank_|payment_notes|dashboard_mode|quote_simple|inventory_mode/i.test(error.message)) {
-            const { bank_name: _b, bank_account: _a, bank_clabe: _c2, bank_beneficiary: _be, payment_notes: _p, dashboard_mode: _dm, quote_simple: _qs, inventory_mode: _im, ...rest } = patch;
+          if (error && /bank_|payment_notes|dashboard_mode|quote_simple|inventory_mode|quote_terms|terms_/i.test(error.message)) {
+            const {
+              bank_name: _b, bank_account: _a, bank_clabe: _c2, bank_beneficiary: _be, payment_notes: _p,
+              dashboard_mode: _dm, quote_simple: _qs, inventory_mode: _im,
+              quote_terms_enabled: _qt, terms_payment: _tp, terms_advance: _ta, terms_special: _ts,
+              ...rest
+            } = patch;
             ({ data, error } = await supabase
               .from('company_settings')
               .update({ ...rest, updated_at: merged.updated_at })
