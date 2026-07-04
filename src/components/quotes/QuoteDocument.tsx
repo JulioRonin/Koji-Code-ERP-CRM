@@ -72,37 +72,90 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
         </div>
 
         {/* Document */}
-        <div id="quote-doc" className="flex-1 overflow-y-auto bg-white p-8 md:p-10 text-[#0f172a]">
-          {/* Letterhead */}
-          <div className="flex justify-between items-start border-b-2 pb-5 mb-6" style={{ borderColor: accent }}>
-            <div className="max-w-[60%]">
-              <div className="flex items-center gap-2.5">
-                {company.logo_url ? (
-                  <img src={company.logo_url} alt={brand} className="h-12 w-12 rounded-md object-contain bg-white border border-[#e2e8f0]" />
-                ) : (
-                  <div className="h-12 w-12 rounded-md flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: accent }}>
-                    {initial}
-                  </div>
-                )}
-                <div>
-                  <p className="text-lg font-bold leading-tight">{company.legal_name || brand}</p>
-                  {company.tagline && <p className="text-xs text-[#475569]">{company.tagline}</p>}
+        <div id="quote-doc" className="flex-1 overflow-y-auto bg-white text-[#0f172a]">
+
+          {/* ══════════ PÁGINA 1 · PORTADA ══════════ */}
+          <section className="p-8 md:p-12 flex flex-col" style={{ minHeight: '92vh' }}>
+            {/* Membrete superior */}
+            <div className="flex items-center gap-3 border-b-2 pb-5" style={{ borderColor: accent }}>
+              {company.logo_url ? (
+                <img src={company.logo_url} alt={brand} className="h-14 w-14 rounded-md object-contain bg-white border border-[#e2e8f0]" />
+              ) : (
+                <div className="h-14 w-14 rounded-md flex items-center justify-center text-white font-bold text-xl" style={{ backgroundColor: accent }}>
+                  {initial}
                 </div>
-              </div>
-              <div className="mt-2 text-[11px] text-[#475569] leading-relaxed">
-                {company.rfc && <p>RFC: <span className="font-mono">{company.rfc}</span></p>}
-                {addressLine && <p>{addressLine}</p>}
-                {(company.phone || company.email) && (
-                  <p>{[company.phone, company.email].filter(Boolean).join(' · ')}</p>
-                )}
+              )}
+              <div>
+                <p className="text-xl font-bold leading-tight">{company.legal_name || brand}</p>
+                {company.tagline && <p className="text-sm text-[#475569]">{company.tagline}</p>}
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xl font-bold" style={{ color: accent }}>COTIZACIÓN</p>
-              <p className="text-sm font-mono mt-0.5">{quote.id}</p>
-              <p className="text-xs text-[#475569] mt-1">
+
+            {/* Título grande centrado */}
+            <div className="flex-1 flex flex-col justify-center items-center text-center py-10">
+              <p className="text-sm font-semibold tracking-[0.35em] text-[#475569]">PROPUESTA COMERCIAL</p>
+              <h1 className="text-5xl md:text-6xl font-bold mt-3 mb-6" style={{ color: accent }}>COTIZACIÓN</h1>
+              <p className="text-lg font-mono">{quote.id}</p>
+              <p className="text-sm text-[#475569] mt-1">
                 {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
               </p>
+
+              {/* Tarjeta de resumen */}
+              <div className="mt-10 w-full max-w-md text-left rounded-lg border border-[#e2e8f0] overflow-hidden">
+                <div className="px-5 py-3 text-white text-sm font-semibold" style={{ backgroundColor: accent }}>
+                  Preparada para
+                </div>
+                <div className="px-5 py-4 space-y-2 text-sm">
+                  <div>
+                    <p className="text-xs text-[#475569] uppercase tracking-wide">Cliente</p>
+                    <p className="font-semibold text-base">{quote.client_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#475569] uppercase tracking-wide">Proyecto</p>
+                    <p className="font-medium">{quote.project_name}</p>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-[#e2e8f0]">
+                    <span className="text-[#475569]">
+                      Vigencia:{' '}
+                      <span className="font-medium text-[#0f172a]">
+                        {quote.valid_until
+                          ? format(new Date(quote.valid_until), 'dd MMM yyyy', { locale: es })
+                          : '30 días naturales'}
+                      </span>
+                    </span>
+                    <span className="text-right font-bold text-base" style={{ color: accent }}>
+                      {money(quote.subtotal + tax)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Datos del emisor al pie de la portada */}
+            <div className="border-t border-[#e2e8f0] pt-4 text-[11px] text-[#475569] leading-relaxed text-center">
+              {company.rfc && <span>RFC: <span className="font-mono">{company.rfc}</span></span>}
+              {addressLine && <p className="mt-0.5">{addressLine}</p>}
+              {(company.phone || company.email) && (
+                <p className="mt-0.5">{[company.phone, company.email].filter(Boolean).join(' · ')}</p>
+              )}
+            </div>
+          </section>
+
+          {/* ══════════ PÁGINA 2 · COTIZACIÓN ══════════ */}
+          <section className="p-8 md:p-12" style={{ breakBefore: 'page', pageBreakBefore: 'always' }}>
+          {/* Membrete compacto */}
+          <div className="flex justify-between items-center border-b-2 pb-3 mb-6" style={{ borderColor: accent }}>
+            <div className="flex items-center gap-2">
+              {company.logo_url ? (
+                <img src={company.logo_url} alt={brand} className="h-9 w-9 rounded object-contain border border-[#e2e8f0]" />
+              ) : (
+                <div className="h-9 w-9 rounded flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: accent }}>{initial}</div>
+              )}
+              <p className="font-bold text-sm">{company.legal_name || brand}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold" style={{ color: accent }}>COTIZACIÓN</p>
+              <p className="text-[11px] font-mono text-[#475569]">{quote.id}</p>
             </div>
           </div>
 
@@ -180,30 +233,6 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
             </div>
           </div>
 
-          {/* Datos para pago (transferencia) */}
-          {(company.bank_name || company.bank_clabe || company.bank_account) && (
-            <div className="mb-8 text-sm rounded-md border border-[#e2e8f0] p-4 bg-[#f8fafc]">
-              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: accent }}>
-                Datos para pago (transferencia)
-              </p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
-                {company.bank_beneficiary && (
-                  <p><span className="text-[#475569]">Beneficiario:</span> <span className="font-medium">{company.bank_beneficiary}</span></p>
-                )}
-                {company.bank_name && (
-                  <p><span className="text-[#475569]">Banco:</span> <span className="font-medium">{company.bank_name}</span></p>
-                )}
-                {company.bank_account && (
-                  <p><span className="text-[#475569]">Cuenta:</span> <span className="font-mono font-medium">{company.bank_account}</span></p>
-                )}
-                {company.bank_clabe && (
-                  <p><span className="text-[#475569]">CLABE:</span> <span className="font-mono font-medium">{company.bank_clabe}</span></p>
-                )}
-              </div>
-              {company.payment_notes && <p className="text-[#475569] text-xs mt-2">{company.payment_notes}</p>}
-            </div>
-          )}
-
           {/* Notas */}
           {quote.notes && (
             <div className="mb-8 text-sm">
@@ -217,7 +246,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
             <p>· Precios en {quote.currency}, sujetos a cambio sin previo aviso después de la vigencia.</p>
             <p>· Tiempo de entrega {quote.delivery_time ? `estimado: ${quote.delivery_time}` : 'a confirmar contra orden de compra'}.</p>
             <p>· No incluye fletes ni maniobras salvo indicación expresa.</p>
-            <p>· Condiciones de pago a convenir.</p>
+            <p>· Los términos de pago, anticipo, datos bancarios y condiciones especiales se detallan en la página siguiente.</p>
           </div>
 
           {/* Firma */}
@@ -235,76 +264,96 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
           <p className="text-center text-[10px] text-[#94a3b8] mt-10">
             {company.legal_name || brand} · {new Date().getFullYear()}
           </p>
+          </section>
 
-          {/* ── ANEXO: Términos y condiciones (hoja 2, configurable) ── */}
-          {company.quote_terms_enabled && (
-            <div style={{ breakBefore: 'page', pageBreakBefore: 'always' }} className="pt-8">
-              {/* Membrete compacto */}
-              <div className="flex justify-between items-center border-b-2 pb-3 mb-6" style={{ borderColor: accent }}>
-                <div className="flex items-center gap-2">
-                  {company.logo_url ? (
-                    <img src={company.logo_url} alt={brand} className="h-8 w-8 rounded object-contain border border-[#e2e8f0]" />
-                  ) : (
-                    <div className="h-8 w-8 rounded flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: accent }}>{initial}</div>
-                  )}
-                  <p className="font-bold text-sm">{company.legal_name || brand}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold" style={{ color: accent }}>TÉRMINOS Y CONDICIONES</p>
-                  <p className="text-[11px] font-mono text-[#475569]">Anexo de la cotización {quote.id}</p>
-                </div>
+          {/* ══════════ PÁGINA 3 · TÉRMINOS, BANCO E INFO FISCAL ══════════ */}
+          <section className="p-8 md:p-12" style={{ breakBefore: 'page', pageBreakBefore: 'always' }}>
+            {/* Membrete compacto */}
+            <div className="flex justify-between items-center border-b-2 pb-3 mb-6" style={{ borderColor: accent }}>
+              <div className="flex items-center gap-2">
+                {company.logo_url ? (
+                  <img src={company.logo_url} alt={brand} className="h-9 w-9 rounded object-contain border border-[#e2e8f0]" />
+                ) : (
+                  <div className="h-9 w-9 rounded flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: accent }}>{initial}</div>
+                )}
+                <p className="font-bold text-sm">{company.legal_name || brand}</p>
               </div>
-
-              <div className="space-y-5 text-sm">
-                {company.terms_payment && (
-                  <TermsSection n={1} title="Términos de pago" body={company.terms_payment} accent={accent} />
-                )}
-                {company.terms_advance && (
-                  <TermsSection n={2} title="Anticipo" body={company.terms_advance} accent={accent} />
-                )}
-
-                {(company.bank_name || company.bank_clabe || company.bank_account) && (
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: accent }}>
-                      {(company.terms_payment ? 1 : 0) + (company.terms_advance ? 1 : 0) + 1}. Cuenta para transferencias y depósitos
-                    </p>
-                    <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
-                      {company.bank_beneficiary && <p><span className="text-[#475569]">Beneficiario:</span> <span className="font-medium">{company.bank_beneficiary}</span></p>}
-                      {company.bank_name && <p><span className="text-[#475569]">Banco:</span> <span className="font-medium">{company.bank_name}</span></p>}
-                      {company.bank_account && <p><span className="text-[#475569]">Cuenta:</span> <span className="font-mono font-medium">{company.bank_account}</span></p>}
-                      {company.bank_clabe && <p><span className="text-[#475569]">CLABE:</span> <span className="font-mono font-medium">{company.bank_clabe}</span></p>}
-                      {company.payment_notes && <p className="col-span-2 text-[#475569] text-xs">{company.payment_notes}</p>}
-                    </div>
-                  </div>
-                )}
-
-                {company.terms_special && (
-                  <TermsSection
-                    n={(company.terms_payment ? 1 : 0) + (company.terms_advance ? 1 : 0) + ((company.bank_name || company.bank_clabe || company.bank_account) ? 1 : 0) + 1}
-                    title="Condiciones especiales y confidencialidad"
-                    body={company.terms_special}
-                    accent={accent}
-                  />
-                )}
+              <div className="text-right">
+                <p className="text-sm font-bold" style={{ color: accent }}>TÉRMINOS Y CONDICIONES</p>
+                <p className="text-[11px] font-mono text-[#475569]">Anexo de la cotización {quote.id}</p>
               </div>
-
-              {/* Aceptación del anexo */}
-              <div className="grid grid-cols-2 gap-16 mt-14">
-                <div className="border-t border-[#cbd5e1] pt-2 text-center">
-                  <p className="text-xs text-[#475569]">Por {company.legal_name || brand}</p>
-                  <p className="text-sm font-medium mt-1">{company.legal_rep || 'Nombre y firma'}</p>
-                </div>
-                <div className="border-t border-[#cbd5e1] pt-2 text-center">
-                  <p className="text-xs text-[#475569]">Acepto los términos y condiciones · {quote.client_name}</p>
-                  <p className="text-sm font-medium mt-1">Nombre, firma y fecha</p>
-                </div>
-              </div>
-
-              <p className="text-center text-[10px] text-[#94a3b8] mt-8">
-                Este anexo forma parte integral de la cotización {quote.id} · {company.legal_name || brand} · {new Date().getFullYear()}
-              </p>
             </div>
-          )}
+
+            <div className="space-y-5 text-sm">
+              {(() => {
+                // Numeración dinámica de las secciones presentes.
+                let n = 0;
+                const showTerms = company.quote_terms_enabled;
+                const hasBank = !!(company.bank_name || company.bank_clabe || company.bank_account);
+                return (
+                  <>
+                    {showTerms && company.terms_payment && (
+                      <TermsSection n={++n} title="Términos de pago" body={company.terms_payment} accent={accent} />
+                    )}
+                    {showTerms && company.terms_advance && (
+                      <TermsSection n={++n} title="Anticipo" body={company.terms_advance} accent={accent} />
+                    )}
+
+                    {hasBank && (
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: accent }}>
+                          {++n}. Cuenta para transferencias y depósitos
+                        </p>
+                        <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
+                          {company.bank_beneficiary && <p><span className="text-[#475569]">Beneficiario:</span> <span className="font-medium">{company.bank_beneficiary}</span></p>}
+                          {company.bank_name && <p><span className="text-[#475569]">Banco:</span> <span className="font-medium">{company.bank_name}</span></p>}
+                          {company.bank_account && <p><span className="text-[#475569]">Cuenta:</span> <span className="font-mono font-medium">{company.bank_account}</span></p>}
+                          {company.bank_clabe && <p><span className="text-[#475569]">CLABE:</span> <span className="font-mono font-medium">{company.bank_clabe}</span></p>}
+                          {company.payment_notes && <p className="col-span-2 text-[#475569] text-xs">{company.payment_notes}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Información fiscal del emisor */}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: accent }}>
+                        {++n}. Información fiscal
+                      </p>
+                      <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
+                        <p><span className="text-[#475569]">Razón social:</span> <span className="font-medium">{company.legal_name || brand}</span></p>
+                        {company.rfc && <p><span className="text-[#475569]">RFC:</span> <span className="font-mono font-medium">{company.rfc}</span></p>}
+                        {company.tax_regime && <p className="col-span-2"><span className="text-[#475569]">Régimen fiscal:</span> <span className="font-medium">{company.tax_regime}</span></p>}
+                        {addressLine && <p className="col-span-2"><span className="text-[#475569]">Domicilio fiscal:</span> <span className="font-medium">{addressLine}</span></p>}
+                        {(company.phone || company.email) && (
+                          <p className="col-span-2"><span className="text-[#475569]">Contacto:</span> <span className="font-medium">{[company.phone, company.email].filter(Boolean).join(' · ')}</span></p>
+                        )}
+                      </div>
+                    </div>
+
+                    {showTerms && company.terms_special && (
+                      <TermsSection n={++n} title="Condiciones especiales y confidencialidad" body={company.terms_special} accent={accent} />
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Aceptación del anexo */}
+            <div className="grid grid-cols-2 gap-16 mt-14">
+              <div className="border-t border-[#cbd5e1] pt-2 text-center">
+                <p className="text-xs text-[#475569]">Por {company.legal_name || brand}</p>
+                <p className="text-sm font-medium mt-1">{company.legal_rep || 'Nombre y firma'}</p>
+              </div>
+              <div className="border-t border-[#cbd5e1] pt-2 text-center">
+                <p className="text-xs text-[#475569]">Acepto los términos y condiciones · {quote.client_name}</p>
+                <p className="text-sm font-medium mt-1">Nombre, firma y fecha</p>
+              </div>
+            </div>
+
+            <p className="text-center text-[10px] text-[#94a3b8] mt-8">
+              Este anexo forma parte integral de la cotización {quote.id} · {company.legal_name || brand} · {new Date().getFullYear()}
+            </p>
+          </section>
         </div>
       </DialogContent>
     </Dialog>
