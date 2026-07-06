@@ -44,13 +44,35 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
 
   return (
     <Dialog open onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-4xl h-[92vh] p-0 overflow-hidden flex flex-col">
+      <DialogContent className="quote-print-root max-w-4xl h-[92vh] p-0 overflow-hidden flex flex-col">
         <style>{`
           @media print {
             @page { size: letter; margin: 14mm; }
+            html, body { height: auto !important; overflow: visible !important; }
             body * { visibility: hidden; }
             #quote-doc, #quote-doc * { visibility: visible; }
-            #quote-doc { position: absolute; left: 0; top: 0; width: 100%; }
+            /* El diálogo (Radix) recorta con overflow-hidden + alto fijo y se centra
+               con transform: sin neutralizarlo, la impresión corta el documento a
+               una sola página. Lo liberamos para que salgan TODAS las páginas. */
+            .quote-print-root {
+              position: static !important;
+              transform: none !important;
+              height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+              display: block !important;
+              box-shadow: none !important;
+              border: 0 !important;
+            }
+            #quote-doc {
+              position: absolute; left: 0; top: 0; width: 100%;
+              height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+            }
+            /* La portada centra su contenido con min-height en pantalla; en impresión
+               eso puede desbordar a una segunda hoja. La dejamos de alto automático. */
+            #quote-cover { min-height: 0 !important; }
             .no-print-quote { display: none !important; }
           }
         `}</style>
@@ -75,7 +97,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
         <div id="quote-doc" className="flex-1 overflow-y-auto bg-white text-[#0f172a]">
 
           {/* ══════════ PÁGINA 1 · PORTADA ══════════ */}
-          <section className="p-8 md:p-12 flex flex-col" style={{ minHeight: '92vh' }}>
+          <section id="quote-cover" className="p-8 md:p-12 flex flex-col" style={{ minHeight: '92vh' }}>
             {/* Membrete superior */}
             <div className="flex items-center gap-3 border-b-2 pb-5" style={{ borderColor: accent }}>
               {company.logo_url ? (
@@ -114,7 +136,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
                     <p className="text-xs text-[#475569] uppercase tracking-wide">Proyecto</p>
                     <p className="font-medium">{quote.project_name}</p>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-[#e2e8f0]">
+                  <div className="pt-2 border-t border-[#e2e8f0]">
                     <span className="text-[#475569]">
                       Vigencia:{' '}
                       <span className="font-medium text-[#0f172a]">
@@ -122,9 +144,6 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
                           ? format(new Date(quote.valid_until), 'dd MMM yyyy', { locale: es })
                           : '30 días naturales'}
                       </span>
-                    </span>
-                    <span className="text-right font-bold text-base" style={{ color: accent }}>
-                      {money(quote.subtotal + tax)}
                     </span>
                   </div>
                 </div>
