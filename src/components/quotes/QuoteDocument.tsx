@@ -49,29 +49,39 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
           @media print {
             @page { size: letter; margin: 14mm; }
             html, body { height: auto !important; overflow: visible !important; }
-            body * { visibility: hidden; }
-            #quote-doc, #quote-doc * { visibility: visible; }
-            /* El diálogo (Radix) recorta con overflow-hidden + alto fijo y se centra
-               con transform: sin neutralizarlo, la impresión corta el documento a
-               una sola página. Lo liberamos para que salgan TODAS las páginas. */
+            /* La app se monta en #root; el diálogo vive en un portal aparte (hermano
+               de #root). Ocultamos #root por completo para que su alto invisible NO
+               genere páginas en blanco al inicio. */
+            #root { display: none !important; }
+            /* Neutraliza el overlay oscuro del diálogo y cualquier otro resto. */
+            body * { visibility: hidden !important; }
+            #quote-doc, #quote-doc * { visibility: visible !important; }
+            /* El contenedor del diálogo está fixed, centrado con transform y con
+               overflow-hidden + alto fijo. Lo devolvemos al flujo normal para que
+               pagine de forma natural (sin position:absolute, que causaba páginas
+               en blanco y saltos erráticos). */
             .quote-print-root {
               position: static !important;
               transform: none !important;
+              inset: auto !important;
+              width: 100% !important;
+              max-width: 100% !important;
               height: auto !important;
               max-height: none !important;
               overflow: visible !important;
               display: block !important;
               box-shadow: none !important;
               border: 0 !important;
+              padding: 0 !important;
             }
             #quote-doc {
-              position: absolute; left: 0; top: 0; width: 100%;
+              position: static !important;
               height: auto !important;
               max-height: none !important;
               overflow: visible !important;
             }
-            /* La portada centra su contenido con min-height en pantalla; en impresión
-               eso puede desbordar a una segunda hoja. La dejamos de alto automático. */
+            /* En pantalla la portada se centra con min-height; en impresión la
+               dejamos de alto automático para no desbordar a una hoja extra. */
             #quote-cover { min-height: 0 !important; }
             .no-print-quote { display: none !important; }
           }
