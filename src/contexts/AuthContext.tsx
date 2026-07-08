@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { STAFF_MEMBERS, StaffMember } from '@/data/crmData';
 
@@ -60,6 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRecovery, setIsRecovery] = useState(false);
   const authMode: 'supabase' | 'demo' = isSupabaseConfigured ? 'supabase' : 'demo';
+  // Id del usuario de auth actualmente cargado. Sirve para IGNORAR los eventos
+  // de refresco de token (TOKEN_REFRESHED / SIGNED_IN re-emitido) que Supabase
+  // dispara cuando la pestaña recupera el foco: si el usuario no cambió, no
+  // recargamos el perfil ni hacemos setUser (eso re-renderizaba toda la app y
+  // borraba filtros, agrupaciones y scroll de los módulos).
+  const userIdRef = useRef<string | null>(null);
 
   // Restaura sesión al cargar
   useEffect(() => {
@@ -83,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Modo Supabase: hidratamos sesión + perfil
       const { data: sessionData } = await supabase.auth.getSession();
       if (sessionData.session?.user && !cancelled) {
+        userIdRef.current = sessionData.session.user.id;
         const profile = await fetchProfileAsStaffMember(sessionData.session.user.id);
         if (profile && !cancelled) setUser(profile);
       }
@@ -96,16 +103,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // fijar su nueva contraseña en lugar de dejarlo entrar al ERP.
         if (event === 'PASSWORD_RECOVERY') {
           setIsRecovery(true);
+          return;
         }
-        if (event === 'SIGNED_OUT') {
+        if (event === 'SIGNED_OUT' || !session?.user) {
           setIsRecovery(false);
-        }
-        if (session?.user) {
-          const profile = await fetchProfileAsStaffMember(session.user.id);
-          setUser(profile);
-        } else {
+          userIdRef.current = null;
           setUser(null);
+          return;
         }
+        // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION y el SIGNED_IN que
+        // Supabase re-emite al recuperar el foco de la pestaña traen el MISMO
+        // usuario. Si no cambió, NO recargamos el perfil ni hacemos setUser:
+        // así la app no se re-renderiza entera ni pierde filtros/scroll.
+        const newId = session.user.id;
+        if (newId === userIdRef.current) return;
+        // Inicio de sesión de un usuario distinto: cargamos su perfil.
+        userIdRef.current = newId;
+        const profile = await fetchProfileAsStaffMember(newId);
+        if (!cancelled) setUser(profile);
       });
 
       return () => listener.subscription.unsubscribe();
@@ -149,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               'Tu cuenta existe pero no tiene un perfil asociado. Pide a tu administrador que te registre en el módulo Personal.',
           };
         }
+        userIdRef.current = data.user.id;
         setUser(profile);
         setIsLoading(false);
         return { ok: true };
@@ -226,6 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (supabase) {
       supabase.auth.signOut();
     }
+    userIdRef.current = null;
     setUser(null);
     setIsRecovery(false);
     localStorage.removeItem(STORAGE_KEY);
