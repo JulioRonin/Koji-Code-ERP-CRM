@@ -56,7 +56,7 @@ export function AppShell() {
   // instante, datos/marca de otra empresa al entrar).
   if (tenantLoading) {
     return (
-      <div className="h-[100dvh] w-screen flex items-center justify-center bg-[var(--color-app-bg)]">
+      <div className="h-[100dvh] w-full flex items-center justify-center bg-[var(--color-app-bg)]">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--color-app-primary)]" />
       </div>
     );
@@ -68,7 +68,16 @@ export function AppShell() {
   }
 
   return (
-    <div className="h-[100dvh] w-screen overflow-hidden flex bg-[var(--color-app-bg)] text-[var(--color-app-text)] font-sans">
+    <div
+      className="h-[100dvh] w-full overflow-hidden flex bg-[var(--color-app-bg)] text-[var(--color-app-text)] font-sans"
+      style={{
+        // Safe-area del notch/barra iOS aplicado aquí (caja border-box: NO infla
+        // la altura), en lugar de en el <body> — que provocaba una segunda barra
+        // de scroll y el desfase del layout.
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
+    >
       {/* Sidebar — drawer en mobile, fijo en desktop */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 

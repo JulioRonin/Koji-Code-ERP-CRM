@@ -135,7 +135,7 @@ export function Quality() {
   const [dimItem, setDimItem] = useState<BomItem | null>(null);
 
   const { data: projects } = useProjects();
-  const { data: bomItems, refetch: refetchBom } = useBomItems(selectedProjectId || undefined);
+  const { data: bomItems, refetch: refetchBom, mutate: mutateBom } = useBomItems(selectedProjectId || undefined);
   const { data: dimReports, refetch: refetchDim } = useDimensionalReports(selectedProjectId || undefined);
   const { data: technicians } = useTechnicians();
   const { data: inspections } = useInspections();
@@ -234,6 +234,8 @@ export function Quality() {
     if (next === item.manufacturing_status) return;
     setBusyId(item.id);
     setError(null);
+    // Reflejamos el cambio al instante (optimista); el refetch reconcilia sin flash.
+    mutateBom(prev => prev.map(b => (b.id === item.id ? { ...b, manufacturing_status: next } : b)));
     try {
       await updateMfg(item.id, next);
       await refetchBom();
@@ -245,6 +247,7 @@ export function Quality() {
         );
       }
     } catch (err) {
+      await refetchBom(); // revertir al estado real del servidor
       setError((err as Error).message || 'No se pudo actualizar el estatus.');
     } finally {
       setBusyId(null);
