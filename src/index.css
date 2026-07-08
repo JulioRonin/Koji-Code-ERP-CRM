@@ -119,12 +119,20 @@ html, body {
   overscroll-behavior-y: none;
 }
 
-/* Safe areas (notch / barra inferior en iOS standalone) */
-@supports (padding: env(safe-area-inset-top)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
+/* Fijamos la cadena de alturas para que SOLO el contenedor interno de la app
+   tenga scroll. Sin esto, el <body> podía crecer (por el padding de safe-area)
+   y aparecía una SEGUNDA barra de scroll que desfasaba todo el layout. El
+   safe-area del notch ahora se maneja dentro del AppShell (caja border-box, no
+   infla la altura). Las páginas públicas (login/landing) siguen haciendo scroll
+   por el documento si su contenido es más alto que la ventana. */
+html, body {
+  height: 100%;
+}
+/* min-height (no height) para que las pantallas públicas más altas que la
+   ventana crezcan y hagan scroll por el documento; el AppShell usa su propio
+   alto fijo (100dvh) y gestiona su scroll interno. */
+#root {
+  min-height: 100%;
 }
 
 

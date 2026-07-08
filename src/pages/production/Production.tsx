@@ -86,8 +86,8 @@ export function Production() {
       setSelectedProjectId(inProd.id);
     }
   }, [projects, selectedProjectId]);
-  const { data: machines, refetch: refetchMachines } = useMachines();
-  const { data: workOrders, refetch: refetchWorkOrders } = useWorkOrders();
+  const { data: machines, refetch: refetchMachines, mutate: mutateMachines } = useMachines();
+  const { data: workOrders, refetch: refetchWorkOrders, mutate: mutateWorkOrders } = useWorkOrders();
   const { remove: removeMachine } = useDeleteMachine();
   const { update: updateMachineStatus } = useUpdateMachine();
   const { update: updateWorkOrder } = useUpdateWorkOrder();
@@ -102,6 +102,12 @@ export function Production() {
   // Liberar una máquina: cierra su orden activa y la regresa a Disponible.
   const releaseMachine = async (machineId: string) => {
     const activeWO = workOrders.find(w => w.machine_id === machineId && w.status === 'En Proceso');
+    // Optimista: la máquina se ve "Disponible" y su orden "Completado" al instante.
+    mutateMachines(prev => prev.map(m => (m.id === machineId ? { ...m, status: 'Disponible' } : m)));
+    if (activeWO) {
+      const end = new Date().toISOString();
+      mutateWorkOrders(prev => prev.map(w => (w.id === activeWO.id ? { ...w, status: 'Completado', actual_end: end } : w)));
+    }
     try {
       if (activeWO) {
         await updateWorkOrder(activeWO.id, { status: 'Completado', actual_end: new Date().toISOString() });
@@ -109,6 +115,7 @@ export function Production() {
       await updateMachineStatus(machineId, { status: 'Disponible' });
       await Promise.all([refetchMachines(), refetchWorkOrders()]);
     } catch (err) {
+      await Promise.all([refetchMachines(), refetchWorkOrders()]); // revertir
       window.alert((err as Error).message);
     }
   };

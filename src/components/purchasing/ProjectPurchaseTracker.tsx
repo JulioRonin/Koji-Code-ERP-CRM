@@ -181,7 +181,7 @@ interface Props {
  */
 export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
   const { data: projects } = useProjects();
-  const { data: allItems, refetch: refetchBom } = useBomItems();
+  const { data: allItems, refetch: refetchBom, mutate: mutateBom } = useBomItems();
   const { insert: bulkInsert, loading: inserting } = useBulkInsertBom();
   const { update: updateItem } = useUpdateBomItem();
   const { remove: deleteItem } = useDeleteBomItem();
@@ -330,10 +330,18 @@ export function ProjectPurchaseTracker({ projectId: lockedProjectId }: Props) {
 
   // ─── Edición inline de cada campo ─────────────────────────────────────
   const handlePatch = async (item: BomItem, patch: Partial<BomItem>) => {
+    // 1) Reflejamos el cambio de inmediato (optimista) para que el estatus y
+    //    los campos editados se vean al instante, sin esperar a la red.
+    mutateBom(prev => prev.map(b => (b.id === item.id ? { ...b, ...patch } : b)));
     try {
+      // 2) Persistimos en el servidor. Un refetch silencioso reconcilia sin
+      //    parpadeo (no vuelve a poner loading) — así no se pierden filtros
+      //    ni el scroll.
       await updateItem(item.id, patch);
       await refetchBom();
     } catch (err) {
+      // Si falla, recargamos para volver al estado real del servidor.
+      await refetchBom();
       flash((err as Error).message || 'No se pudo guardar.', 'error');
     }
   };

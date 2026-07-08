@@ -28,12 +28,18 @@ export function useAsync<T>(fn: () => Promise<T>, initialData: T, deps: unknown[
   // null = todavía no hay un fetch previo con datos reales para este contexto
   const lastRealNonEmptyRef = useRef<T | null>(null);
   const prevDepsRef = useRef<unknown[]>(deps);
+  // Ya se completó al menos una carga para este contexto. Sirve para NO volver
+  // a poner loading=true en los refetch (que provocaba parpadeos y que la UI
+  // dependiente del loading se reseteara). El spinner solo aparece en la carga
+  // inicial o al cambiar de contexto (deps).
+  const hasLoadedRef = useRef(false);
 
   // Si las deps cambiaron desde el render anterior, perdemos el "anchor"
-  // de datos previos (es otro contexto).
+  // de datos previos (es otro contexto) y volvemos a permitir el spinner.
   if (!shallowEqualArrays(prevDepsRef.current, deps)) {
     prevDepsRef.current = deps;
     lastRealNonEmptyRef.current = null;
+    hasLoadedRef.current = false;
   }
 
   useEffect(() => {
@@ -44,11 +50,14 @@ export function useAsync<T>(fn: () => Promise<T>, initialData: T, deps: unknown[
   }, []);
 
   const execute = useCallback(async () => {
-    setLoading(true);
+    // Solo mostramos loading en la carga inicial (o al cambiar de contexto).
+    // Los refetch posteriores son silenciosos: conservan los datos en pantalla.
+    if (!hasLoadedRef.current) setLoading(true);
     setError(null);
     try {
       const result = await fn();
       if (mountedRef.current) {
+        hasLoadedRef.current = true;
         const resultIsEmptyArray = Array.isArray(result) && result.length === 0;
         const anchorHadRealData =
           lastRealNonEmptyRef.current != null &&
@@ -83,7 +92,19 @@ export function useAsync<T>(fn: () => Promise<T>, initialData: T, deps: unknown[
     execute();
   }, [execute]);
 
-  return { data, loading, error, refetch: execute };
+  // Actualización optimista local (sin red). Mantiene el "anchor" en sync para
+  // que un refetch posterior vacío no borre el cambio.
+  const mutate = useCallback((updater: (prev: T) => T) => {
+    setData(prev => {
+      const next = updater(prev);
+      if (Array.isArray(next) && next.length > 0) {
+        lastRealNonEmptyRef.current = next as T;
+      }
+      return next;
+    });
+  }, []);
+
+  return { data, loading, error, refetch: execute, mutate };
 }
 
 function shallowEqualArrays(a: unknown[], b: unknown[]): boolean {

@@ -63,7 +63,7 @@ interface ProjectGroup {
 export function TechnicianDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { data: allBomItems, refetch: refetchBom } = useBomItems();
+  const { data: allBomItems, refetch: refetchBom, mutate: mutateBom } = useBomItems();
   const { data: projects } = useProjects();
   const { update: updateMfg } = useUpdateManufacturingStatus();
 
@@ -165,10 +165,13 @@ export function TechnicianDashboard() {
     if (next === item.manufacturing_status) return;
     setBusyId(item.id);
     setError(null);
+    // Optimista: la tarjeta cambia de estatus al instante.
+    mutateBom(prev => prev.map(b => (b.id === item.id ? { ...b, manufacturing_status: next } : b)));
     try {
       await updateMfg(item.id, next);
       await refetchBom();
     } catch (err) {
+      await refetchBom(); // revertir al estado real del servidor
       setError((err as Error).message || 'No se pudo actualizar el estatus.');
     } finally {
       setBusyId(null);
