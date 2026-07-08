@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   DEFAULT_TENANT,
@@ -57,6 +57,12 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   // resolvemos la empresa real del usuario autenticado.
   const [tenant, setTenant] = useState<Tenant>(DEFAULT_TENANT);
   const [loading, setLoading] = useState(true);
+  // Id del usuario de auth ya resuelto. Evita que los eventos de refresco de
+  // token (TOKEN_REFRESHED / SIGNED_IN re-emitido al recuperar el foco de la
+  // pestaña) vuelvan a resolver la empresa y pongan loading=true — eso hacía
+  // que el AppShell mostrara el spinner y REMONTARA el módulo, perdiendo
+  // proyecto, tab, filtros y scroll.
+  const authUserIdRef = useRef<string | null>(null);
 
   const apply = useCallback((t: Tenant) => {
     setTenant(t);
@@ -100,14 +106,42 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   }, [apply]);
 
-  // Resuelve al montar y cuando cambia la sesión (login/logout).
+  // Resuelve al montar y SOLO cuando cambia el usuario de la sesión
+  // (login de otro usuario / logout). Los refrescos de token no re-resuelven.
   useEffect(() => {
-    loadActive();
-    if (!supabase) return;
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      loadActive();
-    });
-    return () => sub.subscription.unsubscribe();
+    let unsub = () => {};
+    const start = async () => {
+      // Fijamos el id actual ANTES de suscribirnos, para que el evento
+      // INITIAL_SESSION (mismo usuario) no dispare una recarga extra.
+      if (supabase) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          authUserIdRef.current = data.session?.user?.id ?? null;
+        } catch {
+          /* ignore */
+        }
+      }
+      await loadActive();
+      if (!supabase) return;
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+        const uid = session?.user?.id ?? null;
+        // Cierre de sesión o sin usuario: re-resolvemos (vuelve al genérico).
+        if (!uid) {
+          authUserIdRef.current = null;
+          loadActive();
+          return;
+        }
+        // Mismo usuario (token refresh / SIGNED_IN re-emitido al enfocar la
+        // pestaña): NO hacemos nada — así no se remonta el módulo.
+        if (uid === authUserIdRef.current) return;
+        // Usuario distinto (login real de otra cuenta): re-resolvemos su empresa.
+        authUserIdRef.current = uid;
+        loadActive();
+      });
+      unsub = () => sub.subscription.unsubscribe();
+    };
+    start();
+    return () => unsub();
   }, [loadActive]);
 
   const refresh = useCallback(() => loadActive(), [loadActive]);

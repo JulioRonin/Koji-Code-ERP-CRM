@@ -47,6 +47,34 @@ interface TechRow {
   counts: Record<ManufacturingStatus, number>;
 }
 
+function StatTile({
+  label, hint, value, suffix, color, emphasis,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  suffix: string;
+  color: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-xl border p-4"
+      style={{
+        borderColor: emphasis ? color : 'var(--color-app-border)',
+        background: emphasis ? 'color-mix(in srgb, var(--color-app-primary) 7%, white)' : 'white',
+      }}
+    >
+      <div className="text-xs font-medium text-[var(--color-app-text-muted)]">{label}</div>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="text-2xl font-bold tabular-nums" style={{ color }}>{value}</span>
+        <span className="text-xs text-[var(--color-app-text-muted)]">{suffix}</span>
+      </div>
+      <div className="mt-0.5 text-[11px] text-[var(--color-app-text-subtle)]">{hint}</div>
+    </div>
+  );
+}
+
 export function ProductionStatusReport({ projectName, selectedProjectId, bomItems }: Props) {
   const { data: technicians } = useTechnicians();
 
@@ -122,8 +150,26 @@ export function ProductionStatusReport({ projectName, selectedProjectId, bomItem
 
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
+  // Producción real = lo que ya salió de máquina (en calidad + terminado).
+  const realProduced = byStatus.CALIDAD + byStatus.TERMINADO;
+
   return (
     <div className="space-y-6">
+      {/* Tiles de resumen */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatTile
+          label="Producción real"
+          hint="en calidad + terminadas"
+          value={realProduced}
+          suffix={`${pct(realProduced)}%`}
+          color="var(--color-app-primary)"
+          emphasis
+        />
+        <StatTile label="Terminadas" hint="aprobadas" value={byStatus.TERMINADO} suffix={`${pct(byStatus.TERMINADO)}%`} color="var(--color-app-success)" />
+        <StatTile label="En proceso" hint="en el piso" value={byStatus['EN PROCESO']} suffix="WIP" color="var(--color-app-warning)" />
+        <StatTile label="Total piezas" hint={`${totalQty.toLocaleString('es-MX')} unidades`} value={total} suffix="a fabricar" color="var(--color-app-text)" />
+      </div>
+
       {/* Distribución por estatus */}
       <Card className="p-0">
         <CardHeader className="pb-3">
