@@ -141,7 +141,7 @@ export function ShareClientLinkModal({ project, open, onClose }: ShareClientLink
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-md sm:max-w-lg">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share2 className="h-4 w-4 text-[var(--color-app-text-muted)]" />

@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Send,
   CheckCircle2,
+  Layers,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -40,6 +41,7 @@ import {
 import {
   useQuotes,
   useCreateQuote,
+  useDeleteQuote,
   useCustomers,
   useInventoryItems,
   useMaterialPrices,
@@ -60,6 +62,8 @@ const statusBadge: Record<QuoteStatus, 'secondary' | 'default' | 'success' | 'de
   Expirada:   'warning',
 };
 
+const QUOTE_STATUSES: QuoteStatus[] = ['Borrador', 'Enviada', 'Aprobada', 'Rechazada', 'Convertida', 'Expirada'];
+
 const tabs = [
   { id: 'quotes', label: 'Cotizaciones',          icon: Calculator },
   { id: 'prices', label: 'Precios de materiales', icon: DollarSign },
@@ -72,12 +76,49 @@ const money = (n: number) =>
 export function Quotes() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('quotes');
-  const { data: quotes, refetch: refetchQuotes } = useQuotes();
+  const { data: quotes, refetch: refetchQuotes, mutate: mutateQuotes } = useQuotes();
   const { create: createQuote, loading: creating } = useCreateQuote();
+  const { remove: deleteQuote } = useDeleteQuote();
   const { data: customers } = useCustomers();
 
   const [showNew, setShowNew] = useState(false);
   const [draft, setDraft] = useState({ client: '', project: '', email: '', customerId: '', delivery: '', publicSale: false });
+
+  // Filtros y agrupación del historial.
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'TODOS'>('TODOS');
+  const [groupByStatus, setGroupByStatus] = useState(false);
+
+  const visibleQuotes = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return quotes.filter(row => {
+      if (statusFilter !== 'TODOS' && row.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        row.id.toLowerCase().includes(q) ||
+        row.project_name.toLowerCase().includes(q) ||
+        row.client_name.toLowerCase().includes(q)
+      );
+    });
+  }, [quotes, search, statusFilter]);
+
+  const groupedQuotes = useMemo(() => {
+    if (!groupByStatus) return null;
+    return QUOTE_STATUSES
+      .map(s => ({ status: s, rows: visibleQuotes.filter(q => q.status === s) }))
+      .filter(g => g.rows.length > 0);
+  }, [visibleQuotes, groupByStatus]);
+
+  const handleDeleteQuote = async (id: string) => {
+    if (!window.confirm(`¿Eliminar la cotización ${id}? Se borran también sus partidas. Esta acción no se puede deshacer.`)) return;
+    mutateQuotes(prev => prev.filter(q => q.id !== id)); // optimista
+    try {
+      await deleteQuote(id);
+    } catch (err) {
+      await refetchQuotes();
+      window.alert((err as Error).message || 'No se pudo eliminar la cotización.');
+    }
+  };
 
   const stats = useMemo(() => {
     const open = quotes.filter(q => q.status === 'Borrador' || q.status === 'Enviada');
@@ -155,52 +196,59 @@ export function Quotes() {
       {activeTab === 'quotes' && (
         <Card className="p-0">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Historial de cotizaciones</CardTitle>
-            <CardDescription>Haz clic en una cotización para editarla o generar el documento.</CardDescription>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Historial de cotizaciones</CardTitle>
+                <CardDescription>Haz clic en una cotización para editarla o generar el documento.</CardDescription>
+              </div>
+              {/* Toolbar: buscar · filtrar por estatus · agrupar */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative w-full sm:w-56">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
+                  <Input placeholder="Buscar ID, proyecto o cliente…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as QuoteStatus | 'TODOS')}
+                  className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
+                >
+                  <option value="TODOS">Todos los estados</option>
+                  {QUOTE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <Button
+                  variant={groupByStatus ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-9"
+                  onClick={() => setGroupByStatus(v => !v)}
+                >
+                  <Layers className="h-4 w-4 mr-1.5" /> Agrupar por estatus
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             {quotes.length === 0 ? (
               <div className="text-center py-12 text-sm text-[var(--color-app-text-muted)]">
                 No hay cotizaciones. Crea la primera arriba.
               </div>
+            ) : visibleQuotes.length === 0 ? (
+              <div className="text-center py-12 text-sm text-[var(--color-app-text-muted)]">
+                Sin resultados para el filtro actual.
+              </div>
+            ) : groupedQuotes ? (
+              <div className="divide-y divide-[var(--color-app-border)]">
+                {groupedQuotes.map(g => (
+                  <div key={g.status}>
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-app-surface-alt)]">
+                      <Badge variant={statusBadge[g.status]}>{g.status}</Badge>
+                      <span className="text-xs text-[var(--color-app-text-muted)]">{g.rows.length} cotización{g.rows.length === 1 ? '' : 'es'}</span>
+                    </div>
+                    <QuotesTable rows={g.rows} onOpen={id => navigate(`/quotes/${id}`)} onDelete={handleDeleteQuote} hideStatus />
+                  </div>
+                ))}
+              </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Proyecto / cliente</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="hidden md:table-cell">Creada</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {quotes.map(q => (
-                    <TableRow key={q.id} className="cursor-pointer" onClick={() => navigate(`/quotes/${q.id}`)}>
-                      <TableCell className="font-mono text-xs">{q.id}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-sm">{q.project_name}</span>
-                          <span className="text-xs text-[var(--color-app-text-muted)]">{q.client_name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusBadge[q.status]}>{q.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {q.total > 0 ? money(q.total) : '—'}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell text-sm text-[var(--color-app-text-muted)]">
-                        {format(new Date(q.created_at), 'dd MMM yyyy', { locale: es })}
-                      </TableCell>
-                      <TableCell>
-                        <ChevronRight className="h-4 w-4 text-[var(--color-app-text-subtle)]" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <QuotesTable rows={visibleQuotes} onOpen={id => navigate(`/quotes/${id}`)} onDelete={handleDeleteQuote} />
             )}
           </CardContent>
         </Card>
@@ -291,6 +339,71 @@ export function Quotes() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function QuotesTable({
+  rows,
+  onOpen,
+  onDelete,
+  hideStatus,
+}: {
+  rows: import('@/types/database').Quote[];
+  onOpen: (id: string) => void;
+  onDelete: (id: string) => void;
+  hideStatus?: boolean;
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>ID</TableHead>
+          <TableHead>Proyecto / cliente</TableHead>
+          {!hideStatus && <TableHead>Estado</TableHead>}
+          <TableHead className="text-right">Total</TableHead>
+          <TableHead className="hidden md:table-cell">Creada</TableHead>
+          <TableHead className="w-20 text-right">Acciones</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map(q => (
+          <TableRow key={q.id} className="cursor-pointer" onClick={() => onOpen(q.id)}>
+            <TableCell className="font-mono text-xs">{q.id}</TableCell>
+            <TableCell>
+              <div className="flex flex-col">
+                <span className="font-medium text-sm">{q.project_name}</span>
+                <span className="text-xs text-[var(--color-app-text-muted)]">{q.client_name}</span>
+              </div>
+            </TableCell>
+            {!hideStatus && (
+              <TableCell>
+                <Badge variant={statusBadge[q.status]}>{q.status}</Badge>
+              </TableCell>
+            )}
+            <TableCell className="text-right font-semibold tabular-nums">
+              {q.total > 0 ? money(q.total) : '—'}
+            </TableCell>
+            <TableCell className="hidden md:table-cell text-sm text-[var(--color-app-text-muted)]">
+              {format(new Date(q.created_at), 'dd MMM yyyy', { locale: es })}
+            </TableCell>
+            <TableCell className="text-right">
+              <div className="inline-flex items-center gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-[var(--color-app-danger)]"
+                  title="Eliminar cotización"
+                  onClick={e => { e.stopPropagation(); onDelete(q.id); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+                <ChevronRight className="h-4 w-4 text-[var(--color-app-text-subtle)]" />
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
