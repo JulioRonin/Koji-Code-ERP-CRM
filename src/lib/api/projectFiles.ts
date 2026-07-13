@@ -337,3 +337,42 @@ export function useDetachDrawing() {
 
   return { detach, ...state };
 }
+
+/**
+ * Elimina un archivo de proyecto (row de project_files + binario en Storage).
+ * En modo demo solo borra el metadata en localStorage.
+ */
+export function useDeleteProjectFile() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const remove = useCallback(async (file: ProjectFile): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        const key = `koji_demo_files_${file.project_id}`;
+        try {
+          const raw = localStorage.getItem(key);
+          const existing: ProjectFile[] = raw ? JSON.parse(raw) : [];
+          localStorage.setItem(key, JSON.stringify(existing.filter(f => f.id !== file.id)));
+        } catch {
+          /* ignore */
+        }
+        setState({ loading: false, error: null });
+        return;
+      }
+      // Borra el binario (si falla, seguimos con el row para no dejar huérfano el registro).
+      if (file.storage_path) {
+        await supabase.storage.from(BUCKET).remove([file.storage_path]).catch(() => {});
+      }
+      const { error } = await supabase.from('project_files').delete().eq('id', file.id);
+      if (error) throw error;
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const error = err as Error;
+      setState({ loading: false, error });
+      throw error;
+    }
+  }, []);
+
+  return { remove, ...state };
+}

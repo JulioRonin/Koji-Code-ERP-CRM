@@ -53,6 +53,7 @@ import { MasterPlanTaskList } from '@/components/projects/MasterPlanTaskList';
 import { AdHocTaskForm } from '@/components/projects/AdHocTaskForm';
 import { MeetingsCard } from '@/components/projects/MeetingsCard';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
+import { ProjectImagesCard } from '@/components/projects/ProjectImagesCard';
 import {
   useProject,
   useUpdateProjectStatus,
@@ -580,6 +581,8 @@ export function ProjectDetails() {
               </Button>
             </CardContent>
           </Card>
+
+          <ProjectImagesCard projectId={project.id} />
 
           <Card>
             <CardHeader className="pb-3">

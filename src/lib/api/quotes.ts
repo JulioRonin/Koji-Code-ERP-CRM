@@ -423,6 +423,36 @@ export function useUpdateQuote() {
 }
 
 /**
+ * Elimina una cotización y sus partidas.
+ */
+export function useDeleteQuote() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const remove = useCallback(async (id: string): Promise<void> => {
+    setState({ loading: true, error: null });
+    try {
+      if (!supabase) {
+        writeDemo(DEMO_QUOTES_KEY, readDemo<Quote>(DEMO_QUOTES_KEY).filter(q => q.id !== id));
+        writeDemo(DEMO_QUOTE_ITEMS_KEY, readDemo<QuoteItem>(DEMO_QUOTE_ITEMS_KEY).filter(i => i.quote_id !== id));
+        setState({ loading: false, error: null });
+        return;
+      }
+      // Borramos primero las partidas (por si no hay ON DELETE CASCADE).
+      await supabase.from('quote_items').delete().eq('quote_id', id);
+      const { error } = await supabase.from('quotes').delete().eq('id', id);
+      if (error) throw error;
+      setState({ loading: false, error: null });
+    } catch (err) {
+      const e = err as Error;
+      setState({ loading: false, error: e });
+      throw e;
+    }
+  }, []);
+
+  return { remove, ...state };
+}
+
+/**
  * Reemplaza el set completo de items de una quote (patrón save-all del builder)
  * y actualiza subtotal/total en la quote.
  */

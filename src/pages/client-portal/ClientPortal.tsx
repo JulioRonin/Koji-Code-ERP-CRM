@@ -5,13 +5,17 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   Factory, CheckCircle2, Clock, ShieldCheck, Package, FileText, Calendar, Lock, QrCode,
+  ListChecks, Image as ImageIcon, Circle,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { useClientPortalData } from '@/lib/api';
-import type { ProjectStatus } from '@/types/database';
+import { useClientPortalData, getFileDownloadUrl } from '@/lib/api';
+import type { ProjectStatus, ProjectFile } from '@/types/database';
 import { cn } from '@/lib/utils';
+
+const IMG_RE = /\.(png|jpe?g|webp|gif|bmp|avif)$/i;
+const isImageFile = (f: ProjectFile) =>
+  f.category === 'Foto' || (f.mime_type?.startsWith('image/') ?? false) || IMG_RE.test(f.file_name);
 
 const stageOrder: ProjectStatus[] = ['Cotización', 'Diseño', 'Compras', 'En Producción', 'Calidad', 'Embarque', 'Entregado'];
 const stageLabels: Record<ProjectStatus, string> = {
@@ -25,7 +29,7 @@ const KANRI_ACCENT = '#E2401F';
 export function ClientPortal() {
   const { token } = useParams<{ token: string }>();
   const { data, loading } = useClientPortalData(token);
-  const { project, parts, inspections, visibleFiles, brand } = data;
+  const { project, parts, visibleFiles, brand } = data;
 
   const accent = brand?.primary_color && /^#[0-9a-fA-F]{6}$/.test(brand.primary_color) ? brand.primary_color : KANRI_ACCENT;
   const brandName = brand?.name || 'KANRI';
@@ -35,7 +39,31 @@ export function ClientPortal() {
     return stageOrder.indexOf(project.status);
   }, [project]);
 
-  const inspectionsPassed = inspections.filter(i => i.result === 'Aprobado').length;
+  // Conteos reales a partir de las piezas (bom_items). Las inspecciones formales
+  // (quality_inspections) suelen estar vacías; el estatus de fabricación de cada
+  // pieza es el dato real de calidad.
+  const prodParts = useMemo(() => parts.filter(p => p.production_relevant !== false), [parts]);
+  const approvedParts = prodParts.filter(p => p.manufacturing_status === 'TERMINADO').length;
+  const inQualityParts = prodParts.filter(p => p.manufacturing_status === 'CALIDAD').length;
+  // "Inspeccionadas" = todo lo que ya pasó (o está en) control de calidad.
+  const inspectedParts = approvedParts + inQualityParts + prodParts.filter(p => p.manufacturing_status === 'RECHAZADO').length;
+
+  // Separa archivos visibles en imágenes (galería) y documentos.
+  const imageFiles = useMemo(() => visibleFiles.filter(isImageFile), [visibleFiles]);
+  const docFiles = useMemo(() => visibleFiles.filter(f => !isImageFile(f)), [visibleFiles]);
+
+  // Resuelve URLs (firmadas) de las imágenes para mostrarlas en la galería.
+  const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        imageFiles.map(async f => [f.id, (await getFileDownloadUrl(f.storage_path)) ?? ''] as const)
+      );
+      if (!cancelled) setImgUrls(Object.fromEntries(entries.filter(([, u]) => u)));
+    })();
+    return () => { cancelled = true; };
+  }, [imageFiles]);
 
   const [qr, setQr] = useState<string | null>(null);
   useEffect(() => {
@@ -142,32 +170,48 @@ export function ClientPortal() {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <PortalKpi icon={Factory} label="Partes del proyecto" value={String(parts.length)} accent={accent} />
-          <PortalKpi icon={Package} label="Inspecciones" value={String(inspections.length)} accent={accent} />
-          <PortalKpi icon={ShieldCheck} label="Aprobadas" value={String(inspectionsPassed)} accent={accent} />
+          <PortalKpi icon={Factory} label="Partes del proyecto" value={String(prodParts.length)} accent={accent} />
+          <PortalKpi icon={Package} label="Inspeccionadas" value={String(inspectedParts)} accent={accent} sub={`${inQualityParts} en calidad`} />
+          <PortalKpi icon={ShieldCheck} label="Aprobadas" value={String(approvedParts)} accent={accent} sub={prodParts.length > 0 ? `${Math.round((approvedParts / prodParts.length) * 100)}%` : undefined} />
           <PortalKpi icon={Calendar} label="Días para entrega" value={String(daysLeft)} accent={accent} />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Inspecciones */}
+          {/* Hitos del proyecto */}
           <Card className="lg:col-span-2">
             <CardContent className="p-6">
-              <h2 className="text-sm font-semibold text-[#8A9099] uppercase tracking-wide mb-4">Inspecciones recientes</h2>
-              {inspections.length === 0 ? (
-                <p className="text-sm text-[#8A9099]">Aún no hay inspecciones registradas.</p>
-              ) : (
-                <div className="space-y-2">
-                  {inspections.slice(0, 6).map(insp => (
-                    <div key={insp.id} className="flex items-center justify-between p-3 border border-[#eee] rounded-md">
-                      <div>
-                        <p className="text-sm font-medium">{insp.inspection_type}</p>
-                        <p className="text-xs text-[#8A9099] mt-0.5">{format(new Date(insp.inspection_date), 'dd MMM yyyy', { locale: es })}</p>
+              <h2 className="text-sm font-semibold text-[#8A9099] uppercase tracking-wide mb-4 flex items-center gap-1.5">
+                <ListChecks className="h-4 w-4" /> Hitos del proyecto
+              </h2>
+              <div className="space-y-2">
+                {stageOrder.map((stage, i) => {
+                  const done = currentStageIndex > i;
+                  const current = currentStageIndex === i;
+                  const state = done ? 'Completado' : current ? 'En curso' : 'Pendiente';
+                  return (
+                    <div key={stage} className="flex items-center justify-between p-3 border border-[#eee] rounded-md">
+                      <div className="flex items-center gap-3">
+                        {done ? (
+                          <CheckCircle2 className="h-4 w-4" style={{ color: accent }} />
+                        ) : current ? (
+                          <Clock className="h-4 w-4" style={{ color: accent }} />
+                        ) : (
+                          <Circle className="h-4 w-4 text-[#cbd5e1]" />
+                        )}
+                        <div>
+                          <p className={cn('text-sm', current ? 'font-semibold' : 'font-medium')}>{stageLabels[stage]}</p>
+                          {stage === 'Entregado' && (
+                            <p className="text-xs text-[#8A9099] mt-0.5">
+                              Entrega estimada: {format(new Date(project.deadline), 'dd MMM yyyy', { locale: es })}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <Badge variant={insp.result === 'Aprobado' ? 'success' : 'destructive'}>{insp.result}</Badge>
+                      <Badge variant={done ? 'success' : current ? 'default' : 'secondary'}>{state}</Badge>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
 
@@ -181,13 +225,47 @@ export function ClientPortal() {
           </Card>
         </div>
 
+        {/* Galería de imágenes del proyecto */}
+        {imageFiles.length > 0 && (
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="text-sm font-semibold text-[#8A9099] uppercase tracking-wide mb-4 flex items-center gap-1.5">
+                <ImageIcon className="h-4 w-4" /> Imágenes del proyecto
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {imageFiles.map(file => {
+                  const url = imgUrls[file.id];
+                  return (
+                    <a
+                      key={file.id}
+                      href={url || undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block rounded-lg overflow-hidden border border-[#eee] bg-[#f4f4f2] aspect-square"
+                      title={file.file_name}
+                    >
+                      {url ? (
+                        <img src={url} alt={file.file_name} className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <ImageIcon className="h-6 w-6 text-[#cbd5e1]" />
+                        </div>
+                      )}
+                    </a>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Documentos */}
-        {visibleFiles.length > 0 && (
+        {docFiles.length > 0 && (
           <Card>
             <CardContent className="p-6">
               <h2 className="text-sm font-semibold text-[#8A9099] uppercase tracking-wide mb-4">Documentos compartidos</h2>
               <div className="grid sm:grid-cols-2 gap-2">
-                {visibleFiles.map(file => (
+                {docFiles.map(file => (
                   <div key={file.id} className="flex items-center gap-3 p-3 border border-[#eee] rounded-md">
                     <div className="h-9 w-9 rounded-md flex items-center justify-center" style={{ background: `${accent}18` }}>
                       <FileText className="h-4 w-4" style={{ color: accent }} />
@@ -211,8 +289,8 @@ export function ClientPortal() {
   );
 }
 
-function PortalKpi({ icon: Icon, label, value, accent }: {
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; value: string; accent: string;
+function PortalKpi({ icon: Icon, label, value, accent, sub }: {
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; value: string; accent: string; sub?: string;
 }) {
   return (
     <Card className="p-0">
@@ -221,6 +299,7 @@ function PortalKpi({ icon: Icon, label, value, accent }: {
           <div>
             <p className="text-xs text-[#8A9099]">{label}</p>
             <p className="text-2xl font-semibold mt-1">{value}</p>
+            {sub && <p className="text-[11px] text-[#8A9099] mt-0.5">{sub}</p>}
           </div>
           <div className="h-8 w-8 rounded-md flex items-center justify-center" style={{ background: `${accent}18` }}>
             <Icon className="h-4 w-4" style={{ color: accent }} />
