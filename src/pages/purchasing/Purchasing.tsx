@@ -20,6 +20,7 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
+import { NewCorrectiveActionButton } from '@/components/quality/NewCorrectiveActionButton';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -206,6 +207,7 @@ export function Purchasing() {
             Requisiciones, órdenes de compra y proveedores.
           </p>
         </div>
+        <NewCorrectiveActionButton area="Compras" />
       </div>
 
       {/* KPI cards — desglose por estatus de compra del BOM activo */}

@@ -12,6 +12,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
+import { NewCorrectiveActionButton } from '@/components/quality/NewCorrectiveActionButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -154,9 +155,12 @@ export function Production() {
             Monitoreo de piso, máquinas y órdenes de trabajo.
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-1.5" /> Nueva orden de trabajo
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <NewCorrectiveActionButton area="Producción" projectId={selectedProjectId || null} />
+          <Button>
+            <Plus className="h-4 w-4 mr-1.5" /> Nueva orden de trabajo
+          </Button>
+        </div>
       </div>
 
       <ProductionStatusHeader
