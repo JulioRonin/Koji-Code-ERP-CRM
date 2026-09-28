@@ -356,13 +356,24 @@ El **correo** replica estas mismas secciones en HTML, con contenido escapado por
 
 **Propósito.** Inspección por proyecto, no conformidades (NCR), reportes dimensionales e instrumentos de medición con calibraciones.
 
-**KPIs:** **Tasa de aprobación** (Terminado ÷ (Terminado+Rechazado)) · En bandeja de calidad · **NCRs abiertas** · Calibraciones pendientes.
-**Pestañas:** Control por proyecto · Historial inspecciones · No conformidades · Instrumentos.
+**KPIs:** **Tasa de aprobación** (Terminado ÷ (Terminado+Rechazado)) · En bandeja de calidad · **NCRs abiertas** (todas las no cerradas) · Calibraciones pendientes.
+**Pestañas:** Control por proyecto · Historial inspecciones · No conformidades · **Acciones correctivas** · Instrumentos.
 
 **Control por proyecto:** bandejas colapsables por estatus — **Bandeja de calidad** (prioridad, ámbar), En fabricación, Pendientes, Aprobadas (verde), Rechazadas (rojo). Por pieza: documentación (Plano 2D, Cert. material, **Dimensional**) y acciones **Aprobar** / **Rechazar (NCR)** / Reabrir / Re-inspeccionar.
-**Automatización clave:** rechazar una pieza dispara **mensaje automático al chat** pidiendo apertura de NCR.
+**Regla de procedimiento:** **no se puede rechazar una pieza sin registrar su NCR.** “Rechazar” abre el registro (pieza, cantidad, dónde se detectó, tipo de defecto, severidad, descripción y **contención obligatoria**); al guardarlo la pieza pasa a RECHAZADO y se avisa al chat de Calidad.
 
-**No conformidades:** tabla con **severidad** Alta/Media/Baja y estado; NCR con causa raíz, plan de acción y aviso al cliente.
+**Procedimiento documentado PR-CAL-001** (ISO 9001 §8.7 / §10.2), visible e **imprimible** con la marca de la empresa: 7 pasos (detección → identificación y registro → contención → disposición MRB → causa raíz → acción correctiva → verificación de eficacia y cierre) con responsable, plazo y registro de cada paso, criterios e indicadores.
+
+**No conformidades (NCR):** filtros por estatus y búsqueda; columnas de pieza, cantidad, tipo de defecto, **disposición**, severidad y estatus. **“Analizar”** guía la NCR en 5 pasos:
+1. **Contención** — segregación y revisión de lotes en proceso, stock y embarques.
+2. **Disposición (MRB)** — Retrabajo · Reparación · Reinspección 100% · Usar como está (concesión, con aviso de autorización del cliente) · Devolver a proveedor · Desecho. **Actualiza el estatus de la pieza** automáticamente (retrabajo → vuelve a producción; reinspección → bandeja de calidad; concesión → terminada) y registra quién y cuándo decidió.
+3. **Causa raíz** — 5 porqués + conclusión.
+4. **Acciones correctivas** — ligadas a la NCR y visibles en el action list del proyecto.
+5. **Verificación y cierre** — checklist de requisitos, evidencia de eficacia, costo de la no calidad; no permite cerrar sin contención, disposición, causa raíz y verificación (y advierte si quedan acciones abiertas). Se puede reabrir.
+**Registro imprimible de la NCR** con todas las secciones y firmas (Calidad, Producción, MRB) como evidencia de auditoría.
+
+**Acciones correctivas (action list):** todas las acciones de todos los proyectos y áreas. KPIs **Abiertas · Vencidas · En verificación · Cerradas (% eficaces)**; filtros por área, estatus y proyecto; **agrupar por área**; exportación CSV. Cada acción: área y tipo de origen (NCR, plan de control, queja de cliente, auditoría, proveedor, mejora), problema, causa raíz, tipo (contención/correctiva/preventiva/mejora), responsable, fecha compromiso (se marca **vencida** en rojo), prioridad, estatus y **verificación de eficacia obligatoria para cerrar**.
+**Entradas desde todas las áreas:** Producción, Diseño y Compras tienen el botón **“Acción correctiva”** en su encabezado; todo alimenta el mismo action list.
 **Instrumentos (calibración ISO 9001):** banner de alertas (vencidas / por vencer a 30 días), tabla con **estado de calibración** Calibrado (verde) / Por calibrar (ámbar) / Vencido (rojo) / Sin fecha. Modal de instrumento con sugerencia automática de **próxima calibración = última + 12 meses**.
 
 ---
@@ -480,7 +491,9 @@ Del BOM del proyecto a la orden de compra y de vuelta al inventario, sin recaptu
 Piso en tiempo real: parque de máquinas con semáforo, órdenes de trabajo con **time-tracking real vs estimado** por etapa, portal self-service del operador con máquina de estados y reporte de incidencias al chat. **Liberar** una máquina cierra la orden en un clic.
 
 ### 9.3 Calidad (ISO 9001)
-Inspección por **bandejas** (la bandeja de calidad es prioridad), **NCR con alerta automática** al chat, reportes dimensionales, y **control de calibración de instrumentos** con avisos de vencimiento a 30 días. La tasa de aprobación (QA) es un KPI de primera línea.
+Inspección por **bandejas** (la bandeja de calidad es prioridad), **procedimiento de producto no conforme documentado (PR-CAL-001)** con NCR guiada en 5 pasos (contención → disposición → 5 porqués → acciones → verificación) y registro imprimible, **plan de control por proyecto** (formato AIAG/APQP) y un **action list de acciones correctivas** alimentado por Calidad, Producción, Diseño y Compras. Además reportes dimensionales y **control de calibración de instrumentos** ligados al plan de control. Todo lo que un auditor ISO 9001 pide ver: procedimiento, registros y evidencia de eficacia.
+
+**Plan de control por proyecto de maquinado** (en el detalle de cada proyecto → “Calidad del proyecto”): encabezado con fase (Prototipo / Pre-lanzamiento / Producción), revisión, elaboró, aprobó y contacto clave; características por operación con clase especial **CC/SC**, especificación/tolerancia, técnica e **instrumento de medición** (avisa si su calibración está vencida), muestra, frecuencia, método de control, **plan de reacción** y responsable. **Plantilla de maquinado** para arrancar en un clic, duplicar renglones, CSV e **impresión en formato AIAG** (carta horizontal con firmas). Desde cualquier característica se levanta una **acción correctiva** que llega al action list.
 
 ### 9.4 Inventario
 Stock en tiempo real con **mín/máx**, valor de inventario, **lead time** y **estatus de resurtido** (No solicitado/Solicitado/En tránsito con ETA). Dos modos (Taller / Insumos-venta), alertas de reorden y —según plan— **notificaciones automáticas por correo y push**. Importación por Excel/CSV con plantilla.

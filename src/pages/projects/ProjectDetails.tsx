@@ -54,6 +54,7 @@ import { AdHocTaskForm } from '@/components/projects/AdHocTaskForm';
 import { MeetingsCard } from '@/components/projects/MeetingsCard';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
 import { ProjectImagesCard } from '@/components/projects/ProjectImagesCard';
+import { ProjectQualityCard } from '@/components/quality/ProjectQualityCard';
 import {
   useProject,
   useUpdateProjectStatus,
@@ -635,6 +636,9 @@ export function ProjectDetails() {
           </Card>
         </div>
       </div>
+
+      {/* Calidad del proyecto (ancho completo): plan de control + acciones correctivas + NCR */}
+      <ProjectQualityCard project={project} />
 
       {/* Master Plan dialog (Gantt completo) */}
       <Dialog open={isMasterPlanOpen} onOpenChange={setIsMasterPlanOpen}>

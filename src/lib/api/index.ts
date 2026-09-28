@@ -14,6 +14,7 @@ export * from './bom';
 export * from './purchasing';
 export * from './production';
 export * from './quality';
+export * from './capa';
 export * from './profiles';
 export * from './projectFiles';
 export * from './workOrderStages';

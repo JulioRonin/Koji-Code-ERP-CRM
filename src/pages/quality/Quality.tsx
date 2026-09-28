@@ -20,6 +20,7 @@ import {
   Pencil,
   Trash2,
   AlertTriangle,
+  ListChecks,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { useChat } from '@/contexts/ChatContext';
 import {
   useInspections,
   useNcrs,
@@ -53,13 +53,14 @@ import {
   getFileDownloadUrl,
 } from '@/lib/api';
 import { DimensionalModal } from '@/components/quality/DimensionalModal';
-import type { BomItem, ManufacturingStatus, MeasurementInstrument, InstrumentStatus } from '@/types/database';
+import { NcrFormModal } from '@/components/quality/NcrFormModal';
+import { NcrDetailModal } from '@/components/quality/NcrDetailModal';
+import { NonconformingProcedureCard } from '@/components/quality/NonconformingProcedureCard';
+import { CorrectiveActionsPanel } from '@/components/quality/CorrectiveActionsPanel';
+import { NCR_STATUS_VARIANT, SEVERITY_VARIANT, SELECT_CLS } from '@/components/quality/capaMeta';
+import type { BomItem, ManufacturingStatus, MeasurementInstrument, InstrumentStatus, Ncr, NcrStatus } from '@/types/database';
 
-const severityVariant: Record<string, 'destructive' | 'warning' | 'secondary'> = {
-  Alta: 'destructive',
-  Media: 'warning',
-  Baja: 'secondary',
-};
+const NCR_STATUSES: NcrStatus[] = ['Abierta', 'En Investigación', 'Acción Correctiva', 'Cerrada'];
 
 /**
  * Orden de prioridad para mostrar las bandejas: lo que Producción acaba de
@@ -113,6 +114,7 @@ const tabs = [
   { id: 'project_control', label: 'Control por proyecto', icon: LayoutDashboard },
   { id: 'inspections',     label: 'Historial inspecciones', icon: FileSignature },
   { id: 'ncrs',            label: 'No conformidades',     icon: AlertOctagon },
+  { id: 'capa',            label: 'Acciones correctivas', icon: ListChecks },
   { id: 'instruments',     label: 'Instrumentos',         icon: Ruler },
 ] as const;
 type Tab = (typeof tabs)[number]['id'];
@@ -124,7 +126,6 @@ async function openStorageFile(path: string | null) {
 }
 
 export function Quality() {
-  const { sendSystemMessage } = useChat();
   const [activeTab, setActiveTab] = useState<Tab>('project_control');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -139,11 +140,28 @@ export function Quality() {
   const { data: dimReports, refetch: refetchDim } = useDimensionalReports(selectedProjectId || undefined);
   const { data: technicians } = useTechnicians();
   const { data: inspections } = useInspections();
-  const { data: ncrs } = useNcrs();
+  const { data: ncrs, refetch: refetchNcrs } = useNcrs();
   const { data: instruments, refetch: refetchInstruments } = useInstruments();
   const { update: updateMfg } = useUpdateManufacturingStatus();
   const { remove: deleteInstrument } = useDeleteInstrument();
   const [instrModal, setInstrModal] = useState<{ open: boolean; edit: MeasurementInstrument | null }>({ open: false, edit: null });
+
+  // ── Producto no conforme ──
+  // Rechazar una pieza exige registrar la NCR (procedimiento PR-CAL-001).
+  const [ncrForm, setNcrForm] = useState<{ open: boolean; item: BomItem | null }>({ open: false, item: null });
+  const [ncrDetailId, setNcrDetailId] = useState<string | null>(null);
+  const ncrDetail: Ncr | null = ncrs.find(n => n.id === ncrDetailId) ?? null;
+  const [ncrStatusFilter, setNcrStatusFilter] = useState<NcrStatus | 'ABIERTAS' | 'TODAS'>('ABIERTAS');
+  const [ncrSearch, setNcrSearch] = useState('');
+  const visibleNcrs = useMemo(() => {
+    const q = ncrSearch.trim().toLowerCase();
+    return ncrs.filter(n => {
+      if (ncrStatusFilter === 'ABIERTAS' && n.status === 'Cerrada') return false;
+      if (ncrStatusFilter !== 'ABIERTAS' && ncrStatusFilter !== 'TODAS' && n.status !== ncrStatusFilter) return false;
+      if (!q) return true;
+      return [n.id, n.project_id, n.part_number, n.issue_description, n.defect_type].some(v => (v ?? '').toLowerCase().includes(q));
+    });
+  }, [ncrs, ncrStatusFilter, ncrSearch]);
 
   const calibAlerts = useMemo(() => {
     const overdue = instruments.filter(i => calibrationState(i.next_calibration) === 'overdue');
@@ -239,13 +257,7 @@ export function Quality() {
     try {
       await updateMfg(item.id, next);
       await refetchBom();
-      if (next === 'RECHAZADO') {
-        sendSystemMessage(
-          '5',
-          `⚠️ Pieza [${item.part_number}] (${item.description}) del proyecto ${selectedProjectId} RECHAZADA. Requiere apertura de NCR.`,
-          'QUALITY'
-        );
-      }
+      // El aviso de rechazo al chat lo emite el registro de la NCR (NcrFormModal).
     } catch (err) {
       await refetchBom(); // revertir al estado real del servidor
       setError((err as Error).message || 'No se pudo actualizar el estatus.');
@@ -259,7 +271,7 @@ export function Quality() {
     counts.TERMINADO + counts.RECHAZADO > 0
       ? Math.round((counts.TERMINADO / (counts.TERMINADO + counts.RECHAZADO)) * 100 * 10) / 10
       : 100;
-  const openNcrs = ncrs.filter(n => n.status === 'Abierta').length;
+  const openNcrs = ncrs.filter(n => n.status !== 'Cerrada').length;
 
   return (
     <div className="space-y-6">
@@ -272,7 +284,7 @@ export function Quality() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setNcrForm({ open: true, item: null })}>
             <AlertOctagon className="h-4 w-4 mr-1.5" /> Reportar NCR
           </Button>
           <Button>
@@ -463,7 +475,7 @@ export function Quality() {
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="text-left">
-                          <p className="text-sm font-semibold flex items-center gap-2">
+                          <div className="text-sm font-semibold flex items-center gap-2">
                             {meta.label}
                             <Badge
                               variant={
@@ -485,7 +497,7 @@ export function Quality() {
                                 ⚡ Prioridad
                               </Badge>
                             )}
-                          </p>
+                          </div>
                           <p className="text-xs text-[var(--color-app-text-muted)]">
                             {meta.description}
                           </p>
@@ -504,7 +516,11 @@ export function Quality() {
                             busy={busyId === item.id}
                             dimensionalCount={dimCountByItem.get(item.id) ?? 0}
                             onOpenDimensional={() => setDimItem(item)}
-                            onSetStatus={s => setStatus(item, s)}
+                            onSetStatus={s =>
+                              s === 'RECHAZADO'
+                                ? setNcrForm({ open: true, item }) // rechazo = registrar NCR
+                                : setStatus(item, s)
+                            }
                           />
                         ))}
                       </div>
@@ -575,50 +591,94 @@ export function Quality() {
       )}
 
       {activeTab === 'ncrs' && (
-        <Card className="p-0">
-          <CardHeader>
-            <CardTitle>Control de no conformidades</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>NCR-ID</TableHead>
-                  <TableHead>Problema / desviación</TableHead>
-                  <TableHead>Severidad</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Gestión</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ncrs.map(ncr => (
-                  <TableRow key={ncr.id}>
-                    <TableCell className="font-mono text-xs text-[var(--color-app-danger)]">
-                      {ncr.id}
-                    </TableCell>
-                    <TableCell className="max-w-md">
-                      <p className="font-medium">{ncr.project_id}</p>
-                      <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
-                        {ncr.issue_description}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={severityVariant[ncr.severity]}>{ncr.severity}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{ncr.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        Analizar
-                      </Button>
-                    </TableCell>
+        <div className="space-y-4">
+          <NonconformingProcedureCard />
+          <Card className="p-0">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Control de producto no conforme</CardTitle>
+                  <CardDescription>Da clic en “Analizar” para seguir los pasos: contención → disposición → causa raíz → acciones → cierre.</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative w-full sm:w-56">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
+                    <Input placeholder="Buscar NCR, pieza, proyecto…" value={ncrSearch} onChange={e => setNcrSearch(e.target.value)} className="pl-9 h-9" />
+                  </div>
+                  <select className={cn(SELECT_CLS, 'w-auto')} value={ncrStatusFilter} onChange={e => setNcrStatusFilter(e.target.value as NcrStatus | 'ABIERTAS' | 'TODAS')}>
+                    <option value="ABIERTAS">Abiertas (sin cerrar)</option>
+                    <option value="TODAS">Todas</option>
+                    {NCR_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <Button size="sm" className="h-9" onClick={() => setNcrForm({ open: true, item: null })}>
+                    <Plus className="h-4 w-4 mr-1.5" /> Reportar NCR
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>NCR</TableHead>
+                    <TableHead>Pieza / no conformidad</TableHead>
+                    <TableHead className="hidden md:table-cell">Disposición</TableHead>
+                    <TableHead>Severidad</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Gestión</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {visibleNcrs.map(ncr => (
+                    <TableRow key={ncr.id} className="cursor-pointer" onClick={() => setNcrDetailId(ncr.id)}>
+                      <TableCell className="align-top">
+                        <p className="font-mono text-xs text-[var(--color-app-danger)] whitespace-nowrap">{ncr.id}</p>
+                        <p className="text-[11px] text-[var(--color-app-text-muted)]">{ncr.project_id}</p>
+                      </TableCell>
+                      <TableCell className="max-w-md align-top">
+                        <p className="font-medium text-sm">
+                          {ncr.part_number ?? 'Sin pieza'}
+                          {ncr.quantity_affected ? <span className="text-[var(--color-app-text-muted)] font-normal"> · {ncr.quantity_affected} pzas</span> : null}
+                          {ncr.defect_type ? <span className="text-[var(--color-app-text-muted)] font-normal"> · {ncr.defect_type}</span> : null}
+                        </p>
+                        <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5 line-clamp-2">{ncr.issue_description}</p>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell align-top text-sm">
+                        {ncr.disposition ?? <span className="text-[var(--color-app-warning)] text-xs">Pendiente</span>}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Badge variant={SEVERITY_VARIANT[ncr.severity] ?? 'secondary'}>{ncr.severity}</Badge>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Badge variant={NCR_STATUS_VARIANT[ncr.status] ?? 'outline'}>{ncr.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right align-top">
+                        <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); setNcrDetailId(ncr.id); }}>
+                          Analizar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {visibleNcrs.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-[var(--color-app-text-muted)]">
+                        {ncrs.length === 0 ? 'Sin no conformidades registradas.' : 'Sin resultados para el filtro actual.'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'capa' && (
+        <CorrectiveActionsPanel
+          defaultArea="Calidad"
+          title="Action list · acciones correctivas"
+          description="Todas las acciones de todos los proyectos y áreas (Calidad, Producción, Diseño, Compras…). Filtra por proyecto o agrupa por área."
+        />
       )}
 
       {activeTab === 'instruments' && (
@@ -706,6 +766,25 @@ export function Quality() {
           onSaved={async () => { setInstrModal({ open: false, edit: null }); await refetchInstruments(); }}
         />
       )}
+
+      <NcrFormModal
+        open={ncrForm.open}
+        item={ncrForm.item}
+        projectId={ncrForm.item?.project_id ?? (selectedProjectId || undefined)}
+        onClose={() => setNcrForm({ open: false, item: null })}
+        onCreated={async () => {
+          // Rechazo desde la bandeja: la pieza queda RECHAZADA con su NCR.
+          if (ncrForm.item) await setStatus(ncrForm.item, 'RECHAZADO');
+          await refetchNcrs();
+        }}
+      />
+
+      <NcrDetailModal
+        ncr={ncrDetail}
+        open={!!ncrDetail}
+        onClose={() => setNcrDetailId(null)}
+        onChanged={async () => { await refetchNcrs(); await refetchBom(); }}
+      />
 
       {dimItem && (
         <DimensionalModal

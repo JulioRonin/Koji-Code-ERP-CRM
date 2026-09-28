@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Files,
 } from 'lucide-react';
+import { NewCorrectiveActionButton } from '@/components/quality/NewCorrectiveActionButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -92,11 +93,14 @@ export function Design() {
             Gestión de modelos CAD, revisiones y programación CAM.
           </p>
         </div>
-        {activeTab === 'dashboard' && (
-          <Button>
-            <Plus className="h-4 w-4 mr-1.5" /> Nuevo diseño
-          </Button>
-        )}
+        <div className="flex flex-wrap justify-end gap-2">
+          <NewCorrectiveActionButton area="Diseño" />
+          {activeTab === 'dashboard' && (
+            <Button>
+              <Plus className="h-4 w-4 mr-1.5" /> Nuevo diseño
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

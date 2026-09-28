@@ -638,7 +638,7 @@ export interface QualityInspection {
 export interface Ncr {
   id: string;
   project_id: string;
-  bom_item_id: string;
+  bom_item_id: string | null;
   inspection_id: string | null;
   issue_description: string;
   severity: NcrSeverity;
@@ -650,6 +650,108 @@ export interface Ncr {
   closed_by: string | null;
   created_at: string;
   closed_at: string | null;
+  // ── Procedimiento de producto no conforme (db/2026_quality_capa.sql) ──
+  part_number?: string | null;
+  quantity_affected?: number | null;
+  detected_area?: string | null;
+  defect_type?: string | null;
+  containment?: string | null;
+  disposition?: NcrDisposition | null;
+  disposition_notes?: string | null;
+  disposition_by?: string | null;
+  disposition_at?: string | null;
+  why_analysis?: string[] | null;
+  verification?: string | null;
+  effective?: boolean | null;
+  cost_impact?: number | null;
+  updated_at?: string | null;
+}
+
+/** Disposición del material no conforme (decisión del comité / MRB). */
+export type NcrDisposition =
+  | 'Retrabajo'
+  | 'Reparación'
+  | 'Desecho'
+  | 'Usar como está'
+  | 'Devolver a proveedor'
+  | 'Reinspección 100%';
+
+// ── Plan de control (AIAG/APQP) por proyecto ──────────────────────────────
+export type ControlPlanPhase = 'Prototipo' | 'Pre-lanzamiento' | 'Producción';
+
+export interface ControlPlan {
+  id: string;
+  tenant_id?: string | null;
+  project_id: string;
+  phase: ControlPlanPhase;
+  revision: string | null;
+  prepared_by: string | null;
+  approved_by: string | null;
+  key_contact: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ControlPlanItem {
+  id: string;
+  tenant_id?: string | null;
+  project_id: string;
+  bom_item_id: string | null;
+  part_number: string | null;
+  operation_no: string | null;
+  operation: string | null;
+  machine: string | null;
+  characteristic_no: string | null;
+  characteristic: string;
+  char_type: 'Producto' | 'Proceso';
+  special_char: 'CC' | 'SC' | null;
+  specification: string | null;
+  evaluation_technique: string | null;
+  instrument_id: string | null;
+  sample_size: string | null;
+  frequency: string | null;
+  control_method: string | null;
+  reaction_plan: string | null;
+  responsible: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+// ── Acciones correctivas (CAPA · action list multi-área) ─────────────────
+export type CaArea = 'Calidad' | 'Producción' | 'Diseño' | 'Compras' | 'Ventas' | 'Cliente' | 'Auditoría' | 'Otra';
+export type CaSourceType = 'NCR' | 'Plan de control' | 'Queja de cliente' | 'Auditoría' | 'Proveedor' | 'Mejora' | 'Otro';
+export type CaActionType = 'Contención' | 'Correctiva' | 'Preventiva' | 'Mejora';
+export type CaPriority = 'Alta' | 'Media' | 'Baja';
+export type CaStatus = 'Abierta' | 'En proceso' | 'En verificación' | 'Cerrada' | 'Cancelada';
+
+export interface CorrectiveAction {
+  id: string;
+  tenant_id?: string | null;
+  project_id: string | null;
+  source_area: CaArea;
+  source_type: CaSourceType;
+  source_ref: string | null;
+  ncr_id: string | null;
+  control_plan_item_id: string | null;
+  title: string;
+  problem: string | null;
+  root_cause: string | null;
+  action_type: CaActionType;
+  action: string | null;
+  responsible: string | null;
+  due_date: string | null;
+  priority: CaPriority;
+  status: CaStatus;
+  verification: string | null;
+  effective: boolean | null;
+  verified_by: string | null;
+  verified_at: string | null;
+  closed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string | null;
 }
 
 export interface MeasurementInstrument {
