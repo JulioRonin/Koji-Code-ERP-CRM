@@ -29,7 +29,9 @@ import {
   useProjects,
   useUpdateManufacturingStatus,
   getFileDownloadUrl,
+  useMachines,
 } from '@/lib/api';
+import { DailyChecklistModal } from '@/components/maintenance/DailyChecklistModal';
 import type { BomItem, ManufacturingStatus, Project } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -64,6 +66,8 @@ export function TechnicianDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { data: allBomItems, refetch: refetchBom, mutate: mutateBom } = useBomItems();
+  const { data: machines } = useMachines();
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const { data: projects } = useProjects();
   const { update: updateMfg } = useUpdateManufacturingStatus();
 
@@ -211,6 +215,9 @@ export function TechnicianDashboard() {
             <p className="text-xs text-[var(--color-app-text-muted)]">Turno actual</p>
             <p className="text-sm font-medium">Matutino · 07:00 – 16:00</p>
           </div>
+          <Button onClick={() => setChecklistOpen(true)} title="Checklist diario de arranque (FR-MTO-001)">
+            <ClipboardCheck className="w-4 h-4 mr-2" /> Checklist de arranque
+          </Button>
           <Button variant="outline" onClick={() => refetchBom()} title="Recargar mis piezas">
             <RefreshCw className="w-4 h-4 mr-2" /> Refrescar
           </Button>
@@ -219,6 +226,8 @@ export function TechnicianDashboard() {
           </Button>
         </div>
       </header>
+
+      <DailyChecklistModal open={checklistOpen} onClose={() => setChecklistOpen(false)} machines={machines} />
 
       {/* KPIs personales */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

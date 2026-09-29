@@ -37,6 +37,7 @@ import { Subscription } from './pages/saas/Subscription';
 import { Billing } from './pages/billing/Billing';
 import { Finance } from './pages/finance/Finance';
 import { Cobranza } from './pages/finance/Cobranza';
+import { Maintenance } from './pages/maintenance/Maintenance';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
 import { TechnicianDashboard } from './pages/technicians/TechnicianDashboard';
@@ -143,6 +144,7 @@ export default function App() {
           <Route path="production" element={<ProtectedRoute><Production /></ProtectedRoute>} />
           <Route path="production/wo/:id" element={<ProtectedRoute><WorkOrderDetails /></ProtectedRoute>} />
           <Route path="shipping" element={<ProtectedRoute><Shipping /></ProtectedRoute>} />
+          <Route path="maintenance" element={<ProtectedRoute><Maintenance /></ProtectedRoute>} />
           <Route path="pmo" element={<ProtectedRoute><Pmo /></ProtectedRoute>} />
           <Route path="customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
           <Route path="quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />

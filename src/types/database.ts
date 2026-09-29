@@ -563,6 +563,88 @@ export interface Machine {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** Familia para mantenimiento (db/2026_maintenance.sql). */
+  equipment_family?: EquipmentFamily | null;
+}
+
+// ── Mantenimiento preventivo (PR-MTO-001 / FR-MTO-001) ──────────────────
+export type EquipmentFamily = 'convencional' | 'rectificadora' | 'sierra' | 'cnc' | 'router' | 'compresor';
+export type MaintenanceFrequency = 'Semanal' | 'Quincenal' | 'Mensual' | 'Trimestral' | 'Semestral' | 'Anual';
+export type MaintenanceLevel = 'Preventivo' | 'Mayor';
+export type MaintenanceOrderType = 'Preventivo' | 'Correctivo';
+export type MaintenanceOrderStatus = 'Programada' | 'En proceso' | 'Completada' | 'Cancelada';
+export type ChecklistResult = 'ok' | 'fail' | 'na';
+
+export interface MaintenanceTask {
+  id: string;
+  tenant_id?: string | null;
+  machine_id: string;
+  description: string;
+  level: MaintenanceLevel;
+  frequency: MaintenanceFrequency;
+  performer: 'Técnico' | 'Proveedor';
+  last_done: string | null;
+  next_due: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface MaintenanceOrderTask {
+  task_id: string | null;
+  description: string;
+  done: boolean;
+  notes?: string | null;
+}
+
+export interface MaintenanceOrder {
+  id: string;
+  tenant_id?: string | null;
+  machine_id: string;
+  order_type: MaintenanceOrderType;
+  status: MaintenanceOrderStatus;
+  scheduled_date: string | null;
+  original_date: string | null;
+  reprogram_reason: string | null;
+  problem: string | null;
+  tasks: MaintenanceOrderTask[];
+  performed_by: string | null;
+  loto_applied: boolean;
+  loto_removed: boolean;
+  findings: string | null;
+  parts_used: string | null;
+  downtime_hours: number | null;
+  test_ok: boolean;
+  affects_quality: boolean;
+  first_piece_released: boolean;
+  ncr_id: string | null;
+  checklist_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface MaintenanceChecklistItem {
+  key: string;
+  label: string;
+  result: ChecklistResult | null;
+}
+
+export interface MaintenanceChecklist {
+  id: string;
+  tenant_id?: string | null;
+  machine_id: string;
+  check_date: string;
+  shift: string | null;
+  operator_name: string | null;
+  items: MaintenanceChecklistItem[];
+  anomalies: string | null;
+  has_anomaly: boolean;
+  order_id: string | null;
+  created_at: string;
 }
 
 // ============================================================================

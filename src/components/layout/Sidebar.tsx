@@ -20,6 +20,7 @@ import {
   Contact,
   PiggyBank,
   HandCoins,
+  Wrench,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,7 @@ const navItems: NavItem[] = [
   { name: 'Compras',      path: '/purchasing',  icon: ShoppingCart },
   { name: 'Producción',   path: '/production',  icon: Factory },
   { name: 'Calidad',      path: '/quality',     icon: ShieldCheck },
+  { name: 'Mantenimiento', path: '/maintenance', icon: Wrench },
   { name: 'Embarques',    path: '/shipping',    icon: Truck },
   { name: 'PMO',          path: '/pmo',         icon: FileBarChart },
   { name: 'Técnicos',     path: '/technicians', icon: HardHat },

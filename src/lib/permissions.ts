@@ -31,11 +31,11 @@ export const ROLE_ACCESS: Record<string, string[]> = {
   'Administración / PM': ['ALL'],
   Diseñador: ['/', '/projects', '/design', '/chat'],
   Compras: ['/', '/projects', '/quotes', '/customers', '/inventory', '/chat', '/purchasing', '/billing'],
-  Producción: ['/', '/chat', '/inventory', '/quality', '/technicians', '/production'],
-  Calidad: ['/', '/chat', '/quality', '/technicians', '/production'],
+  Producción: ['/', '/chat', '/inventory', '/quality', '/technicians', '/production', '/maintenance'],
+  Calidad: ['/', '/chat', '/quality', '/technicians', '/production', '/maintenance'],
   // Rol por defecto del schema (DEFAULT 'Operador'). Le damos el mismo
   // acceso de Producción para que pueda ver el piso, su KPI y el chat.
-  Operador: ['/', '/chat', '/inventory', '/quality', '/technicians', '/production'],
+  Operador: ['/', '/chat', '/inventory', '/quality', '/technicians', '/production', '/maintenance'],
   // Los técnicos viven en /technician-portal (su dashboard exclusivo) y
   // pueden saltar a /chat para discutir piezas. /technicians lo dejamos
   // permitido sólo para que el redirect del sidebar no rompa: el
@@ -115,6 +115,7 @@ export const ASSIGNABLE_MODULES: { path: string; label: string }[] = [
   { path: '/quality',     label: 'Calidad' },
   { path: '/shipping',    label: 'Embarques' },
   { path: '/pmo',         label: 'PMO' },
+  { path: '/maintenance', label: 'Mantenimiento' },
   { path: '/technicians', label: 'Técnicos' },
   { path: '/personnel',   label: 'Personal' },
   { path: '/billing',     label: 'Facturación' },

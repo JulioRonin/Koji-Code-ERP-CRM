@@ -38,7 +38,9 @@ import { ProductionProjectView } from '@/components/production/ProductionProject
 import { ProductionStatusReport } from '@/components/production/ProductionStatusReport';
 import { MachineFormModal } from '@/components/production/MachineFormModal';
 import { cn } from '@/lib/utils';
-import { useMachines, useWorkOrders, useBomItems, useProjects } from '@/lib/api';
+import { useMachines, useWorkOrders, useBomItems, useProjects, useMaintenanceTasks } from '@/lib/api';
+import { dueLabel, dueState } from '@/lib/maintenance';
+import { nextDueFor } from '@/components/maintenance/shared';
 import { useDeleteMachine, useUpdateMachine, useUpdateWorkOrder } from '@/lib/api/production';
 import type { Machine } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
@@ -88,6 +90,7 @@ export function Production() {
     }
   }, [projects, selectedProjectId]);
   const { data: machines, refetch: refetchMachines, mutate: mutateMachines } = useMachines();
+  const { data: mtoTasks } = useMaintenanceTasks();
   const { data: workOrders, refetch: refetchWorkOrders, mutate: mutateWorkOrders } = useWorkOrders();
   const { remove: removeMachine } = useDeleteMachine();
   const { update: updateMachineStatus } = useUpdateMachine();
@@ -275,6 +278,20 @@ export function Production() {
                         <span className="text-[var(--color-app-text-muted)]">Ubicación</span>
                         <span className="font-medium">{m.location ?? '—'}</span>
                       </div>
+                      {(() => {
+                        // Próximo preventivo del plan de mantenimiento (PR-MTO-001).
+                        const next = nextDueFor(m.id, mtoTasks);
+                        if (!next) return null;
+                        const st = dueState(next);
+                        return (
+                          <div className="flex justify-between">
+                            <span className="text-[var(--color-app-text-muted)]">Preventivo</span>
+                            <span className={cn('font-medium', st === 'overdue' ? 'text-[var(--color-app-danger)]' : st === 'due_soon' ? 'text-[var(--color-app-warning)]' : '')}>
+                              {dueLabel(next)}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="space-y-1.5 pt-3 border-t border-[var(--color-app-border)]">
