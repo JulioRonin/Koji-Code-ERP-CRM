@@ -13,6 +13,7 @@ import { useBomItems, useCreateNcr, useProjects, useUpsertCorrectiveAction } fro
 import type { BomItem, Ncr, NcrSeverity } from '@/types/database';
 import { DEFECT_TYPES, DETECTED_AREAS, SELECT_CLS } from './capaMeta';
 import { Field } from './CorrectiveActionModal';
+import { QMS_DOC } from './qmsDoc';
 
 const SEVERITIES: NcrSeverity[] = ['Baja', 'Media', 'Alta', 'Crítica'];
 const DEFAULT_CONTAINMENT = 'Pieza(s) identificada(s) con etiqueta roja y segregada(s) en área de cuarentena. Se revisa el lote en proceso.';
@@ -31,9 +32,9 @@ interface Props {
 }
 
 /**
- * Paso 1–2 del procedimiento de producto no conforme: registro de la NCR y
- * contención inmediata. La disposición, causa raíz, acciones y cierre se
- * trabajan después desde "Analizar".
+ * Pasos B1–B2 de la sección 8 (TPNC) del PR-CAL-001: registro de la NCR y
+ * contención inmediata. La disposición, causa raíz, acciones y cierre (B3–B6)
+ * se trabajan después desde "Analizar".
  */
 export function NcrFormModal({ open, onClose, onCreated, projectId, item, lockProject, detectedArea }: Props) {
   const { user } = useAuth();
@@ -146,7 +147,7 @@ export function NcrFormModal({ open, onClose, onCreated, projectId, item, lockPr
             Registrar no conformidad (NCR)
           </DialogTitle>
           <DialogDescription>
-            Paso 1–2 del procedimiento: identificar, segregar y contener. La disposición y la causa raíz se completan en “Analizar”.
+            {QMS_DOC.code} §{QMS_DOC.section} ({QMS_DOC.sectionShort}), pasos B1–B2: identificar, segregar, registrar y contener. Disposición, causa raíz y cierre (B3–B6) se completan en “Analizar”.
           </DialogDescription>
         </DialogHeader>
 

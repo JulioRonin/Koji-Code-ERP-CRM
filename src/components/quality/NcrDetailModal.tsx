@@ -22,13 +22,15 @@ import { CorrectiveActionModal, Field } from './CorrectiveActionModal';
 import {
   CA_STATUS_VARIANT, DISPOSITIONS, DISPOSITION_META, NCR_STATUS_VARIANT, SELECT_CLS, SEVERITY_VARIANT,
 } from './capaMeta';
+import { QMS_DOC, QMS_SECTION_LABEL } from './qmsDoc';
 
+/** Pasos B2–B6 de la sección 8 (TPNC) del PR-CAL-001; B1 es el registro de la NCR. */
 const STEPS = [
-  { n: 1, label: 'Contención' },
-  { n: 2, label: 'Disposición' },
-  { n: 3, label: 'Causa raíz' },
-  { n: 4, label: 'Acciones' },
-  { n: 5, label: 'Verificación y cierre' },
+  { n: 1, code: 'B2', label: 'Contención' },
+  { n: 2, code: 'B3', label: 'Disposición' },
+  { n: 3, code: 'B4', label: 'Causa raíz' },
+  { n: 4, code: 'B5', label: 'Acciones' },
+  { n: 5, code: 'B6', label: 'Verificación y cierre' },
 ] as const;
 
 interface Props {
@@ -187,13 +189,13 @@ export function NcrDetailModal({ ncr, open, onClose, onChanged }: Props) {
 table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:5px 7px;text-align:left;vertical-align:top}th{background:#f4f4f2;width:26%;font-weight:600}
 .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #16181D;padding-bottom:8px}.sig{display:flex;gap:40px;margin-top:40px}.sig div{flex:1;border-top:1px solid #999;padding-top:4px;text-align:center;color:#475569}
 .cas th{width:auto}</style></head><body>
-<div class="head"><div><h1>Reporte de No Conformidad</h1><div>${e(brand)} · Procedimiento PR-CAL-001 (ISO 9001 §8.7 / §10.2)</div></div><div style="text-align:right"><b style="font-size:16px">${e(ncr.id)}</b><div>Estatus: ${e(ncr.status)}</div><div>${e(format(new Date(ncr.created_at), 'dd MMM yyyy', { locale: es }))}</div></div></div>
-<h2>1. Identificación</h2><table>${row('Proyecto', `${ncr.project_id}${project ? ' — ' + project.name : ''}`)}${row('Cliente', project?.client_name)}${row('No. de parte', ncr.part_number)}${row('Cantidad afectada', ncr.quantity_affected)}${row('Detectado en', ncr.detected_area)}${row('Tipo de defecto', ncr.defect_type)}${row('Severidad', ncr.severity)}${row('Descripción', ncr.issue_description)}${row('Notificar al cliente', ncr.notify_customer ? 'Sí' : 'No')}</table>
-<h2>2. Contención</h2><table>${row('Acción de contención', containment)}</table>
-<h2>3. Disposición (MRB)</h2><table>${row('Disposición', disposition)}${row('Justificación', dispositionNotes)}${row('Decidió', ncr.disposition_by)}${row('Fecha', ncr.disposition_at ? format(new Date(ncr.disposition_at), 'dd MMM yyyy', { locale: es }) : '')}</table>
-<h2>4. Análisis de causa raíz (5 porqués)</h2><table>${whys.map((w, i) => row(`¿Por qué? ${i + 1}`, w)).join('')}${row('Causa raíz', rootCause)}</table>
-<h2>5. Acciones correctivas</h2>${linked.length ? `<table class="cas"><tr><th>Folio</th><th>Acción</th><th>Responsable</th><th>Compromiso</th><th>Estatus</th><th>Eficaz</th></tr>${casRows}</table>` : '<p>Sin acciones registradas.</p>'}
-<h2>6. Verificación de eficacia y cierre</h2><table>${row('Verificación', verification)}${row('¿Eficaz?', effective === '' ? '' : effective === 'si' ? 'Sí' : 'No')}${row('Costo de la no calidad (MXN)', cost)}${row('Fecha de cierre', ncr.closed_at ? format(new Date(ncr.closed_at), 'dd MMM yyyy', { locale: es }) : '')}</table>
+<div class="head"><div><h1>Reporte de No Conformidad</h1><div>${e(brand)} · ${e(QMS_SECTION_LABEL)} · Rev. ${QMS_DOC.revision} (ISO 9001 §8.7 / §10.2)</div></div><div style="text-align:right"><b style="font-size:16px">${e(ncr.id)}</b><div>Estatus: ${e(ncr.status)}</div><div>${e(format(new Date(ncr.created_at), 'dd MMM yyyy', { locale: es }))}</div></div></div>
+<h2>B1 · Identificación y registro</h2><table>${row('Proyecto', `${ncr.project_id}${project ? ' — ' + project.name : ''}`)}${row('Cliente', project?.client_name)}${row('No. de parte', ncr.part_number)}${row('Cantidad afectada', ncr.quantity_affected)}${row('Detectado en', ncr.detected_area)}${row('Tipo de defecto', ncr.defect_type)}${row('Severidad', ncr.severity)}${row('Descripción', ncr.issue_description)}${row('Notificar al cliente', ncr.notify_customer ? 'Sí' : 'No')}</table>
+<h2>B2 · Contención</h2><table>${row('Acción de contención', containment)}</table>
+<h2>B3 · Disposición (MRB)</h2><table>${row('Disposición', disposition)}${row('Justificación', dispositionNotes)}${row('Decidió', ncr.disposition_by)}${row('Fecha', ncr.disposition_at ? format(new Date(ncr.disposition_at), 'dd MMM yyyy', { locale: es }) : '')}</table>
+<h2>B4 · Análisis de causa raíz (5 porqués)</h2><table>${whys.map((w, i) => row(`¿Por qué? ${i + 1}`, w)).join('')}${row('Causa raíz', rootCause)}</table>
+<h2>B5 · Acciones correctivas</h2>${linked.length ? `<table class="cas"><tr><th>Folio</th><th>Acción</th><th>Responsable</th><th>Compromiso</th><th>Estatus</th><th>Eficaz</th></tr>${casRows}</table>` : '<p>Sin acciones registradas.</p>'}
+<h2>B6 · Verificación de eficacia y cierre</h2><table>${row('Verificación', verification)}${row('¿Eficaz?', effective === '' ? '' : effective === 'si' ? 'Sí' : 'No')}${row('Costo de la no calidad (MXN)', cost)}${row('Fecha de cierre', ncr.closed_at ? format(new Date(ncr.closed_at), 'dd MMM yyyy', { locale: es }) : '')}</table>
 <div class="sig"><div>Calidad</div><div>Producción</div><div>Gerencia / MRB</div></div>
 <script>window.onload=function(){window.print()}</script></body></html>`;
     // Sin "noopener": con él window.open devuelve null y no podríamos escribir el registro.
@@ -245,7 +247,7 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:5p
               ) : (
                 <Circle className="h-4 w-4" />
               )}
-              <span className="text-center leading-tight">{s.n}. {s.label}</span>
+              <span className="text-center leading-tight">{s.code} · {s.label}</span>
             </button>
           ))}
         </div>

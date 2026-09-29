@@ -147,7 +147,7 @@ export function Quality() {
   const [instrModal, setInstrModal] = useState<{ open: boolean; edit: MeasurementInstrument | null }>({ open: false, edit: null });
 
   // ── Producto no conforme ──
-  // Rechazar una pieza exige registrar la NCR (procedimiento PR-CAL-001).
+  // Rechazar una pieza exige registrar la NCR (PR-CAL-001 §8, paso B1).
   const [ncrForm, setNcrForm] = useState<{ open: boolean; item: BomItem | null }>({ open: false, item: null });
   const [ncrDetailId, setNcrDetailId] = useState<string | null>(null);
   const ncrDetail: Ncr | null = ncrs.find(n => n.id === ncrDetailId) ?? null;
@@ -598,7 +598,7 @@ export function Quality() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div>
                   <CardTitle>Control de producto no conforme</CardTitle>
-                  <CardDescription>Da clic en “Analizar” para seguir los pasos: contención → disposición → causa raíz → acciones → cierre.</CardDescription>
+                  <CardDescription>Da clic en “Analizar” para seguir la sección 8 del PR-CAL-001: B2 contención → B3 disposición → B4 causa raíz → B5 acciones → B6 cierre.</CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="relative w-full sm:w-56">
