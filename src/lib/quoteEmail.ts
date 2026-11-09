@@ -1,4 +1,5 @@
 import type { CompanySettings, Quote, QuoteItem } from '@/types/database';
+import { ADVANCE_TERMS_TEXT } from './quoteTerms';
 
 const mx = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
 
@@ -43,7 +44,7 @@ export function quoteEmailHtml(
     let n = 0;
     const sect = (title: string, body: string) => `<div style="margin-top:12px"><p style="margin:0 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;color:${accent}">${++n}. ${title}</p><p style="margin:0;font-size:13px;line-height:1.6;color:#334155;white-space:pre-line">${esc(body)}</p></div>`;
     if (company.terms_payment) termsBlocks.push(sect('Términos de pago', company.terms_payment));
-    if (company.terms_advance) termsBlocks.push(sect('Anticipo', company.terms_advance));
+    termsBlocks.push(sect('Anticipo', ADVANCE_TERMS_TEXT));
     if (company.terms_special) termsBlocks.push(sect('Condiciones especiales y confidencialidad', company.terms_special));
   }
   const terms = termsBlocks.length ? `

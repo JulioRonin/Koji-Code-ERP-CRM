@@ -114,7 +114,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <img
                 src={company.logo_url}
                 alt={brandName}
-                className="h-8 w-8 rounded-md object-cover bg-white"
+                className="h-8 w-8 rounded-md object-contain bg-white"
               />
             ) : (
               <div className="h-8 w-8 rounded-lg bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-sm shrink-0 font-display">

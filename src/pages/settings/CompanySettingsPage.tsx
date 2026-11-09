@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Building2,
   FileText,
@@ -11,13 +11,18 @@ import {
   Lock,
   Landmark,
   LayoutDashboard,
+  ImagePlus,
+  Loader2,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUpdateCompanySettings, type CompanySettingsInput } from '@/lib/api';
+import { useUpdateCompanySettings, uploadCompanyLogo, type CompanySettingsInput } from '@/lib/api';
+import { ACCEPTED_IMAGE_TYPES } from '@/lib/imageUpload';
+import { ADVANCE_TERMS_TEXT } from '@/lib/quoteTerms';
 import { cn } from '@/lib/utils';
 
 const ADMIN_ROLES = ['Administrador', 'Administración / PM'];
@@ -115,6 +120,24 @@ export function CompanySettingsPage() {
     }
   };
 
+  /** Sube (o quita) el logo y lo guarda al momento junto con el resto del formulario. */
+  const handleLogo = async (file: File | null) => {
+    try {
+      const logo_url = file ? await uploadCompanyLogo(file) : null;
+      const next = { ...form, logo_url };
+      setForm(next);
+      if (!next.legal_name?.trim()) {
+        flash('Logo listo. Captura la razón social y presiona Guardar cambios.');
+        return;
+      }
+      await update(company, next);
+      await refresh();
+      flash(file ? 'Logo actualizado. Ya aparece en la app y en las cotizaciones.' : 'Logo eliminado.');
+    } catch (err) {
+      flash((err as Error).message || 'No se pudo subir el logo.', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-start justify-between gap-4">
@@ -171,7 +194,12 @@ export function CompanySettingsPage() {
           <Field label="Razón social *" value={form.legal_name} onChange={v => set({ legal_name: v })} disabled={!isAdmin} placeholder="Mi Empresa S.A. de C.V." />
           <Field label="Nombre comercial" value={form.commercial_name} onChange={v => set({ commercial_name: v })} disabled={!isAdmin} placeholder="Mi Empresa" />
           <Field label="Tagline / giro" value={form.tagline} onChange={v => set({ tagline: v })} disabled={!isAdmin} placeholder="Manufactura CNC de precisión" />
-          <Field label="Logo (URL)" value={form.logo_url} onChange={v => set({ logo_url: v })} disabled={!isAdmin} placeholder="https://…/logo.png" />
+          <LogoUploader
+            value={form.logo_url}
+            disabled={!isAdmin || loading}
+            onUpload={handleLogo}
+            onRemove={() => handleLogo(null)}
+          />
         </CardContent>
       </Card>
 
@@ -298,13 +326,13 @@ export function CompanySettingsPage() {
             disabled={!isAdmin}
             placeholder={'Ej. Crédito 30 días a partir de la entrega. Pagos en MXN vía transferencia electrónica a la cuenta indicada. Facturamos CFDI 4.0 contra orden de compra.'}
           />
-          <TermsArea
-            label="Términos de anticipo"
-            value={form.terms_advance}
-            onChange={v => set({ terms_advance: v })}
-            disabled={!isAdmin}
-            placeholder={'Ej. Anticipo del 50% para iniciar fabricación; 50% restante contra aviso de embarque. El anticipo no es reembolsable una vez iniciada la producción.'}
-          />
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Anticipo</label>
+            <p className="px-3 py-2 rounded-md border border-[var(--color-app-border)] bg-[var(--color-app-surface-alt)] text-sm text-[var(--color-app-text-muted)]">
+              {ADVANCE_TERMS_TEXT}
+            </p>
+            <p className="text-[11px] text-[var(--color-app-text-muted)]">Texto fijo: los anticipos no se definen en la cotización.</p>
+          </div>
           <TermsArea
             label="Condiciones especiales (NDA / confidencialidad, garantías…)"
             value={form.terms_special}
@@ -437,6 +465,61 @@ export function CompanySettingsPage() {
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+function LogoUploader({ value, disabled, onUpload, onRemove }: {
+  value?: string | null; disabled?: boolean; onUpload: (f: File) => Promise<void>; onRemove: () => Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [value]);
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    try { await fn(); } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium">Logo</label>
+      <div className="flex items-center gap-3">
+        <div className="h-16 w-16 shrink-0 rounded-md border border-[var(--color-app-border)] bg-white flex items-center justify-center overflow-hidden">
+          {value && !broken ? (
+            <img src={value} alt="Logo" className="max-h-full max-w-full object-contain" onError={() => setBroken(true)} />
+          ) : (
+            <span className="text-[10px] text-center text-[var(--color-app-text-subtle)] px-1">{broken ? 'No carga' : 'Sin logo'}</span>
+          )}
+        </div>
+        <div className="space-y-1.5 min-w-0">
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPTED_IMAGE_TYPES}
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) void run(() => onUpload(f)); }}
+          />
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={disabled || busy} onClick={() => inputRef.current?.click()}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5 mr-1.5" />}
+              {busy ? 'Subiendo…' : value ? 'Cambiar logo' : 'Subir logo'}
+            </Button>
+            {value && (
+              <Button type="button" variant="ghost" size="sm" disabled={disabled || busy} onClick={() => void run(onRemove)} title="Quitar logo">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+          <p className="text-[11px] text-[var(--color-app-text-muted)]">
+            {broken ? 'El logo actual es un link que no carga; sube el archivo de nuevo.' : 'PNG, JPG o WEBP. Se guarda al subirlo; ideal fondo transparente.'}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

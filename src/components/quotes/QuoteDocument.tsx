@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, Mail } from 'lucide-react';
 import { format } from 'date-fns';
@@ -6,8 +7,11 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useQuotePhotoUrls } from '@/lib/api';
+import { ADVANCE_TERMS_TEXT } from '@/lib/quoteTerms';
 import type { Quote, QuoteItem } from '@/types/database';
 
 const money = (n: number) =>
@@ -39,6 +43,11 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
 
   const brand = company.commercial_name || company.legal_name || 'KANRI';
   const initial = brand.trim().charAt(0).toUpperCase() || 'K';
+  // Si el logo no carga (link roto), usamos la inicial en vez del ícono roto.
+  const [logoFailed, setLogoFailed] = useState(false);
+  const logo = company.logo_url && !logoFailed ? company.logo_url : null;
+  const photos = quote.photos ?? [];
+  const photoUrls = useQuotePhotoUrls(photos);
 
   // Domicilio fiscal compacto en una línea.
   const addressLine = [
@@ -49,6 +58,12 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
     [company.address_city, company.address_state].filter(Boolean).join(', '),
   ].filter(Boolean).join(' · ');
 
+  const smallLogo = logo ? (
+    <img src={logo} alt={brand} onError={() => setLogoFailed(true)} className="h-9 w-9 rounded object-contain border border-[#e2e8f0]" />
+  ) : (
+    <div className="h-9 w-9 rounded flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: accent }}>{initial}</div>
+  );
+
   // Contenido del documento (se reutiliza en pantalla y en el portal de impresión).
   const doc = (
     <>
@@ -56,8 +71,8 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
       <section className="quote-cover p-8 md:p-12 flex flex-col" style={{ minHeight: '92vh' }}>
         {/* Membrete superior */}
         <div className="flex items-center gap-3 border-b-2 pb-5" style={{ borderColor: accent }}>
-          {company.logo_url ? (
-            <img src={company.logo_url} alt={brand} className="h-14 w-14 rounded-md object-contain bg-white border border-[#e2e8f0]" />
+          {logo ? (
+            <img src={logo} alt={brand} onError={() => setLogoFailed(true)} className="h-14 w-14 rounded-md object-contain bg-white border border-[#e2e8f0]" />
           ) : (
             <div className="h-14 w-14 rounded-md flex items-center justify-center text-white font-bold text-xl" style={{ backgroundColor: accent }}>
               {initial}
@@ -121,11 +136,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
         {/* Membrete compacto */}
         <div className="flex justify-between items-center border-b-2 pb-3 mb-6" style={{ borderColor: accent }}>
           <div className="flex items-center gap-2">
-            {company.logo_url ? (
-              <img src={company.logo_url} alt={brand} className="h-9 w-9 rounded object-contain border border-[#e2e8f0]" />
-            ) : (
-              <div className="h-9 w-9 rounded flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: accent }}>{initial}</div>
-            )}
+            {smallLogo}
             <p className="font-bold text-sm">{company.legal_name || brand}</p>
           </div>
           <div className="text-right">
@@ -222,6 +233,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
           <p>· Tiempo de entrega {quote.delivery_time ? `estimado: ${quote.delivery_time}` : 'a confirmar contra orden de compra'}.</p>
           <p>· No incluye fletes ni maniobras salvo indicación expresa.</p>
           <p>· Los términos de pago, anticipo, datos bancarios y condiciones especiales se detallan en la página siguiente.</p>
+          {photos.length > 0 && <p>· Se anexa{photos.length > 1 ? 'n' : ''} {photos.length} foto{photos.length > 1 ? 's' : ''} de referencia al final del documento.</p>}
         </div>
 
         {/* Firma */}
@@ -246,11 +258,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
         {/* Membrete compacto */}
         <div className="flex justify-between items-center border-b-2 pb-3 mb-6" style={{ borderColor: accent }}>
           <div className="flex items-center gap-2">
-            {company.logo_url ? (
-              <img src={company.logo_url} alt={brand} className="h-9 w-9 rounded object-contain border border-[#e2e8f0]" />
-            ) : (
-              <div className="h-9 w-9 rounded flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: accent }}>{initial}</div>
-            )}
+            {smallLogo}
             <p className="font-bold text-sm">{company.legal_name || brand}</p>
           </div>
           <div className="text-right">
@@ -270,8 +278,8 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
                 {showTerms && company.terms_payment && (
                   <TermsSection n={++n} title="Términos de pago" body={company.terms_payment} accent={accent} />
                 )}
-                {showTerms && company.terms_advance && (
-                  <TermsSection n={++n} title="Anticipo" body={company.terms_advance} accent={accent} />
+                {showTerms && (
+                  <TermsSection n={++n} title="Anticipo" body={ADVANCE_TERMS_TEXT} accent={accent} />
                 )}
 
                 {hasBank && (
@@ -329,6 +337,41 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
           Este anexo forma parte integral de la cotización {quote.id} · {company.legal_name || brand} · {new Date().getFullYear()}
         </p>
       </section>
+
+      {/* ══════════ PÁGINA 4 · ANEXO FOTOGRÁFICO (opcional) ══════════ */}
+      {photos.length > 0 && (
+        <section className="p-8 md:p-12" style={{ breakBefore: 'page', pageBreakBefore: 'always' }}>
+          <div className="flex justify-between items-center border-b-2 pb-3 mb-6" style={{ borderColor: accent }}>
+            <div className="flex items-center gap-2">
+              {smallLogo}
+              <p className="font-bold text-sm">{company.legal_name || brand}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold" style={{ color: accent }}>ANEXO FOTOGRÁFICO</p>
+              <p className="text-[11px] font-mono text-[#475569]">Cotización {quote.id}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {photos.map((p, i) => (
+              <figure
+                key={p.id}
+                className={`quote-photo rounded-md border border-[#e2e8f0] overflow-hidden ${photos.length % 2 === 1 && i === photos.length - 1 ? 'col-span-2 mx-auto w-1/2' : ''}`}
+                style={{ breakInside: 'avoid' }}
+              >
+                <div className="h-[185px] bg-[#f8fafc] flex items-center justify-center">
+                  {photoUrls[p.id] && <img src={photoUrls[p.id]} alt={p.caption || p.name} className="max-h-full max-w-full object-contain" />}
+                </div>
+                <figcaption className="px-3 py-1.5 text-[11px] text-[#475569] border-t border-[#e2e8f0]">
+                  <span className="font-semibold text-[#0f172a]">Foto {i + 1}</span>{p.caption ? ` · ${p.caption}` : ''}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+          <p className="text-center text-[10px] text-[#94a3b8] mt-5">
+            Imágenes de referencia · forman parte de la cotización {quote.id} · {company.legal_name || brand}
+          </p>
+        </section>
+      )}
     </>
   );
 
@@ -354,7 +397,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
 
         {/* Toolbar */}
         <div className="px-5 py-3 border-b border-[var(--color-app-border)] flex justify-between items-center bg-white shrink-0">
-          <span className="text-sm font-medium">Vista previa · {quote.id}</span>
+          <DialogTitle className="text-sm font-medium">Vista previa · {quote.id}</DialogTitle>
           <div className="flex gap-2">
             {onEmail && (
               <Button variant="outline" size="sm" onClick={onEmail}>

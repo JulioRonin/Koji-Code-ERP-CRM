@@ -265,9 +265,21 @@ export interface Quote {
   total: number;
   converted_project_id: string | null;
   inventory_deducted?: boolean;
+  /** Fotos anexas al PDF (máx. 5). */
+  photos?: QuotePhoto[] | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Foto anexa a una cotización. `path` en el bucket privado `quote-photos`
+ *  (Supabase) o `data_url` en modo demo. */
+export interface QuotePhoto {
+  id: string;
+  path: string | null;
+  data_url?: string | null;
+  name: string;
+  caption?: string | null;
 }
 
 export interface QuoteItem {

@@ -41,3 +41,4 @@ export * from './invoicing';
 export * from './finance';
 export * from './receivables';
 export * from './tenantScope';
+export * from './quotePhotos';

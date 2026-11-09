@@ -48,8 +48,9 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
-import type { Quote, QuoteItem, QuoteStatus } from '@/types/database';
+import type { Quote, QuoteItem, QuotePhoto, QuoteStatus } from '@/types/database';
 import { QuoteDocument } from '@/components/quotes/QuoteDocument';
+import { QuotePhotosCard } from '@/components/quotes/QuotePhotosCard';
 import { quoteEmailHtml } from '@/lib/quoteEmail';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Textarea } from '@/components/ui/textarea';
@@ -97,7 +98,7 @@ export function QuoteBuilder() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: quote, refetch: refetchQuote } = useQuote(id);
+  const { data: quote, refetch: refetchQuote, mutate: mutateQuote } = useQuote(id);
   const { data: savedItems, loading: loadingItems } = useQuoteItems(id);
   const { data: materialPrices } = useMaterialPrices();
   const { data: inventory } = useInventoryItems();
@@ -299,6 +300,19 @@ export function QuoteBuilder() {
     await updateQuote(quote.id, patch);
     await refetchQuote();
     setDirty(true);
+  };
+
+  /** Fotos anexas: guardado inmediato con actualización optimista. */
+  const handlePhotosChange = async (photos: QuotePhoto[]) => {
+    if (!quote) return;
+    const prev = quote.photos ?? [];
+    mutateQuote(q => (q ? { ...q, photos } : q));
+    try {
+      await updateQuote(quote.id, { photos });
+    } catch (e) {
+      mutateQuote(q => (q ? { ...q, photos: prev } : q));
+      throw e;
+    }
   };
 
   /** Importa listado de componentes desde Excel (Name/Part Number, Description, Qty, Material). */
@@ -873,6 +887,9 @@ export function QuoteBuilder() {
           </CardContent>
         </Card>
       )}
+
+      {/* Fotos anexas al PDF */}
+      <QuotePhotosCard quoteId={quote.id} photos={quote.photos ?? []} onChange={handlePhotosChange} />
 
       {/* Documento imprimible */}
       {showDocument && (

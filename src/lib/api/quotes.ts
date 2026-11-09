@@ -410,6 +410,9 @@ export function useUpdateQuote() {
         const { client_email: _e, delivery_time: _d, inventory_deducted: _x, ...rest } = patch;
         ({ error } = await supabase.from('quotes').update({ ...rest, updated_at: now }).eq('id', id));
       }
+      if (error && /photos/i.test(error.message)) {
+        throw new Error('Para anexar fotos ejecuta db/2026_quote_photos.sql en Supabase.');
+      }
       if (error) throw error;
       setState({ loading: false, error: null });
     } catch (err) {
@@ -437,6 +440,11 @@ export function useDeleteQuote() {
         setState({ loading: false, error: null });
         return;
       }
+      // Fotos anexas: borra los binarios del bucket (best-effort).
+      const { data: q } = await supabase.from('quotes').select('photos').eq('id', id).maybeSingle();
+      const paths = ((q as { photos?: { path: string | null }[] } | null)?.photos ?? [])
+        .map(p => p.path).filter((p): p is string => !!p);
+      if (paths.length) await supabase.storage.from('quote-photos').remove(paths).catch(() => {});
       // Borramos primero las partidas (por si no hay ON DELETE CASCADE).
       await supabase.from('quote_items').delete().eq('quote_id', id);
       const { error } = await supabase.from('quotes').delete().eq('id', id);
