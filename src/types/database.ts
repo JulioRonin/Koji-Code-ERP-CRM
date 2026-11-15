@@ -267,6 +267,8 @@ export interface Quote {
   inventory_deducted?: boolean;
   /** Fotos anexas al PDF (máx. 5). */
   photos?: QuotePhoto[] | null;
+  /** Cuándo se aprobó (fecha real de la venta). Lo fija un trigger en la base. */
+  approved_at?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

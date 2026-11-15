@@ -14,15 +14,16 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useQuotes, useInventoryItems } from '@/lib/api';
 import type { Quote } from '@/types/database';
+import { isWonQuote, quoteSaleDate } from '@/lib/sales';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 const money2 = (n: number) =>
   n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
 
-/** Fecha de la venta: cuándo se aprobó (updated_at) o, si no, cuándo se creó. */
-const saleDate = (q: Quote) => new Date(q.updated_at || q.created_at);
-const isSale = (q: Quote) => q.status === 'Aprobada' || q.status === 'Convertida';
+/** Fecha de la venta: cuándo se aprobó (approved_at). */
+const saleDate = (q: Quote) => quoteSaleDate(q);
+const isSale = (q: Quote) => isWonQuote(q);
 
 /**
  * Tablero para giros que venden artículos (comercio / proveeduría): ventas por

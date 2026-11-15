@@ -397,7 +397,12 @@ export function useUpdateQuote() {
         const all = readDemo<Quote>(DEMO_QUOTES_KEY);
         const idx = all.findIndex(q => q.id === id);
         if (idx >= 0) {
-          all[idx] = { ...all[idx], ...patch, updated_at: now };
+          // Igual que el trigger de la base: approved_at al aprobar por primera vez.
+          const prev = all[idx];
+          const next = { ...prev, ...patch, updated_at: now };
+          const won = (st: string) => st === 'Aprobada' || st === 'Convertida';
+          next.approved_at = won(next.status) ? (won(prev.status) && prev.approved_at ? prev.approved_at : now) : null;
+          all[idx] = next;
           writeDemo(DEMO_QUOTES_KEY, all);
         }
         setState({ loading: false, error: null });

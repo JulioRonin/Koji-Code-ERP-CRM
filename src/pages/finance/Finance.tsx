@@ -21,6 +21,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Profitability } from './Profitability';
 import { cn } from '@/lib/utils';
 import { toLocalDate } from '@/lib/dates';
+import { isWonQuote, quoteSaleDate } from '@/lib/sales';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 const money2 = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
@@ -67,7 +68,8 @@ export function Finance() {
     const nomina = paidPayroll.filter(p => inPeriod(p.created_at)).reduce((s, p) => s + (p.total_net || 0), 0);
     const manualIncome = txs.filter(t => t.kind === 'income' && inPeriod(t.tx_date)).reduce((s, t) => s + t.amount, 0);
     const manualExpense = txs.filter(t => t.kind === 'expense' && inPeriod(t.tx_date)).reduce((s, t) => s + t.amount, 0);
-    const ventas = quotes.filter(q => (q.status === 'Aprobada' || q.status === 'Convertida') && inPeriod(q.updated_at)).reduce((s, q) => s + (q.total || 0), 0);
+    // Ventas por fecha de aprobación (editar después no la mueve de periodo).
+    const ventas = quotes.filter(q => isWonQuote(q) && quoteSaleDate(q) >= start).reduce((s, q) => s + (q.total || 0), 0);
 
     const income = cobrado + manualIncome;
     const expenses = compras + nomina + manualExpense;
