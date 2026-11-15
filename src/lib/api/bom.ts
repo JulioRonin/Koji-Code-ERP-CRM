@@ -4,6 +4,7 @@ import { useAsync } from './useAsync';
 import { MOCK_BOM_ITEMS } from './mocks';
 import type { BomItem, BomStatus, ManufacturingStatus } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
+import { scopeByTenant } from './tenantScope';
 
 /**
  * Trae TODAS las filas de bom_items que cumplan el filtro, paginando en
@@ -26,7 +27,7 @@ async function fetchAllBomItems(projectId?: string): Promise<BomItem[]> {
   // Tope de seguridad: 50 páginas (50k ítems) para no loopear infinito.
   // IMPORTANTE: filtros (.eq) van ANTES de modificadores (.order, .range).
   for (let guard = 0; guard < 50; guard++) {
-    let q = supabase.from('bom_items').select('*');
+    let q = scopeByTenant(supabase.from('bom_items').select('*'));
     if (projectId) q = q.eq('project_id', projectId);
     const { data, error } = await q.order('part_number').range(from, from + PAGE - 1);
     if (error) throw error;
@@ -44,7 +45,7 @@ async function fetchAllBomItems(projectId?: string): Promise<BomItem[]> {
 export function useBomItems(projectId?: string): AsyncState<BomItem[]> {
   return useAsync<BomItem[]>(
     () => fetchAllBomItems(projectId),
-    projectId ? MOCK_BOM_ITEMS.filter(b => b.project_id === projectId) : MOCK_BOM_ITEMS,
+    supabase ? [] : projectId ? MOCK_BOM_ITEMS.filter(b => b.project_id === projectId) : MOCK_BOM_ITEMS,
     [projectId]
   );
 }

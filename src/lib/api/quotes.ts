@@ -4,6 +4,7 @@ import { useAsync } from './useAsync';
 import { scopeByTenant } from './tenantScope';
 import type { MaterialPrice, Quote, QuoteItem, QuoteStatus } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
+import { insertWithUniqueId, newDocId } from './docIds';
 
 const DEMO_PRICES_KEY = 'koji_demo_material_prices';
 const DEMO_QUOTES_KEY = 'koji_demo_quotes';
@@ -333,8 +334,7 @@ export function useCreateQuote() {
   const create = useCallback(async (input: CreateQuoteInput): Promise<Quote> => {
     setState({ loading: true, error: null });
     try {
-      const year = new Date().getFullYear();
-      const id = `COT-${year}-${String(Math.floor(Math.random() * 900) + 100)}`;
+      const id = newDocId('COT');
       const now = new Date().toISOString();
 
       const draft: Quote = {
@@ -365,12 +365,13 @@ export function useCreateQuote() {
         return draft;
       }
 
-      let { data, error } = await supabase.from('quotes').insert(draft).select('*').single();
+      const db = supabase;
+      let { data, error } = await insertWithUniqueId(draft, 'COT', row => db.from('quotes').insert(row).select('*').single());
       // Resiliencia: si faltan columnas nuevas (migración pendiente), reintenta
       // sin ellas para no bloquear la creación de la cotización.
-      if (error && /client_email|delivery_time/i.test(error.message)) {
-        const { client_email: _e, delivery_time: _d, ...base } = draft;
-        ({ data, error } = await supabase.from('quotes').insert(base).select('*').single());
+      if (error && /client_email|delivery_time|photos/i.test(error.message ?? '')) {
+        const { client_email: _e, delivery_time: _d, photos: _p, ...base } = draft;
+        ({ data, error } = await insertWithUniqueId(base, 'COT', row => db.from('quotes').insert(row).select('*').single()));
       }
       if (error) throw error;
       setState({ loading: false, error: null });

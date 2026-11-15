@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
+import { scopeByTenant } from './tenantScope';
 import type { ChatChannel, ChatMessage, MessageType } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
 
@@ -46,20 +47,21 @@ function writeDemoMessages(items: ChatMessage[]): void {
 /**
  * Lista canales de chat (con realtime opcional).
  */
-export function useChannels(): AsyncState<ChatChannel[]> {
+export function useChannels(scopeKey?: string | null): AsyncState<ChatChannel[]> {
   return useAsync<ChatChannel[]>(
     async () => {
       if (!supabase) return readDemoChannels();
-      const { data, error } = await supabase
+      const { data, error } = await scopeByTenant(supabase
         .from('chat_channels')
         .select('*')
-        .eq('is_archived', false)
+        .eq('is_archived', false))
         .order('name');
       if (error) throw error;
       return (data ?? []) as ChatChannel[];
     },
     [],
-    []
+    // scopeKey (usuario/empresa) fuerza recargar al iniciar sesión o cambiar de empresa.
+    [scopeKey ?? null]
   );
 }
 

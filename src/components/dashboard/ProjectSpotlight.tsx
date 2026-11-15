@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useBomItems, useWorkOrders, useInspections, useNcrs, summarizePurchasing } from '@/lib/api';
 import type { Project, ProjectStatus } from '@/types/database';
+import { toLocalDate } from '@/lib/dates';
 
 const STAGES: ProjectStatus[] = ['Cotización', 'Diseño', 'Compras', 'En Producción', 'Calidad', 'Embarque', 'Entregado'];
 
@@ -49,7 +50,7 @@ export function ProjectSpotlight({ project }: { project: Project }) {
     { name: 'Recibido', value: purchasing.received_items },
   ].filter(d => d.value > 0)), [purchasing]);
 
-  const deadline = new Date(project.deadline);
+  const deadline = toLocalDate(project.deadline);
   const daysLeft = isValid(deadline) ? Math.ceil((deadline.getTime() - Date.now()) / 86_400_000) : null;
   const currentStage = STAGES.indexOf(project.status);
   const cancelled = project.status === 'Cancelado';
@@ -142,7 +143,7 @@ export function ProjectSpotlight({ project }: { project: Project }) {
             ) : (
               <>
                 <div className="h-[150px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                     <PieChart>
                       <Pie data={comprasData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={42} outerRadius={64} paddingAngle={3} strokeWidth={0}>
                         {comprasData.map(d => <Cell key={d.name} fill={COMPRAS_COLORS[d.name] ?? '#94a3b8'} />)}
@@ -177,7 +178,7 @@ export function ProjectSpotlight({ project }: { project: Project }) {
               <p className="py-10 text-center text-sm text-[var(--color-app-text-muted)]">Sin órdenes de trabajo.</p>
             ) : (
               <div className="h-[190px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                   <BarChart data={[{ name: 'Piezas', Completadas: prod.done, Pendientes: Math.max(0, prod.total - prod.done) }]}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />

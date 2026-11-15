@@ -138,7 +138,7 @@ export function PurchasingInsights({ items }: Props) {
           </div>
         ) : (
           <div style={{ height: chartHeight }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
               <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                 <CartesianGrid horizontal={false} stroke="#eef2f7" />
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={fmt} />

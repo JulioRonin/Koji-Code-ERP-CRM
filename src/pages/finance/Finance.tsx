@@ -20,6 +20,7 @@ import {
 import { Combobox } from '@/components/ui/combobox';
 import { Profitability } from './Profitability';
 import { cn } from '@/lib/utils';
+import { toLocalDate } from '@/lib/dates';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 const money2 = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
@@ -51,15 +52,19 @@ export function Finance() {
   const [tab, setTab] = useState<'resumen' | 'rentabilidad'>('resumen');
 
   const start = periodStart(period);
-  const inPeriod = (d: string | null | undefined) => !!d && new Date(d) >= start;
+  const inPeriod = (d: string | null | undefined) => !!d && toLocalDate(d) >= start;
+  // Solo gasto real: OC no canceladas ni en borrador, y nómina ya dispersada
+  // (cada "Guardar borrador" crea una corrida nueva y la contaría doble).
+  const realPos = pos.filter(p => p.status !== 'Borrador' && p.status !== 'Cancelada');
+  const paidPayroll = payroll.filter(p => p.status === 'dispersada');
 
   const agg = useMemo(() => {
     // Ingreso REAL = dinero cobrado (Cobranza) + ingresos manuales. La facturación
     // se muestra aparte como referencia (no siempre = dinero recibido).
     const cobrado = cobranza.filter(p => inPeriod(p.paid_date)).reduce((s, p) => s + (p.amount || 0), 0);
     const invIncome = invoices.filter(i => inPeriod(i.created_at)).reduce((s, i) => s + (i.total || 0), 0);
-    const compras = pos.filter(p => inPeriod(p.created_at)).reduce((s, p) => s + (p.total_amount || 0), 0);
-    const nomina = payroll.filter(p => inPeriod(p.created_at)).reduce((s, p) => s + (p.total_net || 0), 0);
+    const compras = realPos.filter(p => inPeriod(p.created_at)).reduce((s, p) => s + (p.total_amount || 0), 0);
+    const nomina = paidPayroll.filter(p => inPeriod(p.created_at)).reduce((s, p) => s + (p.total_net || 0), 0);
     const manualIncome = txs.filter(t => t.kind === 'income' && inPeriod(t.tx_date)).reduce((s, t) => s + t.amount, 0);
     const manualExpense = txs.filter(t => t.kind === 'expense' && inPeriod(t.tx_date)).reduce((s, t) => s + t.amount, 0);
     const ventas = quotes.filter(q => (q.status === 'Aprobada' || q.status === 'Convertida') && inPeriod(q.updated_at)).reduce((s, q) => s + (q.total || 0), 0);
@@ -80,6 +85,7 @@ export function Finance() {
     const expenseByCat = Array.from(byCat.entries()).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }));
 
     return { income, expenses, profit, margin, cobrado, invIncome, compras, nomina, manualIncome, manualExpense, ventas, expenseByCat };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, pos, payroll, txs, quotes, cobranza, period]);
 
   // Serie mensual (últimos 6 meses): ingresos vs egresos
@@ -87,14 +93,15 @@ export function Finance() {
     const now = new Date();
     return Array.from({ length: 6 }, (_, idx) => {
       const d = subMonths(now, 5 - idx);
-      const inMonth = (s: string | null | undefined) => !!s && isSameMonth(new Date(s), d);
+      const inMonth = (s: string | null | undefined) => !!s && isSameMonth(toLocalDate(s), d);
       const income = cobranza.filter(p => inMonth(p.paid_date)).reduce((s, p) => s + (p.amount || 0), 0)
         + txs.filter(t => t.kind === 'income' && inMonth(t.tx_date)).reduce((s, t) => s + t.amount, 0);
-      const expense = pos.filter(p => inMonth(p.created_at)).reduce((s, p) => s + (p.total_amount || 0), 0)
-        + payroll.filter(p => inMonth(p.created_at)).reduce((s, p) => s + (p.total_net || 0), 0)
+      const expense = realPos.filter(p => inMonth(p.created_at)).reduce((s, p) => s + (p.total_amount || 0), 0)
+        + paidPayroll.filter(p => inMonth(p.created_at)).reduce((s, p) => s + (p.total_net || 0), 0)
         + txs.filter(t => t.kind === 'expense' && inMonth(t.tx_date)).reduce((s, t) => s + t.amount, 0);
       return { label: format(d, 'MMM yy', { locale: es }), Ingresos: Math.round(income), Egresos: Math.round(expense) };
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cobranza, pos, payroll, txs]);
 
   const exportCsv = () => {
@@ -109,7 +116,7 @@ export function Finance() {
       ['UTILIDAD', agg.profit.toFixed(2)].join(','),
       '',
       ['Fecha', 'Tipo', 'Categoría', 'Descripción', 'Monto'].join(','),
-      ...txs.filter(t => new Date(t.tx_date) >= start).map(t =>
+      ...txs.filter(t => toLocalDate(t.tx_date) >= start).map(t =>
         [t.tx_date, t.kind === 'income' ? 'Ingreso' : 'Egreso', csv(t.category ?? ''), csv(t.description ?? ''), t.amount.toFixed(2)].join(',')),
     ].join('\n');
     const blob = new Blob([`﻿${lines}`], { type: 'text/csv;charset=utf-8;' });
@@ -178,7 +185,7 @@ export function Finance() {
           <CardHeader className="pb-2"><CardTitle className="text-base">Ingresos vs Egresos</CardTitle><CardDescription>Últimos 6 meses</CardDescription></CardHeader>
           <CardContent className="pb-4">
             <div className="h-[260px] -ml-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <BarChart data={monthly}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                   <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
@@ -202,7 +209,7 @@ export function Finance() {
             ) : (
               <>
                 <div className="h-[170px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                     <PieChart>
                       <Pie data={agg.expenseByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={44} outerRadius={68} paddingAngle={3} strokeWidth={0}>
                         {agg.expenseByCat.map((_, i) => <Cell key={i} fill={EXP_COLORS[i % EXP_COLORS.length]} />)}

@@ -59,6 +59,7 @@ import { NonconformingProcedureCard } from '@/components/quality/NonconformingPr
 import { CorrectiveActionsPanel } from '@/components/quality/CorrectiveActionsPanel';
 import { NCR_STATUS_VARIANT, SEVERITY_VARIANT, SELECT_CLS } from '@/components/quality/capaMeta';
 import type { BomItem, ManufacturingStatus, MeasurementInstrument, InstrumentStatus, Ncr, NcrStatus } from '@/types/database';
+import { toLocalDate } from '@/lib/dates';
 
 const NCR_STATUSES: NcrStatus[] = ['Abierta', 'En Investigación', 'Acción Correctiva', 'Cerrada'];
 
@@ -723,7 +724,7 @@ export function Quality() {
                 <TableBody>
                   {instruments.map(tool => {
                     const cs = calibrationState(tool.next_calibration);
-                    const days = tool.next_calibration ? Math.ceil((new Date(tool.next_calibration).getTime() - Date.now()) / 86_400_000) : null;
+                    const days = tool.next_calibration ? Math.ceil((toLocalDate(tool.next_calibration).getTime() - Date.now()) / 86_400_000) : null;
                     return (
                       <TableRow key={tool.id}>
                         <TableCell className="font-medium">{tool.name}</TableCell>

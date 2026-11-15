@@ -5,6 +5,7 @@ import { scopeByTenant } from './tenantScope';
 import { MOCK_PROJECTS } from './mocks';
 import type { Project, ProjectStatus } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
+import { insertWithUniqueId, newDocId } from './docIds';
 
 /**
  * Lista todos los proyectos ordenados por fecha de actualización desc.
@@ -20,7 +21,7 @@ export function useProjects(): AsyncState<Project[]> {
       if (error) throw error;
       return (data ?? []) as Project[];
     },
-    MOCK_PROJECTS,
+    supabase ? [] : MOCK_PROJECTS,
     [isSupabaseConfigured]
   );
 }
@@ -62,8 +63,7 @@ export function useCreateProject() {
   const create = useCallback(async (input: CreateProjectInput): Promise<Project> => {
     setState({ loading: true, error: null });
     try {
-      const year = new Date().getFullYear();
-      const id = `IMC-${year}-${String(Math.floor(Math.random() * 900) + 100)}`;
+      const id = newDocId('IMC');
       const now = new Date().toISOString();
 
       const draft: Project = {
@@ -92,7 +92,8 @@ export function useCreateProject() {
         return draft;
       }
 
-      const { data, error } = await supabase.from('projects').insert(draft).select('*').single();
+      const db = supabase;
+      const { data, error } = await insertWithUniqueId(draft, 'IMC', row => db.from('projects').insert(row).select('*').single());
       if (error) throw error;
       setState({ loading: false, error: null });
       return data as Project;

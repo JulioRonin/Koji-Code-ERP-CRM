@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
 import type { AsyncState, MutationState } from './types';
 import type { DimensionalReport } from '@/types/database';
+import { scopeByTenant } from './tenantScope';
 
 const DEMO_KEY = 'koji_demo_dimensional';
 const BUCKET = 'project-files';
@@ -47,9 +48,9 @@ export function useDimensionalReports(
             (!bomItemId || r.bom_item_id === bomItemId)
         );
       }
-      let query = supabase
+      let query = scopeByTenant(supabase
         .from('dimensional_reports')
-        .select('*')
+        .select('*'))
         .order('created_at', { ascending: false });
       if (projectId) query = query.eq('project_id', projectId);
       if (bomItemId) query = query.eq('bom_item_id', bomItemId);

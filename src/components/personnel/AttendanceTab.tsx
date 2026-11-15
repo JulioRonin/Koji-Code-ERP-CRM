@@ -126,7 +126,7 @@ export function AttendanceTab({ staff, isAdmin }: { staff: Profile[]; isAdmin: b
           </div>
           <div className="ml-auto flex gap-6 text-sm">
             <div><span className="text-[var(--color-app-text-muted)]">Horas pagadas: </span><span className="font-semibold tabular-nums">{totals.paid.toFixed(1)} h</span></div>
-            <div><span className="text-[var(--color-app-text-muted)]">Monto del día: </span><span className="font-semibold tabular-nums">{money(totals.pay)}</span></div>
+            {isAdmin && <div><span className="text-[var(--color-app-text-muted)]">Monto del día: </span><span className="font-semibold tabular-nums">{money(totals.pay)}</span></div>}
           </div>
         </CardContent>
       </Card>
@@ -143,7 +143,7 @@ export function AttendanceTab({ staff, isAdmin }: { staff: Profile[]; isAdmin: b
                 <TableHead className="text-right">Trabajadas</TableHead>
                 <TableHead className="text-center">Estado</TableHead>
                 <TableHead className="text-right w-28">Horas pagadas</TableHead>
-                <TableHead className="text-right">Pago</TableHead>
+                {isAdmin && <TableHead className="text-right">Pago</TableHead>}
                 <TableHead className="text-right">Checador</TableHead>
               </TableRow>
             </TableHeader>
@@ -181,7 +181,7 @@ export function AttendanceTab({ staff, isAdmin }: { staff: Profile[]; isAdmin: b
                         className="h-8 w-20 text-right text-xs ml-auto"
                       />
                     </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{money(pay)}</TableCell>
+                    {isAdmin && <TableCell className="text-right tabular-nums font-medium">{money(pay)}</TableCell>}
                     <TableCell className="text-right">
                       {isAdmin && (
                         <div className="flex justify-end gap-1">

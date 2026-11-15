@@ -51,6 +51,7 @@ import type { PmoReportType, Project } from '@/types/database';
 import { ProjectReport } from '@/components/projects/ProjectReport';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
 import { cn } from '@/lib/utils';
+import { toLocalDate } from '@/lib/dates';
 
 const GANTT_MOCK = [
   { id: 't1', name: 'Procura de Acero',    department: 'Compras' as const,    startDay: 0,  duration: 5,  progress: 100, status: 'completed' as const },
@@ -119,7 +120,9 @@ export function Pmo() {
   const reportsByMonth = useMemo(() => {
     const months: { key: string; label: string; generados: number; enviados: number }[] = [];
     for (let i = 5; i >= 0; i--) {
+      // Desde el día 1: con setMonth en un día 29–31 se saltaba/duplicaba un mes.
       const d = new Date();
+      d.setDate(1);
       d.setMonth(d.getMonth() - i);
       months.push({
         key: `${d.getFullYear()}-${d.getMonth()}`,
@@ -227,7 +230,7 @@ export function Pmo() {
           </CardHeader>
           <CardContent className="pb-4">
             <div className="h-[200px] md:h-[240px] -ml-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <BarChart data={reportsByMonth}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                   <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} className="capitalize" />
@@ -264,7 +267,7 @@ export function Pmo() {
             ) : (
               <>
                 <div className="h-[150px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                     <PieChart>
                       <Pie
                         data={reportsByType}
@@ -342,7 +345,7 @@ export function Pmo() {
                       </div>
                       <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5">
                         {p.client_name} · estado {p.status} · entrega{' '}
-                        {format(new Date(p.deadline), 'dd MMM yyyy', { locale: es })}
+                        {format(toLocalDate(p.deadline), 'dd MMM yyyy', { locale: es })}
                       </p>
                     </div>
                     <Button

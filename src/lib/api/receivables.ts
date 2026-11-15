@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
 import { scopeByTenant } from './tenantScope';
 import type { AsyncState, MutationState } from './types';
+import { toLocalDate } from '@/lib/dates';
 
 export interface Receivable {
   id: string;
@@ -37,7 +38,8 @@ export type ReceivableStatus = 'pendiente' | 'parcial' | 'liquidado' | 'vencido'
 /** Estatus derivado de lo pagado vs total y la fecha de vencimiento. */
 export function receivableStatus(total: number, paid: number, dueDate: string | null): ReceivableStatus {
   if (paid >= total && total > 0) return 'liquidado';
-  const overdue = dueDate ? new Date(dueDate) < new Date() : false;
+  // Vence al terminar el día de vencimiento (fecha local, no UTC).
+  const overdue = dueDate ? toLocalDate(dueDate).getTime() + 86_400_000 <= Date.now() : false;
   if (overdue) return 'vencido';
   return paid > 0 ? 'parcial' : 'pendiente';
 }

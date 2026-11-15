@@ -46,7 +46,7 @@ export const ROLE_ACCESS: Record<string, string[]> = {
 /** Normaliza un rol guardado en BD para tolerar variaciones simples (acentos,
  *  espacios extra, mayúsculas). Si después de normalizar coincide con una
  *  clave conocida, la devuelve; si no, devuelve el original. */
-function resolveRole(role: string): string {
+export function resolveRole(role: string): string {
   if (ROLE_ACCESS[role]) return role;
   const norm = role
     .normalize('NFD')
@@ -134,4 +134,20 @@ export function defaultRouteForRole(role: string | undefined): string {
   // del antiguo /chat, que dejaba al usuario "atrapado" si no podía ver nada).
   if (allowed.includes('/')) return '/';
   return allowed[0] ?? '/';
+}
+
+/** Roles que pueden ver montos (precios, costos, valor de inventario, ventas).
+ *  Regla de negocio: administradores y Compras (cotiza y genera órdenes de
+ *  compra); el resto de los roles operativos no ve cifras de dinero. */
+const AMOUNT_ROLES = ['Administrador', 'Administración / PM', 'Compras'];
+
+export function canSeeAmounts(role: string | undefined, isPlatformOwner = false): boolean {
+  if (isPlatformOwner) return true;
+  if (!role) return false;
+  return AMOUNT_ROLES.includes(resolveRole(role));
+}
+
+/** ¿El rol (con variantes como "Tecnico") es Técnico? */
+export function isTechnicianRole(role: string | undefined): boolean {
+  return !!role && resolveRole(role) === 'Técnico';
 }

@@ -55,6 +55,7 @@ import { ProjectFormModal } from './ProjectFormModal';
 import { useChat } from '@/contexts/ChatContext';
 import { useProjects, useCreateProject, useDeleteProject } from '@/lib/api';
 import type { Project, ProjectStatus } from '@/types/database';
+import { toLocalDate } from '@/lib/dates';
 
 const statusVariant: Record<ProjectStatus, 'default' | 'secondary' | 'success' | 'outline' | 'warning'> = {
   'En Producción': 'default',
@@ -71,7 +72,7 @@ const columnHelper = createColumnHelper<Project>();
 
 /** Fila de proyecto reutilizable (usada en la vista agrupada). */
 function ProjectRow({ project, onOpen, onDelete }: { project: Project; onOpen: () => void; onDelete: () => void }) {
-  const date = new Date(project.deadline);
+  const date = toLocalDate(project.deadline);
   return (
     <TableRow className="cursor-pointer" onClick={onOpen}>
       <TableCell className="font-mono text-xs text-[var(--color-app-text-muted)]">{project.id}</TableCell>
@@ -190,7 +191,7 @@ export function Projects() {
     columnHelper.accessor('deadline', {
       header: 'Entrega',
       cell: info => {
-        const date = new Date(info.getValue());
+        const date = toLocalDate(info.getValue());
         return (
           <div className="flex items-center gap-2 text-sm text-[var(--color-app-text-muted)]">
             <Calendar className="h-3.5 w-3.5" />

@@ -8,6 +8,7 @@ import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { isBlocked, isOnTrial } from '@/lib/saas';
 import { Subscription } from '@/pages/saas/Subscription';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -103,7 +104,9 @@ export function AppShell() {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="px-4 py-4 md:px-8 md:py-6 max-w-[1600px] mx-auto w-full">
-            <Outlet />
+            <ErrorBoundary resetKey={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </div>
       </main>

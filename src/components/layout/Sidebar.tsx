@@ -28,7 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useTenant } from '@/contexts/TenantContext';
 import { moduleKeyForPath } from '@/lib/saas';
-import { canAccessPath } from '@/lib/permissions';
+import { canAccessPath, isTechnicianRole } from '@/lib/permissions';
 
 type NavItem = {
   name: string;
@@ -80,7 +80,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       return mk ? isEnabled(mk) : true;
     })
     .map(item =>
-      user?.role === 'Técnico' && item.path === '/technicians'
+      isTechnicianRole(user?.role) && item.path === '/technicians'
         ? { ...item, name: 'Mi portal', path: '/technician-portal' }
         : item
     );

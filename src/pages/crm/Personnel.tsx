@@ -259,7 +259,7 @@ export function Personnel() {
 
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit">
-        {tabs.map(t => (
+        {tabs.filter(t => isAdmin || t.id !== 'payroll').map(t => (
           <button
             key={t.id}
             onClick={() => {
@@ -477,7 +477,8 @@ export function Personnel() {
       {activeTab === 'attendance' && <AttendanceTab staff={staff} isAdmin={isAdmin} />}
 
       {/* Payroll */}
-      {activeTab === 'payroll' && <PayrollTab staff={staff} isAdmin={isAdmin} />}
+      {/* Nómina = sueldos: solo administradores. */}
+      {activeTab === 'payroll' && isAdmin && <PayrollTab staff={staff} isAdmin={isAdmin} />}
 
       {/* Edit modal (sólo administradores) */}
       {editDraft && selectedStaff && (

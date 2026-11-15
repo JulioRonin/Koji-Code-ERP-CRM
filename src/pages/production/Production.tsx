@@ -228,7 +228,7 @@ export function Production() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {machines.map(m => {
               const activeWO = workOrders.find(w => w.machine_id === m.id && w.status === 'En Proceso');
-              const progress = activeWO ? Math.round((activeWO.completed_qty / activeWO.quantity) * 100) : 0;
+              const progress = activeWO && activeWO.quantity > 0 ? Math.round((activeWO.completed_qty / activeWO.quantity) * 100) : 0;
               return (
                 <Card
                   key={m.id}
@@ -399,7 +399,7 @@ export function Production() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1 w-36">
-                            <Progress value={(wo.completed_qty / wo.quantity) * 100} className="h-1.5" />
+                            <Progress value={wo.quantity > 0 ? (wo.completed_qty / wo.quantity) * 100 : 0} className="h-1.5" />
                             <span className="text-xs text-[var(--color-app-text-muted)] tabular-nums">
                               {wo.completed_qty} / {wo.quantity}
                             </span>

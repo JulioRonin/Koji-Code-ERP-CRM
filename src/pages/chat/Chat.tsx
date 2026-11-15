@@ -39,13 +39,19 @@ export function Chat() {
   // una sola vez y luego limpia el query string.
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
+    // Espera a que carguen los canales para no perder ?channel=.
+    if (channels.length === 0) return;
     const prefill = searchParams.get('prefill');
     const preferredChannel = searchParams.get('channel');
-    if (preferredChannel && channels.some(c => c.id === preferredChannel)) {
-      setActiveChannelId(preferredChannel);
+    if (preferredChannel) {
+      // Acepta id o nombre ("ch-produccion" → "producción").
+      const norm = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^ch-/, '');
+      const target = channels.find(c => c.id === preferredChannel) ?? channels.find(c => norm(c.name) === norm(preferredChannel));
+      if (target) setActiveChannelId(target.id);
     }
     if (prefill) {
-      setNewMessage(decodeURIComponent(prefill));
+      // searchParams ya viene decodificado (decodificar otra vez rompe con "%").
+      setNewMessage(prefill);
     }
     if (prefill || preferredChannel) {
       const next = new URLSearchParams(searchParams);

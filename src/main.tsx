@@ -7,6 +7,7 @@ import { AuthProvider } from './contexts/AuthContext.tsx';
 import { CompanyProvider } from './contexts/CompanyContext.tsx';
 import { TenantProvider } from './contexts/TenantContext.tsx';
 import { registerSW } from 'virtual:pwa-register';
+import { ErrorBoundary } from './components/layout/ErrorBoundary.tsx';
 
 // Registra el service worker (PWA). autoUpdate: recarga en silencio al haber nueva versión.
 registerSW({ immediate: true });
@@ -17,7 +18,9 @@ createRoot(document.getElementById('root')!).render(
       <CompanyProvider>
         <AuthProvider>
           <ChatProvider>
-            <App />
+            <ErrorBoundary fullScreen>
+              <App />
+            </ErrorBoundary>
           </ChatProvider>
         </AuthProvider>
       </CompanyProvider>

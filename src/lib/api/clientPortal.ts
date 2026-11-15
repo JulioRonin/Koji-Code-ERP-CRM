@@ -141,13 +141,15 @@ export function useClientPortalData(token: string | undefined): AsyncState<Clien
       }
 
       // --- Modo Supabase ---
+      // Solo columnas que el portal muestra: el cliente (anónimo) nunca debe
+      // recibir montos (quote_amount, precios de partidas) ni datos internos.
       const { data: projectRow, error: projErr } = await supabase
         .from('projects')
-        .select('*')
+        .select('id, name, client_name, status, progress, start_date, deadline, delivered_at, client_portal_token, client_portal_expires, created_at, updated_at, tenant_id')
         .eq('client_portal_token', token)
         .maybeSingle();
       if (projErr || !projectRow) return empty;
-      const project = projectRow as Project;
+      const project = { quote_amount: null, purchase_order: null, description: null, ...projectRow } as unknown as Project;
 
       // Verifica vigencia
       if (project.client_portal_expires && new Date(project.client_portal_expires) < new Date()) {
@@ -156,7 +158,10 @@ export function useClientPortalData(token: string | undefined): AsyncState<Clien
 
       const projectTenant = (project as Project & { tenant_id?: string | null }).tenant_id ?? null;
       const [{ data: parts }, { data: inspections }, { data: files }, brandRes] = await Promise.all([
-        supabase.from('bom_items').select('*').eq('project_id', project.id),
+        supabase
+          .from('bom_items')
+          .select('id, project_id, part_number, description, category, material, quantity, production_quantity, uom, bom_status, manufacturing_status, production_relevant, image_url, created_at, updated_at')
+          .eq('project_id', project.id),
         supabase
           .from('quality_inspections')
           .select('*')

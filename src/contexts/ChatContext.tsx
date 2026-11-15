@@ -1,6 +1,8 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useSendMessage, useChannels } from '@/lib/api';
 import type { MessageType } from '@/types/database';
+import { useAuth } from './AuthContext';
+import { useTenant } from './TenantContext';
 
 /**
  * ChatContext es un wrapper minimal sobre los hooks reales.
@@ -33,7 +35,10 @@ const LEGACY_CHANNEL_MAP: Record<string, string> = {
 };
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const { data: channels } = useChannels();
+  const { user } = useAuth();
+  const { tenant } = useTenant();
+  // Se monta antes del login: recarga los canales cuando cambia el usuario o la empresa.
+  const { data: channels } = useChannels(`${user?.id ?? ''}|${tenant.id}`);
   const { send } = useSendMessage();
 
   const sendSystemMessage = async (channelHint: string, content: string, type: MessageType = 'SYSTEM') => {

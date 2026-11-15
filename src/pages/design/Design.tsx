@@ -36,6 +36,7 @@ import { DesignChecklist } from '@/components/design/DesignChecklist';
 import { useProjects } from '@/lib/api';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { toLocalDate } from '@/lib/dates';
 
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'default' | 'outline'> = {
   'Cotización': 'warning',
@@ -181,7 +182,7 @@ export function Design() {
                       <Badge variant={statusVariant[task.status] ?? 'secondary'}>{task.status}</Badge>
                     </TableCell>
                     <TableCell className="text-[var(--color-app-text-muted)]">
-                      {task.dueDate ? format(new Date(task.dueDate), 'dd MMM yyyy') : '—'}
+                      {task.dueDate ? format(toLocalDate(task.dueDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>

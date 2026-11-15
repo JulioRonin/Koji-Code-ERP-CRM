@@ -33,6 +33,9 @@ export function useAsync<T>(fn: () => Promise<T>, initialData: T, deps: unknown[
   // dependiente del loading se reseteara). El spinner solo aparece en la carga
   // inicial o al cambiar de contexto (deps).
   const hasLoadedRef = useRef(false);
+  // Id de la petición más reciente: descarta respuestas viejas que lleguen
+  // después de cambiar de contexto (p. ej. cambiar rápido de canal/proyecto).
+  const requestIdRef = useRef(0);
 
   // Si las deps cambiaron desde el render anterior, perdemos el "anchor"
   // de datos previos (es otro contexto) y volvemos a permitir el spinner.
@@ -52,17 +55,20 @@ export function useAsync<T>(fn: () => Promise<T>, initialData: T, deps: unknown[
   const execute = useCallback(async () => {
     // Solo mostramos loading en la carga inicial (o al cambiar de contexto).
     // Los refetch posteriores son silenciosos: conservan los datos en pantalla.
+    const requestId = ++requestIdRef.current;
     if (!hasLoadedRef.current) setLoading(true);
     setError(null);
     try {
       const result = await fn();
-      if (mountedRef.current) {
+      if (mountedRef.current && requestId === requestIdRef.current) {
         hasLoadedRef.current = true;
         const resultIsEmptyArray = Array.isArray(result) && result.length === 0;
+        // Con un solo registro previo, quedarse en vacío es lo normal tras
+        // borrarlo: solo protegemos listas con varios registros.
         const anchorHadRealData =
           lastRealNonEmptyRef.current != null &&
           Array.isArray(lastRealNonEmptyRef.current) &&
-          (lastRealNonEmptyRef.current as unknown[]).length > 0;
+          (lastRealNonEmptyRef.current as unknown[]).length > 1;
 
         if (resultIsEmptyArray && anchorHadRealData) {
           // Resultado vacío inesperado tras haber tenido datos reales:
@@ -81,9 +87,9 @@ export function useAsync<T>(fn: () => Promise<T>, initialData: T, deps: unknown[
         }
       }
     } catch (err) {
-      if (mountedRef.current) setError(err as Error);
+      if (mountedRef.current && requestId === requestIdRef.current) setError(err as Error);
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && requestId === requestIdRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
@@ -97,8 +103,9 @@ export function useAsync<T>(fn: () => Promise<T>, initialData: T, deps: unknown[
   const mutate = useCallback((updater: (prev: T) => T) => {
     setData(prev => {
       const next = updater(prev);
-      if (Array.isArray(next) && next.length > 0) {
-        lastRealNonEmptyRef.current = next as T;
+      if (Array.isArray(next)) {
+        // Un vaciado explícito (p. ej. borrar el último) sí es intencional.
+        lastRealNonEmptyRef.current = next.length > 0 ? (next as T) : null;
       }
       return next;
     });

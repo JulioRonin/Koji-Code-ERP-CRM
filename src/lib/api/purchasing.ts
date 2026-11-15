@@ -39,7 +39,7 @@ export function useSuppliers(): AsyncState<Supplier[]> {
       if (error) throw error;
       return (data ?? []) as Supplier[];
     },
-    MOCK_SUPPLIERS,
+    supabase ? [] : MOCK_SUPPLIERS,
     []
   );
 }
@@ -129,7 +129,7 @@ export function useRequisitions(): AsyncState<Requisition[]> {
       if (error) throw error;
       return (data ?? []) as Requisition[];
     },
-    MOCK_REQUISITIONS,
+    supabase ? [] : MOCK_REQUISITIONS,
     []
   );
 }
@@ -330,21 +330,26 @@ export function useReceivePurchaseOrder() {
         if (error) throw error;
         items = (data ?? []) as PurchaseOrderItem[];
       }
-      // 2. Suma al inventario lo que esté ligado a un producto.
+      // 2. Por partida: suma al inventario lo pendiente y en seguida marca
+      //    received_qty. Así, si algo falla a medias, un reintento no vuelve a
+      //    sumar lo que ya entró.
       for (const it of items) {
         const pending = it.quantity - (it.received_qty ?? 0);
-        if (it.inventory_item_id && pending > 0) {
+        if (pending <= 0) continue;
+        if (it.inventory_item_id) {
           await applyInventoryMovement(it.inventory_item_id, 'entrada', pending, 'Recepción OC', poId);
         }
+        if (!supabase) {
+          write(POI_KEY, read<PurchaseOrderItem>(POI_KEY, []).map(i => i.id === it.id ? { ...i, received_qty: i.quantity } : i));
+        } else {
+          const { error } = await supabase.from('purchase_order_items').update({ received_qty: it.quantity }).eq('id', it.id);
+          if (error) throw error;
+        }
       }
-      // 3. Marca recibido (received_qty = quantity) + estatus.
+      // 3. Estatus de la OC.
       if (!supabase) {
-        write(POI_KEY, read<PurchaseOrderItem>(POI_KEY, []).map(i => i.purchase_order_id === poId ? { ...i, received_qty: i.quantity } : i));
         write(PO_KEY, read<PurchaseOrder>(PO_KEY, []).map(p => p.id === poId ? { ...p, status: 'Recibida', received_at: now, updated_at: now } : p));
       } else {
-        for (const it of items) {
-          await supabase.from('purchase_order_items').update({ received_qty: it.quantity }).eq('id', it.id);
-        }
         const { error } = await supabase.from('purchase_orders').update({ status: 'Recibida', received_at: now, updated_at: now }).eq('id', poId);
         if (error) throw error;
       }

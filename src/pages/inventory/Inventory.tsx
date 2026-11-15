@@ -20,6 +20,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useTenant } from '@/contexts/TenantContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { canSeeAmounts } from '@/lib/permissions';
 import {
   useInventoryItems, useUpsertInventoryItem, useDeleteInventoryItem, useRegisterMovement,
   useBulkInsertInventory, stockStatus,
@@ -79,6 +81,9 @@ export function Inventory() {
     );
   }, [items, search]);
 
+  const { user } = useAuth();
+  const showAmounts = canSeeAmounts(user?.role, user?.isPlatformOwner);
+
   const stats = useMemo(() => {
     const value = items.reduce((s, i) => s + i.stock * i.unit_cost, 0);
     const low = items.filter(i => stockStatus(i) === 'bajo').length;
@@ -133,9 +138,9 @@ export function Inventory() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className={cn('grid grid-cols-2 gap-3', showAmounts ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
         <Kpi icon={Boxes} label="Productos (SKU)" value={String(stats.skus)} />
-        <Kpi icon={DollarSign} label="Valor del inventario" value={MXN.format(stats.value)} tone="primary" />
+        {showAmounts && <Kpi icon={DollarSign} label="Valor del inventario" value={MXN.format(stats.value)} tone="primary" />}
         <Kpi icon={AlertTriangle} label="Bajo mínimo" value={String(stats.low)} tone={stats.low ? 'warning' : 'muted'} />
         <Kpi icon={PackageX} label="Agotados" value={String(stats.out)} tone={stats.out ? 'danger' : 'muted'} />
       </div>
@@ -211,7 +216,7 @@ export function Inventory() {
                   <TableHead className="text-center">Mín / Máx</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Entrega</TableHead>
-                  <TableHead className="text-right">{mode === 'insumos' ? 'Precio venta' : 'Valor'}</TableHead>
+                  {showAmounts && <TableHead className="text-right">{mode === 'insumos' ? 'Precio venta' : 'Valor'}</TableHead>}
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -247,9 +252,11 @@ export function Inventory() {
                           <span className="text-[var(--color-app-text-subtle)]">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {mode === 'insumos' ? MXN.format(i.unit_price) : MXN.format(i.stock * i.unit_cost)}
-                      </TableCell>
+                      {showAmounts && (
+                        <TableCell className="text-right tabular-nums">
+                          {mode === 'insumos' ? MXN.format(i.unit_price) : MXN.format(i.stock * i.unit_cost)}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           {(st === 'bajo' || st === 'agotado') && (
@@ -432,6 +439,8 @@ function ItemFormModal({ item, onClose, onSaved }: {
   item: InventoryItem | null; onClose: () => void; onSaved: () => void;
 }) {
   const { save, loading } = useUpsertInventoryItem();
+  const { user } = useAuth();
+  const showAmounts = canSeeAmounts(user?.role, user?.isPlatformOwner);
   const [f, setF] = useState({
     sku: item?.sku ?? '', name: item?.name ?? '', category: item?.category ?? 'General', uom: item?.uom ?? 'Pza',
     stock: String(item?.stock ?? 0), min_stock: String(item?.min_stock ?? 0), max_stock: item?.max_stock != null ? String(item.max_stock) : '',
@@ -492,8 +501,12 @@ function ItemFormModal({ item, onClose, onSaved }: {
           {!item && <L label="Stock inicial"><Input type="number" value={f.stock} onChange={set('stock')} /></L>}
           <L label="Mínimo (reorden)"><Input type="number" value={f.min_stock} onChange={set('min_stock')} /></L>
           <L label="Máximo"><Input type="number" value={f.max_stock} onChange={set('max_stock')} placeholder="Opcional" /></L>
-          <L label="Costo unitario"><Input type="number" value={f.unit_cost} onChange={set('unit_cost')} /></L>
-          <L label="Precio venta"><Input type="number" value={f.unit_price} onChange={set('unit_price')} /></L>
+          {showAmounts && (
+            <>
+              <L label="Costo unitario"><Input type="number" value={f.unit_cost} onChange={set('unit_cost')} /></L>
+              <L label="Precio venta"><Input type="number" value={f.unit_price} onChange={set('unit_price')} /></L>
+            </>
+          )}
           <L label="Ubicación"><Input value={f.location} onChange={set('location')} placeholder="A-1, Almacén…" /></L>
           <L label="Proveedor"><Input value={f.supplier_name} onChange={set('supplier_name')} /></L>
           <L label="Tiempo de entrega (días)" full>

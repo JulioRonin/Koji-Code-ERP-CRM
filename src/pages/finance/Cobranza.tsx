@@ -16,6 +16,7 @@ import {
   type Receivable, type ReceivablePayment, type PaymentKind, type ReceivableStatus,
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { toLocalDate } from '@/lib/dates';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
 const money0 = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
@@ -50,7 +51,7 @@ export function Cobranza() {
     const porCobrar = enriched.reduce((s, r) => s + r.balance, 0);
     const vencido = enriched.filter(r => r.status === 'vencido').reduce((s, r) => s + r.balance, 0);
     const now = new Date();
-    const cobradoMes = payments.filter(p => { const d = new Date(p.paid_date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).reduce((s, p) => s + p.amount, 0);
+    const cobradoMes = payments.filter(p => { const d = toLocalDate(p.paid_date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).reduce((s, p) => s + p.amount, 0);
     const activas = enriched.filter(r => r.status !== 'liquidado').length;
     return { porCobrar, vencido, cobradoMes, activas };
   }, [enriched, payments]);

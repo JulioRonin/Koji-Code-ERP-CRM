@@ -240,7 +240,7 @@ export function Profitability() {
             ) : (
               <>
                 <div className="h-[180px] -ml-4">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                     <BarChart data={byClient.slice(0, 6)} layout="vertical" margin={{ left: 8, right: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                       <XAxis type="number" stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />

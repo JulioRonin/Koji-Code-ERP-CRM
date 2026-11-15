@@ -13,6 +13,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useQuotePhotoUrls } from '@/lib/api';
 import { ADVANCE_TERMS_TEXT } from '@/lib/quoteTerms';
 import type { Quote, QuoteItem } from '@/types/database';
+import { toLocalDate } from '@/lib/dates';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
@@ -112,7 +113,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
                   Vigencia:{' '}
                   <span className="font-medium text-[#0f172a]">
                     {quote.valid_until
-                      ? format(new Date(quote.valid_until), 'dd MMM yyyy', { locale: es })
+                      ? format(toLocalDate(quote.valid_until), 'dd MMM yyyy', { locale: es })
                       : '30 días naturales'}
                   </span>
                 </span>
@@ -159,7 +160,7 @@ export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentP
               Vigencia:{' '}
               <span className="font-medium text-[#0f172a]">
                 {quote.valid_until
-                  ? format(new Date(quote.valid_until), 'dd MMM yyyy', { locale: es })
+                  ? format(toLocalDate(quote.valid_until), 'dd MMM yyyy', { locale: es })
                   : '30 días naturales'}
               </span>
             </p>

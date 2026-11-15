@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
 import type { AsyncState } from './types';
+import { scopeByTenant } from './tenantScope';
 
 /**
  * Devuelve el set de project_ids que tienen al menos un master plan activo.
@@ -18,10 +19,10 @@ export function useProjectsMasterPlanStatus(): AsyncState<Set<string>> {
           return new Set();
         }
       }
-      const { data, error } = await supabase
+      const { data, error } = await scopeByTenant(supabase
         .from('master_plans')
         .select('project_id')
-        .eq('status', 'Activo');
+        .eq('status', 'Activo'));
       if (error) throw error;
       return new Set(((data ?? []) as { project_id: string }[]).map(r => r.project_id));
     },

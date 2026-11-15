@@ -41,7 +41,7 @@ import { Maintenance } from './pages/maintenance/Maintenance';
 import { Chat } from './pages/chat/Chat';
 import { useAuth } from './contexts/AuthContext';
 import { TechnicianDashboard } from './pages/technicians/TechnicianDashboard';
-import { canAccessPath, defaultRouteForRole } from './lib/permissions';
+import { canAccessPath, defaultRouteForRole, isTechnicianRole } from './lib/permissions';
 
 // Role-based Access Guard
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -84,14 +84,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   // Técnicos viven en /technician-portal pero pueden ir a /chat para
   // discutir piezas concretas. Cualquier otra ruta los regresa al portal.
+  const isTech = isTechnicianRole(user?.role);
   if (
-    user?.role === 'Técnico' &&
+    isTech &&
     !location.pathname.startsWith('/technician-portal') &&
     !location.pathname.startsWith('/chat')
   ) {
     return <Navigate to="/technician-portal" replace />;
   }
-  if (user?.role !== 'Técnico' && location.pathname.startsWith('/technician-portal')) {
+  if (!isTech && location.pathname.startsWith('/technician-portal')) {
     return <Navigate to="/" replace />;
   }
 

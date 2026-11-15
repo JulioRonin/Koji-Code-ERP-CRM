@@ -115,6 +115,7 @@ export function QuoteBuilder() {
   const [savedMsg, setSavedMsg] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [emailTo, setEmailTo] = useState('');
   const [sending, setSending] = useState(false);
   const [emailMsg, setEmailMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
@@ -265,12 +266,17 @@ export function QuoteBuilder() {
     // Al aprobar por primera vez, descuenta del inventario las partidas ligadas.
     if (status === 'Aprobada' && !quote.inventory_deducted) {
       const linked = computedItems.filter(it => it.inventory_item_id && it.quantity > 0);
+      if (linked.length > 0 && dirty) {
+        window.alert('Guarda los cambios de las partidas antes de aprobar: el inventario se descuenta de lo guardado.');
+        return;
+      }
       if (linked.length > 0) {
         const ok = window.confirm(
           `Esta cotización tiene ${linked.length} partida(s) ligada(s) al inventario.\n` +
           `Al aprobarla se descontará el stock correspondiente. ¿Continuar?`
         );
         if (!ok) return;
+        const applied: typeof linked = [];
         try {
           for (const it of linked) {
             await applyInventoryMovement(
@@ -280,8 +286,19 @@ export function QuoteBuilder() {
               `Cotización ${quote.id}`,
               quote.id
             );
+            applied.push(it);
           }
         } catch (e) {
+          // Revierte lo ya descontado para que un segundo intento no lo duplique.
+          for (const it of applied) {
+            await applyInventoryMovement(
+              it.inventory_item_id as string,
+              'entrada',
+              it.quantity,
+              `Reverso cotización ${quote.id}`,
+              quote.id
+            ).catch(() => {});
+          }
           window.alert(`No se pudo descontar el inventario: ${(e as Error).message}`);
           return;
         }
@@ -379,29 +396,41 @@ export function QuoteBuilder() {
   };
 
   const handleConvertToProject = async () => {
-    if (!quote) return;
-    const project = await createProject({
-      name: quote.project_name,
-      client_name: quote.client_name,
-      description: `Generado desde cotización ${quote.id}. ${quote.notes ?? ''}`.trim(),
-      start_date: format(new Date(), 'yyyy-MM-dd'),
-      deadline: format(addDays(new Date(), 45), 'yyyy-MM-dd'),
-    });
-    if (computedItems.length > 0) {
-      await insertBom(
-        computedItems.map(it => ({
-          project_id: project.id,
-          part_number: it.part_number,
-          description: it.description,
-          category: 'General',
-          quantity: it.quantity,
-          uom: 'Pzas',
-          material: it.material_name,
-        }))
-      );
+    if (!quote || converting) return;
+    // Ya convertida: abre el proyecto en vez de crear un duplicado.
+    if (quote.converted_project_id) {
+      navigate(`/projects/${quote.converted_project_id}`);
+      return;
     }
-    await updateQuote(quote.id, { status: 'Convertida', converted_project_id: project.id });
-    navigate(`/projects/${project.id}`);
+    setConverting(true);
+    try {
+      const project = await createProject({
+        name: quote.project_name,
+        client_name: quote.client_name,
+        description: `Generado desde cotización ${quote.id}. ${quote.notes ?? ''}`.trim(),
+        start_date: format(new Date(), 'yyyy-MM-dd'),
+        deadline: format(addDays(new Date(), 45), 'yyyy-MM-dd'),
+      });
+      if (computedItems.length > 0) {
+        await insertBom(
+          computedItems.map(it => ({
+            project_id: project.id,
+            part_number: it.part_number,
+            description: it.description,
+            category: 'General',
+            quantity: it.quantity,
+            uom: 'Pzas',
+            material: it.material_name,
+          }))
+        );
+      }
+      await updateQuote(quote.id, { status: 'Convertida', converted_project_id: project.id });
+      navigate(`/projects/${project.id}`);
+    } catch (e) {
+      window.alert(`No se pudo convertir a proyecto: ${(e as Error).message}`);
+    } finally {
+      setConverting(false);
+    }
   };
 
   if (!quote) {
@@ -460,7 +489,7 @@ export function QuoteBuilder() {
             <Mail className="h-4 w-4 mr-1.5" /> Enviar por correo
           </Button>
           {quote.status === 'Aprobada' && (
-            <Button variant="outline" onClick={handleConvertToProject}>
+            <Button variant="outline" onClick={handleConvertToProject} disabled={converting}>
               <FolderKanban className="h-4 w-4 mr-1.5" /> Convertir a proyecto
             </Button>
           )}

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAsync } from './useAsync';
 import type { PmoReport, PmoReportType } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
+import { scopeByTenant } from './tenantScope';
 
 const DEMO_KEY = 'koji_demo_pmo_reports';
 
@@ -33,7 +34,7 @@ export function usePmoReports(projectId?: string): AsyncState<PmoReport[]> {
         const all = readDemo();
         return projectId ? all.filter(r => r.project_id === projectId) : all;
       }
-      let query = supabase.from('pmo_reports').select('*').order('created_at', { ascending: false });
+      let query = scopeByTenant(supabase.from('pmo_reports').select('*')).order('created_at', { ascending: false });
       if (projectId) query = query.eq('project_id', projectId);
       const { data, error } = await query;
       if (error) throw error;

@@ -470,7 +470,7 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
                   <div className="pmi-keep">
                     <h3 className="text-sm font-semibold text-[#0f172a] mb-3">Desempeño por departamento</h3>
                     <div className="h-[220px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                         <BarChart data={deptPerformanceData} layout="vertical" margin={{ left: 20, right: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                           <XAxis type="number" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} domain={[0, 100]} />
@@ -488,7 +488,7 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
                   <div className="pmi-keep">
                     <h3 className="text-sm font-semibold text-[#0f172a] mb-3">Curva de progreso (S-Curve)</h3>
                     <div className="h-[220px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                         <LineChart data={progressTimelineData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />

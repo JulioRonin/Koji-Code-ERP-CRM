@@ -8,6 +8,8 @@ import type {
   ShipmentStatus,
 } from '@/types/database';
 import type { AsyncState, MutationState } from './types';
+import { scopeByTenant } from './tenantScope';
+import { insertWithUniqueId, newDocId } from './docIds';
 
 const DEMO_SHIPMENTS_KEY = 'koji_demo_shipments';
 const DEMO_LABELS_KEY = 'koji_demo_shipping_labels';
@@ -40,9 +42,9 @@ export function useShipments(projectId?: string): AsyncState<Shipment[]> {
         const all = readDemo<Shipment>(DEMO_SHIPMENTS_KEY);
         return projectId ? all.filter(s => s.project_id === projectId) : all;
       }
-      let query = supabase
+      let query = scopeByTenant(supabase
         .from('shipments')
-        .select('*')
+        .select('*'))
         .order('created_at', { ascending: false });
       if (projectId) query = query.eq('project_id', projectId);
       const { data, error } = await query;
@@ -67,8 +69,7 @@ export function useCreateShipment() {
   const create = useCallback(async (input: CreateShipmentInput): Promise<Shipment> => {
     setState({ loading: true, error: null });
     try {
-      const year = new Date().getFullYear();
-      const id = `SHIP-${year}-${String(Math.floor(Math.random() * 900) + 100)}`;
+      const id = newDocId('SHIP');
       const now = new Date().toISOString();
 
       const draft: Shipment = {
@@ -94,7 +95,8 @@ export function useCreateShipment() {
         return draft;
       }
 
-      const { data, error } = await supabase.from('shipments').insert(draft).select('*').single();
+      const db = supabase;
+      const { data, error } = await insertWithUniqueId(draft, 'SHIP', row => db.from('shipments').insert(row).select('*').single());
       if (error) throw error;
       setState({ loading: false, error: null });
       return data as Shipment;
@@ -114,7 +116,7 @@ export function useCreateShipment() {
 export function useUpdateShipmentStatus() {
   const [state, setState] = useState<MutationState>({ loading: false, error: null });
 
-  const update = useCallback(async (id: string, status: ShipmentStatus, tracking?: string): Promise<void> => {
+  const update = useCallback(async (id: string, status: ShipmentStatus, tracking?: string, carrier?: string): Promise<void> => {
     setState({ loading: true, error: null });
     try {
       const now = new Date().toISOString();
@@ -125,6 +127,7 @@ export function useUpdateShipmentStatus() {
       if (status === 'En Tránsito') patch.shipped_at = now;
       if (status === 'Entregado') patch.delivered_at = now;
       if (tracking) patch.tracking_number = tracking;
+      if (carrier) patch.carrier = carrier;
 
       if (!supabase) {
         const all = readDemo<Shipment>(DEMO_SHIPMENTS_KEY);

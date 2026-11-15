@@ -39,7 +39,7 @@ export function useInspections(projectId?: string): AsyncState<QualityInspection
       if (error) throw error;
       return (data ?? []) as QualityInspection[];
     },
-    projectId ? MOCK_INSPECTIONS.filter(i => i.project_id === projectId) : MOCK_INSPECTIONS,
+    supabase ? [] : projectId ? MOCK_INSPECTIONS.filter(i => i.project_id === projectId) : MOCK_INSPECTIONS,
     [projectId]
   );
 }
@@ -83,7 +83,7 @@ export function useNcrs(projectId?: string): AsyncState<Ncr[]> {
       if (error) throw error;
       return (data ?? []) as Ncr[];
     },
-    projectId ? MOCK_NCRS.filter(n => n.project_id === projectId) : MOCK_NCRS,
+    supabase ? [] : projectId ? MOCK_NCRS.filter(n => n.project_id === projectId) : MOCK_NCRS,
     [projectId]
   );
 }
@@ -99,7 +99,7 @@ export function useInstruments(): AsyncState<MeasurementInstrument[]> {
       if (error) throw error;
       return (data ?? []) as MeasurementInstrument[];
     },
-    MOCK_INSTRUMENTS,
+    supabase ? [] : MOCK_INSTRUMENTS,
     []
   );
 }

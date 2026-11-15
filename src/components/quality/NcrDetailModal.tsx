@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { canSeeAmounts } from '@/lib/permissions';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
   useUpdateNcr, useCorrectiveActions, useUpdateManufacturingStatus, useProjects, CA_OPEN_STATUSES,
@@ -48,6 +49,7 @@ interface Props {
  */
 export function NcrDetailModal({ ncr, open, onClose, onChanged }: Props) {
   const { user } = useAuth();
+  const showAmounts = canSeeAmounts(user?.role, user?.isPlatformOwner);
   const { company } = useCompany();
   const { data: projects } = useProjects();
   const { update, loading } = useUpdateNcr();
@@ -195,7 +197,7 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:5p
 <h2>B3 · Disposición (MRB)</h2><table>${row('Disposición', disposition)}${row('Justificación', dispositionNotes)}${row('Decidió', ncr.disposition_by)}${row('Fecha', ncr.disposition_at ? format(new Date(ncr.disposition_at), 'dd MMM yyyy', { locale: es }) : '')}</table>
 <h2>B4 · Análisis de causa raíz (5 porqués)</h2><table>${whys.map((w, i) => row(`¿Por qué? ${i + 1}`, w)).join('')}${row('Causa raíz', rootCause)}</table>
 <h2>B5 · Acciones correctivas</h2>${linked.length ? `<table class="cas"><tr><th>Folio</th><th>Acción</th><th>Responsable</th><th>Compromiso</th><th>Estatus</th><th>Eficaz</th></tr>${casRows}</table>` : '<p>Sin acciones registradas.</p>'}
-<h2>B6 · Verificación de eficacia y cierre</h2><table>${row('Verificación', verification)}${row('¿Eficaz?', effective === '' ? '' : effective === 'si' ? 'Sí' : 'No')}${row('Costo de la no calidad (MXN)', cost)}${row('Fecha de cierre', ncr.closed_at ? format(new Date(ncr.closed_at), 'dd MMM yyyy', { locale: es }) : '')}</table>
+<h2>B6 · Verificación de eficacia y cierre</h2><table>${row('Verificación', verification)}${row('¿Eficaz?', effective === '' ? '' : effective === 'si' ? 'Sí' : 'No')}${showAmounts ? row('Costo de la no calidad (MXN)', cost) : ''}${row('Fecha de cierre', ncr.closed_at ? format(new Date(ncr.closed_at), 'dd MMM yyyy', { locale: es }) : '')}</table>
 <div class="sig"><div>Calidad</div><div>Producción</div><div>Gerencia / MRB</div></div>
 <script>window.onload=function(){window.print()}</script></body></html>`;
     // Sin "noopener": con él window.open devuelve null y no podríamos escribir el registro.
@@ -400,9 +402,11 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:5p
                     <option value="no">No — reabrir análisis</option>
                   </select>
                 </Field>
-                <Field label="Costo de la no calidad (MXN)">
-                  <Input type="number" min={0} value={cost} onChange={e => setCost(e.target.value)} disabled={closed} placeholder="Material + horas de retrabajo" />
-                </Field>
+                {showAmounts && (
+                  <Field label="Costo de la no calidad (MXN)">
+                    <Input type="number" min={0} value={cost} onChange={e => setCost(e.target.value)} disabled={closed} placeholder="Material + horas de retrabajo" />
+                  </Field>
+                )}
               </div>
             </div>
           )}

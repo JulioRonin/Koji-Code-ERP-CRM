@@ -39,9 +39,12 @@ import type { DashboardMode, Project, ProjectStatus } from '@/types/database';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { canSeeAmounts } from '@/lib/permissions';
 import { SalesDashboard } from './SalesDashboard';
 import { Combobox } from '@/components/ui/combobox';
 import { ProjectSpotlight } from '@/components/dashboard/ProjectSpotlight';
+import { toLocalDate } from '@/lib/dates';
 
 /** Giros que por defecto usan el tablero de ventas (venden artículos). */
 const SALES_INDUSTRIES = ['herramientas', 'mro'];
@@ -58,8 +61,12 @@ export function resolveDashboardMode(
 export function Dashboard() {
   const { company } = useCompany();
   const { tenant } = useTenant();
+  const { user } = useAuth();
   const mode = resolveDashboardMode(company.dashboard_mode, tenant?.industry);
-  return mode === 'sales' ? <SalesDashboard /> : <OperationsDashboard />;
+  // El tablero de ventas es todo montos: solo para quien puede verlos.
+  return mode === 'sales' && canSeeAmounts(user?.role, user?.isPlatformOwner)
+    ? <SalesDashboard />
+    : <OperationsDashboard />;
 }
 
 const statusBadge: Partial<Record<ProjectStatus, { variant: 'default' | 'success' | 'warning' | 'secondary' | 'outline'; label: string }>> = {
@@ -155,7 +162,7 @@ function OperationsDashboard() {
       .filter(p => p.status !== 'Entregado' && p.status !== 'Cancelado')
       .map(p => ({
         ...p,
-        daysLeft: Math.ceil((new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+        daysLeft: Math.ceil((toLocalDate(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
       }))
       .sort((a, b) => a.daysLeft - b.daysLeft);
   }, [projects]);
@@ -317,7 +324,7 @@ function OperationsDashboard() {
           </CardHeader>
           <CardContent className="pb-4">
             <div className="h-[220px] md:h-[260px] -ml-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <AreaChart data={productionTrend}>
                   <defs>
                     <linearGradient id="prodGradient" x1="0" y1="0" x2="0" y2="1">
@@ -353,7 +360,7 @@ function OperationsDashboard() {
           </CardHeader>
           <CardContent className="pb-4">
             <div className="h-[160px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <PieChart>
                   <Pie
                     data={statusDistribution}
@@ -404,7 +411,7 @@ function OperationsDashboard() {
           </CardHeader>
           <CardContent className="pb-4">
             <div className="h-[220px] -ml-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <BarChart data={machineLoad} layout="vertical" margin={{ left: 8, right: 12 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                   <XAxis type="number" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />

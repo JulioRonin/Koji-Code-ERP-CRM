@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { useClientPortalData, getFileDownloadUrl } from '@/lib/api';
 import type { ProjectStatus, ProjectFile } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { toLocalDate } from '@/lib/dates';
 
 const IMG_RE = /\.(png|jpe?g|webp|gif|bmp|avif)$/i;
 const isImageFile = (f: ProjectFile) =>
@@ -92,7 +93,7 @@ export function ClientPortal() {
     );
   }
 
-  const daysLeft = Math.max(0, Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86_400_000));
+  const daysLeft = Math.max(0, Math.ceil((toLocalDate(project.deadline).getTime() - Date.now()) / 86_400_000));
 
   return (
     <div className="min-h-screen bg-[#F7F5F0] text-[#16181D]">
@@ -130,7 +131,7 @@ export function ClientPortal() {
             <div className="text-left md:text-right">
               <Badge className="bg-white/20 text-white border-0">{stageLabels[project.status]}</Badge>
               <p className="text-xs text-white/70 mt-1.5">Entrega estimada</p>
-              <p className="font-semibold">{format(new Date(project.deadline), "dd 'de' MMM yyyy", { locale: es })}</p>
+              <p className="font-semibold">{format(toLocalDate(project.deadline), "dd 'de' MMM yyyy", { locale: es })}</p>
             </div>
           </div>
           <div className="mt-5">
@@ -202,7 +203,7 @@ export function ClientPortal() {
                           <p className={cn('text-sm', current ? 'font-semibold' : 'font-medium')}>{stageLabels[stage]}</p>
                           {stage === 'Entregado' && (
                             <p className="text-xs text-[#8A9099] mt-0.5">
-                              Entrega estimada: {format(new Date(project.deadline), 'dd MMM yyyy', { locale: es })}
+                              Entrega estimada: {format(toLocalDate(project.deadline), 'dd MMM yyyy', { locale: es })}
                             </p>
                           )}
                         </div>

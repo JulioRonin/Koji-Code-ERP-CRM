@@ -147,10 +147,15 @@ export function Shipping() {
         <ShipmentDrawer
           shipment={selectedShipment}
           onClose={() => setSelectedShipment(null)}
-          onStatusChange={async (status, tracking) => {
-            await updateShipmentStatus(selectedShipment.id, status, tracking);
+          onStatusChange={async (status, tracking, carrier) => {
+            await updateShipmentStatus(selectedShipment.id, status, tracking, carrier);
             await refetchShipments();
-            setSelectedShipment({ ...selectedShipment, status, tracking_number: tracking ?? selectedShipment.tracking_number });
+            setSelectedShipment({
+              ...selectedShipment,
+              status,
+              tracking_number: tracking ?? selectedShipment.tracking_number,
+              carrier: carrier ?? selectedShipment.carrier,
+            });
           }}
         />
       )}
@@ -167,7 +172,7 @@ function ShipmentDrawer({
 }: {
   shipment: Shipment;
   onClose: () => void;
-  onStatusChange: (status: ShipmentStatus, tracking?: string) => Promise<void>;
+  onStatusChange: (status: ShipmentStatus, tracking?: string, carrier?: string) => Promise<void>;
 }) {
   const { data: projects } = useProjects();
   const project = projects.find(p => p.id === shipment.project_id);
@@ -178,6 +183,9 @@ function ShipmentDrawer({
 
   const [showCreateLabel, setShowCreateLabel] = useState(false);
   const [printingLabel, setPrintingLabel] = useState<ShippingLabel | null>(null);
+  // Token recién generado (el de useClientPortalToken no se refresca solo).
+  const [newToken, setNewToken] = useState<string | null>(null);
+  const portalToken = existingToken || newToken;
   const [carrierInput, setCarrierInput] = useState(shipment.carrier ?? '');
   const [trackingInput, setTrackingInput] = useState(shipment.tracking_number ?? '');
 
@@ -207,9 +215,8 @@ function ShipmentDrawer({
   };
 
   const handlePrint = async (label: ShippingLabel) => {
-    let token = existingToken;
-    if (!token) {
-      token = await generateToken(shipment.project_id);
+    if (!portalToken) {
+      setNewToken(await generateToken(shipment.project_id));
     }
     setPrintingLabel(label);
     // Pequeño delay para que el modal renderice antes del print
@@ -249,7 +256,7 @@ function ShipmentDrawer({
                       key={s}
                       variant={shipment.status === s ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => onStatusChange(s, trackingInput || undefined)}
+                      onClick={() => onStatusChange(s, trackingInput.trim() || undefined, carrierInput.trim() || undefined)}
                     >
                       {s}
                     </Button>
@@ -404,12 +411,12 @@ function ShipmentDrawer({
         </DialogFooter>
 
         {/* Print preview (oculto en pantalla salvo al imprimir) */}
-        {printingLabel && project && existingToken && (
+        {printingLabel && project && portalToken && (
           <BoxLabelPrintWrapper
             project={project}
             shipment={shipment}
             label={printingLabel}
-            trackingUrl={`${trackingBaseUrl}/${existingToken}`}
+            trackingUrl={`${trackingBaseUrl}/${portalToken}`}
             onDone={() => setPrintingLabel(null)}
           />
         )}

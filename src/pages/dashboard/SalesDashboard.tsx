@@ -134,7 +134,7 @@ export function SalesDashboard() {
           </CardHeader>
           <CardContent className="pb-4">
             <div className="h-[230px] -ml-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <AreaChart data={porDia}>
                   <defs>
                     <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
@@ -163,7 +163,7 @@ export function SalesDashboard() {
           </CardHeader>
           <CardContent className="pb-4">
             <div className="h-[230px] -ml-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <BarChart data={porMes}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                   <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
@@ -194,7 +194,7 @@ export function SalesDashboard() {
               <p className="py-10 text-center text-sm text-[var(--color-app-text-muted)]">Aún no hay ventas registradas.</p>
             ) : (
               <div className="h-[260px] -ml-2">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                   <BarChart data={porCliente} layout="vertical" margin={{ left: 8, right: 16 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                     <XAxis type="number" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
