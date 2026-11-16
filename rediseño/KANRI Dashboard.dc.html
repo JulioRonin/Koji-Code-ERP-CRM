@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9EBEF;font-family:'Outfit',system-ui,sans-serif;color:#16181D;-webkit-font-smoothing:antialiased}
+a{color:#16181D;text-decoration:underline;text-underline-offset:2px}a:hover{color:#6B7079}
+button{font-family:inherit;color:inherit}
+</style>
+</helmet>
+<div ref="{{ root }}" style="padding:16px;min-height:100vh;box-sizing:border-box">
+<div style="background:#F5F6F8;border-radius:36px;padding:20px 24px 28px;box-shadow:0 0 0 8px rgba(255,255,255,.6)">
+
+<!-- Top bar -->
+<header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;row-gap:14px">
+  <div style="display:flex;align-items:center;gap:20px;margin-right:16px">
+    <sc-if value="{{ logoSquare }}" hint-placeholder-val="{{ true }}">
+      <div style="width:44px;height:44px;border-radius:14px;background:#16181D;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;letter-spacing:.06em">IMC</div>
+    </sc-if>
+    <sc-if value="{{ logoRect }}">
+      <div style="display:flex;align-items:baseline;gap:6px;height:44px;align-content:center;flex-wrap:wrap"><span style="font-weight:600;font-size:22px;letter-spacing:.02em">IMC</span><span style="font-weight:300;font-size:14px;letter-spacing:.32em;color:#6B7079">DESIGN</span></div>
+    </sc-if>
+  </div>
+  <nav style="display:flex;flex-wrap:wrap;gap:8px">
+    <sc-for list="{{ areas }}" as="a" hint-placeholder-count="5">
+      <div data-area="1" style="position:relative">
+        <button onClick="{{ a.toggle }}" style="display:flex;align-items:center;gap:8px;height:52px;padding:0 20px;border:0;border-radius:999px;cursor:pointer;font-size:15px;background:{{ a.bg }};color:{{ a.fg }}">
+          <span style="width:7px;height:7px;border-radius:50%;background:{{ a.dot }}"></span>{{ a.name }}
+          <sc-if value="{{ a.hasMenu }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></sc-if>
+        </button>
+        <sc-if value="{{ a.open }}">
+          <div style="position:absolute;top:60px;left:0;z-index:20;min-width:250px;background:#fff;border-radius:22px;padding:8px;box-shadow:0 18px 50px rgba(22,24,29,.14);display:flex;flex-direction:column;gap:2px">
+            <div style="font-size:12px;color:#A3A8B1;padding:8px 14px 4px;letter-spacing:.08em;text-transform:uppercase">{{ a.name }}</div>
+            <sc-for list="{{ a.modules }}" as="m">
+              <button onClick="{{ m.go }}" style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border:0;background:transparent;border-radius:14px;cursor:pointer;font-size:15px;text-align:left" style-hover="background:#F2F3F6">
+                <span>{{ m.name }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#A3A8B1">{{ m.route }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </nav>
+  <div style="flex:1;min-width:8px"></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex">
+      <div style="width:44px;height:44px;border-radius:50%;background:#D7DCE6;border:3px solid #F5F6F8;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">LP</div>
+      <div style="width:44px;height:44px;border-radius:50%;background:#E6DCCF;border:3px solid #F5F6F8;margin-left:-12px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">AG</div>
+      <div style="width:44px;height:44px;border-radius:50%;background:#D5E4DB;border:3px solid #F5F6F8;margin-left:-12px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">RT</div>
+      <div style="width:44px;height:44px;border-radius:50%;background:#16181D;color:#fff;border:3px solid #F5F6F8;margin-left:-12px;display:flex;align-items:center;justify-content:center;font-size:13px">+9</div>
+    </div>
+    <span style="font-size:14px;color:#6B7079;padding-right:6px">en planta</span>
+  </div>
+  <button style="display:flex;align-items:center;gap:10px;height:52px;padding:0 10px 0 18px;border:0;border-radius:999px;background:#ECEEF2;cursor:pointer;font-size:14px;color:#6B7079;min-width:240px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16181D" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+    <span style="flex:1;text-align:left">Proyecto, pieza, OC, cliente…</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#fff;border-radius:10px;padding:6px 8px;color:#16181D">⌘K</span>
+  </button>
+  <span style="height:32px;display:flex;align-items:center;padding:0 12px;border-radius:999px;border:1px dashed #C9CDD5;font-size:12px;color:#6B7079">Modo demo</span>
+  <button style="position:relative;width:52px;height:52px;border-radius:50%;border:0;background:#ECEEF2;cursor:pointer;display:flex;align-items:center;justify-content:center">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+    <span style="position:absolute;top:14px;right:15px;width:8px;height:8px;border-radius:50%;background:#D93A1F;border:2px solid #ECEEF2"></span>
+  </button>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="width:52px;height:52px;border-radius:50%;background:#C9D2E3;display:flex;align-items:center;justify-content:center;font-weight:500">{{ userInitials }}</div>
+    <div style="display:flex;flex-direction:column;line-height:1.2"><span style="font-size:15px">{{ userName }}</span><span style="font-size:12px;color:#6B7079">{{ userRole }}</span></div>
+  </div>
+</header>
+
+<div style="display:grid;grid-template-columns:{{ shellCols }};gap:28px;margin-top:40px">
+<!-- Rail: favoritos -->
+<aside style="display:{{ railDisplay }};flex-direction:column;align-items:center;gap:12px;padding-top:150px">
+  <button title="Inicio" style="width:56px;height:56px;border-radius:50%;border:0;background:#16181D;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg></button>
+  <button title="Proyectos" style="width:56px;height:56px;border-radius:50%;border:0;background:#ECEEF2;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E2E5EB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"></path></svg></button>
+  <button title="Producción" style="width:56px;height:56px;border-radius:50%;border:0;background:#ECEEF2;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E2E5EB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2 20V9l6 4V9l6 4V4h8v16z"></path></svg></button>
+  <button title="Calidad" style="width:56px;height:56px;border-radius:50%;border:0;background:#ECEEF2;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E2E5EB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path><path d="m9 12 2 2 4-4"></path></svg></button>
+  <button title="Chat" style="width:56px;height:56px;border-radius:50%;border:0;background:#ECEEF2;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E2E5EB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>
+  <button title="Fijar módulo" style="width:56px;height:56px;border-radius:50%;border:1.5px dashed #C9CDD5;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6B7079"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 12h14M12 5v14"></path></svg></button>
+  <div style="flex:1"></div>
+  <button title="Configuración" style="width:56px;height:56px;border-radius:50%;border:0;background:#ECEEF2;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg></button>
+</aside>
+
+<main style="min-width:0">
+  <!-- Page header -->
+  <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#6B7079">
+    <span>Inicio</span><span>→</span><span style="color:#16181D">Tablero</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px;margin-top:10px">
+    <div>
+      <h1 style="margin:0;font-weight:400;font-size:clamp(40px,5vw,64px);letter-spacing:-.025em;line-height:1">Tablero de planta</h1>
+      <p style="margin:12px 0 0;font-size:16px;color:#6B7079">Sábado 15 nov 2026 · Turno matutino</p>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">
+      <button style="width:52px;height:52px;border-radius:50%;border:0;background:#ECEEF2;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"></path></svg></button>
+      <button style="display:flex;align-items:center;gap:12px;height:52px;padding:0 18px;border:0;border-radius:999px;background:#ECEEF2;cursor:pointer;font-size:15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="3"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>9–15 nov 2026<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+      <button style="display:flex;align-items:center;gap:10px;height:52px;padding:0 20px;border:0;border-radius:999px;background:#ECEEF2;cursor:pointer;font-size:15px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 12h14M12 5v14"></path></svg>Agregar widget</button>
+      <button style="height:52px;padding:0 24px;border:0;border-radius:999px;background:#16181D;color:#fff;cursor:pointer;font-size:15px">Crear reporte</button>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div style="display:grid;grid-template-columns:{{ gridCols }};grid-auto-flow:dense;gap:12px;margin-top:36px">
+
+    <!-- A · Proyecto destacado -->
+    <section style="grid-row:{{ aRow }};background:#E4E7EF;border-radius:30px;display:flex;flex-direction:column;overflow:hidden;min-height:560px">
+      <div style="padding:24px 24px 0;display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <h2 style="margin:0;font-weight:400;font-size:22px;min-width:0">Proyecto</h2>
+        <button onClick="{{ nextProject }}" style="white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border:0;border-radius:999px;background:#fff;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px">{{ p.id }}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+      </div>
+      <div style="margin:18px 24px 0;flex:1;min-height:180px;border-radius:22px;background:repeating-linear-gradient(135deg,#D6DAE4 0 2px,transparent 2px 12px);display:flex;align-items:flex-end;padding:14px;box-sizing:border-box">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B7079;background:rgba(255,255,255,.7);padding:5px 8px;border-radius:8px">render / foto de pieza</span>
+      </div>
+      <div style="margin:12px;background:rgba(255,255,255,.72);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div style="font-size:20px;line-height:1.2">{{ p.name }}</div>
+            <div style="font-size:14px;color:#6B7079;margin-top:4px">{{ p.client }}</div>
+          </div>
+          <span style="flex-shrink:0;display:flex;align-items:center;height:30px;padding:0 12px;border-radius:999px;font-size:13px;background:{{ accent }};color:{{ accentInk }}">{{ p.daysLeft }}</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:4px"><span style="font-size:48px;font-weight:300;letter-spacing:-.02em;line-height:1">{{ p.progress }}</span><span style="font-size:22px;color:#A3A8B1">%</span><span style="margin-left:auto;font-size:13px;color:#6B7079">{{ p.bom }}</span></div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px">
+          <sc-for list="{{ p.stages }}" as="s" hint-placeholder-count="5">
+            <div style="display:flex;flex-direction:column;gap:6px"><div style="height:8px;border-radius:4px;background:{{ s.color }}"></div><span style="font-size:11px;color:{{ s.text }}">{{ s.name }}</span></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <span style="font-size:14px;color:#6B7079">Entrega <span style="color:#16181D">{{ p.due }}</span></span>
+          <button style="display:flex;align-items:center;gap:14px;height:52px;padding:0 6px 0 20px;border:0;border-radius:999px;background:#fff;cursor:pointer;font-size:15px;box-shadow:0 4px 14px rgba(22,24,29,.06)">Abrir proyecto<span style="width:40px;height:40px;border-radius:50%;background:#16181D;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M7 7h10v10M7 17 17 7"></path></svg></span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- B · Producción semanal -->
+    <section style="background:#fff;border-radius:30px;padding:24px;display:flex;flex-direction:column;min-height:360px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0;font-weight:400;font-size:22px">Producción</h2>
+        <button style="width:40px;height:40px;border-radius:50%;border:0;background:#F2F3F6;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 7h10v10M7 17 17 7"></path></svg></button>
+      </div>
+      <div style="font-size:14px;color:#6B7079;margin-top:24px">Piezas terminadas esta semana</div>
+      <div style="display:flex;align-items:baseline;gap:4px;margin-top:4px"><span style="font-size:48px;font-weight:300;letter-spacing:-.02em;line-height:1">1,229</span><span style="font-size:20px;color:#A3A8B1">pzs</span></div>
+      <div style="font-size:13px;color:#146C35;margin-top:6px">↗ 8.4 % vs. semana anterior</div>
+      <div style="flex:1;display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;margin-top:20px;min-height:150px">
+        <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+            <sc-if value="{{ b.today }}"><span style="font-size:12px;padding:5px 9px;border-radius:999px;background:{{ accent }};color:{{ accentInk }};font-family:'JetBrains Mono',monospace">{{ b.v }}</span></sc-if>
+            <div style="width:100%;height:{{ b.h }};border-radius:12px;background:{{ b.bg }}"></div>
+            <span style="font-size:12px;color:#6B7079">{{ b.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- C · Pipeline -->
+    <section style="background:#fff;border-radius:30px;padding:24px;display:flex;flex-direction:column;min-height:360px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0;font-weight:400;font-size:22px">Pipeline por etapa</h2>
+        <button style="width:40px;height:40px;border-radius:50%;border:0;background:#F2F3F6;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 7h10v10M7 17 17 7"></path></svg></button>
+      </div>
+      <div style="font-size:14px;color:#6B7079;margin-top:24px">Proyectos activos</div>
+      <div style="font-size:48px;font-weight:300;letter-spacing:-.02em;line-height:1;margin-top:4px">24</div>
+      <div style="font-size:13px;color:#146C35;margin-top:6px">↗ 3 nuevos este mes</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto;padding-top:20px">
+        <sc-for list="{{ pipeline }}" as="s" hint-placeholder-count="6">
+          <div style="display:grid;grid-template-columns:86px 1fr;align-items:center;gap:10px">
+            <span style="font-size:13px;color:#474C55">{{ s.name }}</span>
+            <div style="height:30px;border-radius:12px;background:{{ s.bg }};color:{{ s.fg }};width:{{ s.w }};display:flex;align-items:center;padding:0 10px;box-sizing:border-box;font-size:14px;font-family:'JetBrains Mono',monospace">{{ s.n }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- D · Alertas -->
+    <section style="background:{{ accentSoft }};border-radius:30px;padding:24px;display:flex;flex-direction:column;gap:12px;min-height:360px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0;font-weight:400;font-size:22px">Alertas</h2>
+        <span style="width:36px;height:36px;border-radius:50%;background:#16181D;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px">3</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        <div style="background:#fff;border-radius:20px;padding:14px 16px;display:flex;gap:12px">
+          <span style="width:10px;height:10px;border-radius:50%;background:#B91C1C;margin-top:6px;flex-shrink:0"></span>
+          <div><div style="font-size:15px">Máquina parada</div><div style="font-size:13px;color:#6B7079;margin-top:2px">HAAS VF-2 · correctivo desde 07:40</div></div>
+        </div>
+        <div style="background:#fff;border-radius:20px;padding:14px 16px;display:flex;gap:12px">
+          <span style="width:10px;height:10px;border-radius:50%;background:#B91C1C;margin-top:6px;flex-shrink:0"></span>
+          <div><div style="font-size:15px">NCR alta · <span style="font-family:'JetBrains Mono',monospace;font-size:12px">IMC-2026-038</span></div><div style="font-size:13px;color:#6B7079;margin-top:2px">Ø 42.00 fuera de tolerancia (+0.04)</div></div>
+        </div>
+        <div style="background:#fff;border-radius:20px;padding:14px 16px;display:flex;gap:12px">
+          <span style="width:10px;height:10px;border-radius:50%;background:#B45309;margin-top:6px;flex-shrink:0"></span>
+          <div><div style="font-size:15px">Preventivo en 2 días</div><div style="font-size:13px;color:#6B7079;margin-top:2px">Mazak QTN-200 · 17 nov 2026</div></div>
+        </div>
+      </div>
+      <button style="margin-top:auto;align-self:flex-start;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border:0;border-radius:999px;background:rgba(255,255,255,.7);cursor:pointer;font-size:14px">Ver todas<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+    </section>
+
+    <!-- E · Calidad -->
+    <section style="grid-column:{{ eCol }};background:#fff;border-radius:30px;padding:24px;display:flex;flex-wrap:wrap;gap:24px;min-height:300px">
+      <div style="flex:1 1 200px;display:flex;flex-direction:column">
+        <h2 style="margin:0;font-weight:400;font-size:22px">Calidad</h2>
+        <div style="font-size:14px;color:#6B7079;margin-top:24px">Aprobación QA · semana</div>
+        <div style="display:flex;align-items:baseline;gap:2px;margin-top:4px"><span style="font-size:48px;font-weight:300;letter-spacing:-.02em;line-height:1">96.4</span><span style="font-size:22px;color:#A3A8B1">%</span></div>
+        <div style="font-size:13px;color:#B91C1C;margin-top:6px">↘ 0.6 pts vs. semana anterior</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto;padding-top:20px">
+          <div style="display:flex;align-items:center;gap:12px;background:#F2F3F6;border-radius:14px;padding:10px 14px"><span style="font-size:18px;font-family:'JetBrains Mono',monospace">7</span><span style="font-size:14px;color:#474C55">NCR abiertas</span><span style="margin-left:auto;font-size:12px;color:#B91C1C">2 alta</span></div>
+          <div style="display:flex;align-items:center;gap:12px;background:#F2F3F6;border-radius:14px;padding:10px 14px"><span style="font-size:18px;font-family:'JetBrains Mono',monospace">3</span><span style="font-size:14px;color:#474C55">CAPA en curso</span></div>
+        </div>
+      </div>
+      <div style="flex:2 1 280px;display:flex;flex-direction:column;min-height:220px">
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button style="width:40px;height:40px;border-radius:50%;border:0;background:#F2F3F6;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"></path></svg></button>
+          <button style="width:40px;height:40px;border-radius:50%;border:0;background:#F2F3F6;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 7h10v10M7 17 17 7"></path></svg></button>
+        </div>
+        <div style="position:relative;flex:1;margin:24px 0 0;min-height:150px">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible">
+            <path d="{{ qaArea }}" fill="#F2F3F6"></path>
+            <path d="{{ qaLine }}" fill="none" stroke="#16181D" stroke-width="1.4" vector-effect="non-scaling-stroke"></path>
+          </svg>
+          <div style="position:absolute;left:{{ qaTip.x }};top:{{ qaTip.y }};bottom:0;border-left:1.5px dashed #C9CDD5"></div>
+          <sc-for list="{{ qaDots }}" as="d" hint-placeholder-count="7">
+            <div style="position:absolute;left:{{ d.x }};top:{{ d.y }};width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#16181D;border:2px solid #fff"></div>
+          </sc-for>
+          <span style="position:absolute;left:{{ qaTip.x }};top:{{ qaTip.y }};transform:translate(-50%,-150%);font-size:12px;padding:5px 9px;border-radius:999px;background:{{ accent }};color:{{ accentInk }};font-family:'JetBrains Mono',monospace;white-space:nowrap">{{ qaTip.v }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-top:12px;font-size:12px;color:#6B7079;text-align:center">
+          <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- F · Máquinas -->
+    <section style="background:#fff;border-radius:30px;padding:24px;display:flex;flex-direction:column;min-height:300px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0;font-weight:400;font-size:22px">Máquinas</h2>
+        <button style="width:40px;height:40px;border-radius:50%;border:0;background:#F2F3F6;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 7h10v10M7 17 17 7"></path></svg></button>
+      </div>
+      <div style="position:relative;flex:1;min-height:180px;margin-top:8px">
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-55%,-45%);width:150px;height:150px;border-radius:50%;background:#CDEBD8;display:flex;align-items:center;justify-content:center"><span style="font-size:40px;font-weight:300;color:#0F5A2B">78<span style="font-size:18px">%</span></span></div>
+        <div style="position:absolute;left:50%;top:50%;transform:translate(30%,-115%);width:68px;height:68px;border-radius:50%;background:#FBE9C9;border:4px solid #fff;display:flex;align-items:center;justify-content:center;font-size:17px;color:#7A4205">17%</div>
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-150%,45%);width:54px;height:54px;border-radius:50%;background:#F8D9D6;border:4px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;color:#8E1616">5%</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);margin-top:12px">
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:26px;font-weight:300">14</span><span style="font-size:13px;color:#6B7079">Operando</span></div>
+        <div style="display:flex;flex-direction:column;gap:2px;border-left:1px solid #E7E9ED;padding-left:12px"><span style="font-size:26px;font-weight:300">3</span><span style="font-size:13px;color:#6B7079">Setup</span></div>
+        <div style="display:flex;flex-direction:column;gap:2px;border-left:1px solid #E7E9ED;padding-left:12px"><span style="font-size:26px;font-weight:300">1</span><span style="font-size:13px;color:#6B7079">Paro</span></div>
+      </div>
+    </section>
+
+    <!-- G · Próximas entregas -->
+    <section style="grid-column:{{ gCol }};background:#fff;border-radius:30px;padding:24px;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0;font-weight:400;font-size:22px">Próximas entregas</h2>
+        <div style="display:flex;gap:6px;background:#F2F3F6;border-radius:999px;padding:4px" role="tablist">
+          <button role="tab" aria-selected="true" style="height:36px;padding:0 14px;border:0;border-radius:999px;background:#fff;cursor:pointer;font-size:14px">14 días</button>
+          <button role="tab" aria-selected="false" style="height:36px;padding:0 14px;border:0;border-radius:999px;background:transparent;cursor:pointer;font-size:14px;color:#6B7079">30 días</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;margin-top:16px">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;min-width:620px">
+          <thead><tr style="color:#6B7079;font-size:12px;text-align:left">
+            <th style="font-weight:400;padding:10px 12px;background:#F5F6F8;border-radius:12px 0 0 12px">Folio</th>
+            <th style="font-weight:400;padding:10px 12px;background:#F5F6F8">Proyecto · cliente</th>
+            <th style="font-weight:400;padding:10px 12px;background:#F5F6F8">Etapa</th>
+            <th style="font-weight:400;padding:10px 12px;background:#F5F6F8">Avance</th>
+            <th style="font-weight:400;padding:10px 12px;background:#F5F6F8;text-align:right;border-radius:{{ lastThRadius }}">Entrega</th>
+            <sc-if value="{{ showMoney }}"><th style="font-weight:400;padding:10px 12px;background:#F5F6F8;text-align:right;border-radius:0 12px 12px 0">Monto</th></sc-if>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+              <tr style="border-bottom:1px solid #EEF0F3">
+                <td style="padding:12px;font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap">{{ r.id }}</td>
+                <td style="padding:12px"><div>{{ r.name }}</div><div style="font-size:12px;color:#6B7079">{{ r.client }}</div></td>
+                <td style="padding:12px"><span style="display:inline-flex;height:26px;align-items:center;padding:0 10px;border-radius:999px;font-size:12px;background:{{ r.bg }};color:{{ r.fg }};white-space:nowrap">{{ r.stage }}</span></td>
+                <td style="padding:12px"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1;min-width:60px;height:6px;border-radius:3px;background:#EEF0F3"><div style="height:6px;border-radius:3px;background:#16181D;width:{{ r.pw }}"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:12px;width:34px;text-align:right">{{ r.pw }}</span></div></td>
+                <td style="padding:12px;text-align:right;white-space:nowrap"><div>{{ r.due }}</div><div style="font-size:12px;color:{{ r.inColor }}">{{ r.inDays }}</div></td>
+                <sc-if value="{{ showMoney }}"><td style="padding:12px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;white-space:nowrap">{{ r.amount }}</td></sc-if>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- H · Facturación (solo roles con montos) -->
+    <sc-if value="{{ showMoney }}" hint-placeholder-val="{{ true }}">
+      <section style="background:#fff;border-radius:30px;padding:24px;display:flex;flex-direction:column;min-height:300px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2 style="margin:0;font-weight:400;font-size:22px">Facturación</h2>
+          <button style="width:40px;height:40px;border-radius:50%;border:0;background:#F2F3F6;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 7h10v10M7 17 17 7"></path></svg></button>
+        </div>
+        <div style="font-size:14px;color:#6B7079;margin-top:24px">Facturado en noviembre · MXN</div>
+        <div style="display:flex;align-items:baseline;margin-top:4px;flex-wrap:wrap"><span style="font-size:20px;color:#6B7079">$</span><span style="font-size:42px;font-weight:300;letter-spacing:-.02em;line-height:1">1,284,560</span><span style="font-size:26px;font-weight:300;color:#A3A8B1">.00</span></div>
+        <div style="font-size:13px;color:#146C35;margin-top:6px">↗ $214,300.00 vs. octubre</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto;padding-top:20px">
+          <div style="display:grid;grid-template-columns:80px 1fr;align-items:center;gap:10px"><span style="font-size:13px;color:#474C55">Cobrado</span><div style="height:30px;width:72%;border-radius:12px;background:#DDF3E4;color:#146C35;display:flex;align-items:center;padding:0 10px;font-size:14px;font-family:'JetBrains Mono',monospace">72%</div></div>
+          <div style="display:grid;grid-template-columns:80px 1fr;align-items:center;gap:10px"><span style="font-size:13px;color:#474C55">Por cobrar</span><div style="height:30px;width:28%;min-width:56px;border-radius:12px;background:#FDF0D5;color:#8A4B06;display:flex;align-items:center;padding:0 10px;font-size:14px;font-family:'JetBrains Mono',monospace">28%</div></div>
+        </div>
+      </section>
+    </sc-if>
+  </div>
+  <div style="margin-top:28px;font-size:12px;color:#A3A8B1;text-align:right">IMC Design · powered by KANRI</div>
+</main>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;acento&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Lima&quot;,&quot;Bermellón&quot;,&quot;Cobalto&quot;,&quot;Turquesa&quot;],&quot;default&quot;:&quot;Lima&quot;,&quot;section&quot;:&quot;Marca blanca&quot;},&quot;logo&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Cuadrado&quot;,&quot;Rectangular&quot;],&quot;default&quot;:&quot;Cuadrado&quot;,&quot;section&quot;:&quot;Marca blanca&quot;},&quot;rol&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Administrador&quot;,&quot;Producción&quot;],&quot;default&quot;:&quot;Administrador&quot;,&quot;section&quot;:&quot;Permisos&quot;}}">
+const ACCENTS = {
+  'Lima': ['#E4F47C', '#16181D', '#EEF5C8'],
+  'Bermellón': ['#E2401F', '#FFFFFF', '#FBE7E0'],
+  'Cobalto': ['#2F5BEA', '#FFFFFF', '#E1E8FC'],
+  'Turquesa': ['#62CABF', '#16181D', '#D6EEEA'],
+};
+const STAGE = {
+  'Cotización': ['#FDF0D5', '#8A4B06'], 'Diseño': ['#ECEDF0', '#474C55'], 'Compras': ['#ECEDF0', '#474C55'],
+  'Producción': ['#E1E9FB', '#1D46B8'], 'Calidad': ['#DDF3E4', '#146C35'], 'Embarque': ['#DDF3E4', '#146C35'],
+};
+const AREAS = [
+  { name: 'Inicio', modules: [] },
+  { name: 'Comercial', modules: [['Clientes', '/customers'], ['Cotizaciones', '/quotes']] },
+  { name: 'Ingeniería', modules: [['Proyectos', '/projects'], ['Diseño', '/design'], ['PMO', '/pmo']] },
+  { name: 'Operación', modules: [['Compras', '/purchasing'], ['Inventario', '/inventory'], ['Producción', '/production'], ['Calidad', '/quality'], ['Mantenimiento', '/maintenance'], ['Embarques', '/shipping'], ['Técnicos', '/technicians']] },
+  { name: 'Administración', modules: [['Personal', '/personnel'], ['Facturación', '/billing'], ['Cobranza', '/cobranza'], ['Finanzas', '/finance']] },
+];
+const PROD_ALLOWED = ['Producción', 'Calidad', 'Inventario', 'Mantenimiento', 'Técnicos'];
+const PROJECTS = [
+  { id: 'IMC-2026-042', name: 'Carcasa de bomba centrífuga', client: 'Hidráulica del Bajío', stage: 2, progress: 68, due: '28 nov 2026', daysLeft: '13 días', bom: '118 / 142 piezas' },
+  { id: 'IMC-2026-038', name: 'Brida de acoplamiento DN150', client: 'Grupo Metalmecánico Saltillo', stage: 3, progress: 91, due: '19 nov 2026', daysLeft: '4 días', bom: '36 / 38 piezas' },
+  { id: 'IMC-2026-045', name: 'Molde de soplado PET 600 ml', client: 'Envases Norteños', stage: 0, progress: 22, due: '4 dic 2026', daysLeft: '19 días', bom: '12 / 64 piezas' },
+];
+const ROWS = [
+  ['IMC-2026-040', 'Eje escalonado 4140', 'Agroindustrias Celaya', 'Embarque', 98, '17 nov', 2, '$64,380.00'],
+  ['IMC-2026-038', 'Brida de acoplamiento DN150', 'Grupo Metalmecánico Saltillo', 'Calidad', 91, '19 nov', 4, '$128,750.00'],
+  ['IMC-2026-042', 'Carcasa de bomba centrífuga', 'Hidráulica del Bajío', 'Producción', 68, '28 nov', 13, '$486,200.00'],
+  ['IMC-2026-045', 'Molde de soplado PET 600 ml', 'Envases Norteños', 'Diseño', 22, '4 dic', 19, '$912,000.00'],
+  ['IMC-2026-047', 'Placa base para fixture', 'Autopartes Ramos', 'Compras', 35, '10 dic', 25, '$203,900.00'],
+];
+const QA = [95.2, 96.8, 94.1, 97.0, 96.6, 97.9, 96.4];
+
+class Component extends DCLogic {
+  state = { cols: 4, openArea: null, project: 0 };
+  root = React.createRef();
+  componentDidMount() {
+    this.ro = new ResizeObserver(e => {
+      const w = e[0].contentRect.width;
+      const cols = w >= 1180 ? 4 : w >= 700 ? 2 : 1;
+      if (cols !== this.state.cols) this.setState({ cols });
+    });
+    if (this.root.current) this.ro.observe(this.root.current);
+    this.onDoc = e => { if (!e.target.closest('[data-area]')) this.setState({ openArea: null }); };
+    document.addEventListener('click', this.onDoc);
+  }
+  componentWillUnmount() { this.ro && this.ro.disconnect(); document.removeEventListener('click', this.onDoc); }
+
+  renderVals() {
+    const [accent, accentInk, accentSoft] = ACCENTS[this.props.acento] || ACCENTS['Lima'];
+    const admin = (this.props.rol ?? 'Administrador') !== 'Producción';
+    const square = (this.props.logo ?? 'Cuadrado') !== 'Rectangular';
+    const { cols, openArea } = this.state;
+
+    const areas = AREAS.map(a => ({ ...a, modules: admin ? a.modules : a.modules.filter(m => PROD_ALLOWED.includes(m[0])) }))
+      .filter(a => a.name === 'Inicio' || a.modules.length)
+      .map(a => {
+        const active = a.name === 'Inicio', open = openArea === a.name;
+        return {
+          name: a.name, hasMenu: a.modules.length > 0, open,
+          modules: a.modules.map(([name, route]) => ({ name, route, go: () => { location.href = 'KANRI App.dc.html#' + route.slice(1); } })),
+          bg: active ? '#16181D' : open ? '#fff' : '#ECEEF2', fg: active ? '#fff' : '#16181D',
+          dot: active ? accent : '#A3A8B1',
+          toggle: () => a.modules.length && this.setState({ openArea: open ? null : a.name }),
+        };
+      });
+
+    const P = PROJECTS[this.state.project];
+    const names = ['Diseño', 'Compras', 'Producción', 'Calidad', 'Embarque'];
+    const p = { ...P, stages: names.map((n, i) => ({ name: n, color: i < P.stage ? '#16181D' : i === P.stage ? accent : '#D3D7DF', text: i <= P.stage ? '#16181D' : '#8A9099' })) };
+
+    const W = [168, 192, 181, 214, 236, 96, 0];
+    const bars = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d, i) => ({
+      d, v: W[i], today: i === 4, h: Math.max(8, W[i] / 236 * 100) + '%', bg: i === 4 ? accent : '#F2F3F6',
+    }));
+
+    const PIPE = [['Cotización', 6], ['Diseño', 4], ['Compras', 3], ['Producción', 8], ['Calidad', 2], ['Embarque', 1]];
+    const pipeline = PIPE.map(([name, n]) => ({ name, n, w: Math.max(18, n / 8 * 100) + '%', bg: STAGE[name][0], fg: STAGE[name][1] }));
+
+    const pts = QA.map((v, i) => [(i + 0.5) / 7 * 100, (1 - (v - 92) / 7) * 100]);
+    const qaLine = 'M' + pts.map(p => p.join(' ')).join(' L');
+    const qaArea = qaLine + ` L${pts[6][0]} 100 L${pts[0][0]} 100 Z`;
+    const qaDots = pts.map(([x, y]) => ({ x: x + '%', y: y + '%' }));
+    const qaTip = { x: pts[2][0] + '%', y: pts[2][1] + '%', v: '94.1 %' };
+
+    const rows = ROWS.map(([id, name, client, stage, pr, due, days, amount]) => ({
+      id, name, client, stage, pw: pr + '%', due, amount, bg: STAGE[stage][0], fg: STAGE[stage][1],
+      inDays: `en ${days} días`, inColor: days <= 3 ? '#B91C1C' : days <= 7 ? '#B45309' : '#6B7079',
+    }));
+
+    return {
+      root: this.root, accent, accentInk, accentSoft, areas, p, bars, pipeline, qaLine, qaArea, qaDots, qaTip, rows,
+      showMoney: admin, logoSquare: square, logoRect: !square,
+      userInitials: admin ? 'MR' : 'JM', userName: admin ? 'Mariana Ruiz' : 'Jorge Medina', userRole: admin ? 'Administración · PM' : 'Producción',
+      nextProject: () => this.setState(s => ({ project: (s.project + 1) % PROJECTS.length })),
+      lastThRadius: admin ? '0' : '0 12px 12px 0',
+      shellCols: cols === 1 ? 'minmax(0,1fr)' : '56px minmax(0,1fr)', railDisplay: cols === 1 ? 'none' : 'flex',
+      gridCols: `repeat(${cols}, minmax(0,1fr))`,
+      aRow: cols === 1 ? 'auto' : 'span 2',
+      eCol: cols === 1 ? 'auto' : 'span 2',
+      gCol: cols === 1 ? 'auto' : cols === 2 ? 'span 2' : (admin ? 'span 3' : 'span 4'),
+    };
+  }
+}
+</script>
+</body>
+</html>
