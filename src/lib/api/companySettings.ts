@@ -27,7 +27,7 @@ export const DEFAULT_COMPANY: CompanySettings = {
   website: null,
   legal_rep: null,
   logo_url: null,
-  primary_color: '#E2401F',
+  primary_color: '#E4F47C', // Lima: acento por defecto del rediseño
   currency: 'MXN',
   bank_name: null,
   bank_account: null,

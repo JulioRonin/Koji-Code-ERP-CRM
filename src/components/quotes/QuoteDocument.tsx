@@ -12,6 +12,7 @@ import {
 import { useCompany } from '@/contexts/CompanyContext';
 import { useQuotePhotoUrls } from '@/lib/api';
 import { ADVANCE_TERMS_TEXT } from '@/lib/quoteTerms';
+import { accentOnWhite, resolveAccent } from '@/lib/brand';
 import type { Quote, QuoteItem } from '@/types/database';
 import { toLocalDate } from '@/lib/dates';
 
@@ -38,9 +39,8 @@ interface QuoteDocumentProps {
 export function QuoteDocument({ quote, items, onClose, onEmail }: QuoteDocumentProps) {
   const { company } = useCompany();
   const tax = quote.subtotal * (quote.tax_pct / 100);
-  const accent = company.primary_color && /^#[0-9a-fA-F]{6}$/.test(company.primary_color)
-    ? company.primary_color
-    : '#0369a1';
+  // Acento de la marca, legible sobre blanco (un acento claro como lima pasa a tinta).
+  const accent = accentOnWhite(resolveAccent(company.primary_color));
 
   const brand = company.commercial_name || company.legal_name || 'KANRI';
   const initial = brand.trim().charAt(0).toUpperCase() || 'K';

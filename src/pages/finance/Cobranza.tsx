@@ -67,7 +67,7 @@ export function Cobranza() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2"><HandCoins className="h-5 w-5 text-[var(--color-app-primary)]" /> Crédito y Cobranza</h1>
+          <h1 className="page-title flex items-center gap-2"><HandCoins className="h-5 w-5 text-[var(--color-app-primary)]" /> Crédito y Cobranza</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">Control de anticipos, saldos y liquidaciones por proyecto. Los pagos se reflejan en Finanzas.</p>
         </div>
         <Button onClick={() => { setEdit(null); setOpen(true); }}><Plus className="h-4 w-4 mr-1.5" /> Nueva cuenta por cobrar</Button>

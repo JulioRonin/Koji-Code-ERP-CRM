@@ -14,7 +14,7 @@ function Placeholder({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-[var(--color-app-text)]">{title}</h1>
+        <h1 className="page-title">{title}</h1>
         <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">{description}</p>
       </div>
       <Card>

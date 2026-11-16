@@ -66,7 +66,7 @@ export function Maintenance() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)] flex items-center gap-2">
+          <h1 className="page-title flex items-center gap-2">
             <Wrench className="h-5 w-5 text-[var(--color-app-text-muted)]" /> Mantenimiento
           </h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">

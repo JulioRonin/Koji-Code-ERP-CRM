@@ -245,7 +245,7 @@ export function Personnel() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Personal</h1>
+          <h1 className="page-title">Personal</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Talento, roles y nómina.
           </p>

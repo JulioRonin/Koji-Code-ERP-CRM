@@ -73,7 +73,7 @@ export function Integrations() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold">Integraciones</h1>
+        <h1 className="page-title">Integraciones</h1>
         <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
           Configura el webhook de n8n y monitorea la cola de eventos de automatización.
         </p>

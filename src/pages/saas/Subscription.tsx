@@ -122,7 +122,7 @@ export function Subscription({ blocked = false }: { blocked?: boolean }) {
   const inner = (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Suscripción</h1>
+        <h1 className="page-title">Suscripción</h1>
         <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
           {blocked ? 'Activa tu plan para seguir usando KANRI.' : 'Tu plan, tu demo y la facturación de tu empresa.'}
         </p>

@@ -138,7 +138,7 @@ export function Finance() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2"><PiggyBank className="h-5 w-5 text-[var(--color-app-primary)]" /> Finanzas</h1>
+          <h1 className="page-title flex items-center gap-2"><PiggyBank className="h-5 w-5 text-[var(--color-app-primary)]" /> Finanzas</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">P&L, ingresos, egresos y utilidad — combina facturas, compras, nómina y movimientos.</p>
         </div>
         <div className="flex gap-2 flex-wrap">

@@ -111,7 +111,7 @@ export function Inventory() {
       {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)] flex items-center gap-2">
+          <h1 className="page-title flex items-center gap-2">
             Inventario
             <Badge variant="outline" className="font-normal">
               {mode === 'insumos' ? 'Insumos / venta' : 'Taller'}

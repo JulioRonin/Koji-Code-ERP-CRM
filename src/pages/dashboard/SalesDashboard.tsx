@@ -101,7 +101,7 @@ export function SalesDashboard() {
     <div className="space-y-5 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg md:text-xl font-semibold text-[var(--color-app-text)]">Tablero de ventas</h1>
+          <h1 className="page-title">Tablero de ventas</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             {format(new Date(), "EEEE d 'de' MMMM", { locale: es })} · ventas, clientes e inventario
           </p>

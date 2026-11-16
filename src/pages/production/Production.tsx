@@ -153,7 +153,7 @@ export function Production() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Producción</h1>
+          <h1 className="page-title">Producción</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Monitoreo de piso, máquinas y órdenes de trabajo.
           </p>

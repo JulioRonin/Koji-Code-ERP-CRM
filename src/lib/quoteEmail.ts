@@ -1,5 +1,6 @@
 import type { CompanySettings, Quote, QuoteItem } from '@/types/database';
 import { ADVANCE_TERMS_TEXT } from './quoteTerms';
+import { accentOnWhite, resolveAccent } from './brand';
 
 const mx = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
 
@@ -14,7 +15,7 @@ export function quoteEmailHtml(
   company: CompanySettings,
   opts: { subtotal: number; tax: number; total: number },
 ): string {
-  const accent = company.primary_color && /^#[0-9a-fA-F]{6}$/.test(company.primary_color) ? company.primary_color : '#E2401F';
+  const accent = accentOnWhite(resolveAccent(company.primary_color));
   const brand = company.commercial_name || company.legal_name || 'KANRI';
 
   const rows = items.map((it, i) => `

@@ -78,7 +78,7 @@ export function Technicians() {
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center gap-6">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Técnicos</h1>
+          <h1 className="page-title">Técnicos</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Control de personal, maquinaria asignada y órdenes de trabajo.
           </p>

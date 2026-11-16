@@ -84,7 +84,7 @@ export function Combobox({
         disabled={disabled}
         onClick={() => setOpen(o => !o)}
         className={cn(
-          'w-full h-9 px-2.5 rounded-md border border-[var(--color-app-border-strong)] bg-white',
+          'w-full h-10 px-3.5 rounded-xl border border-[var(--color-app-border)] bg-white',
           'text-xs flex items-center justify-between gap-2 text-left',
           'focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 disabled:opacity-60',
         )}
@@ -104,7 +104,7 @@ export function Combobox({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[240px] rounded-md border border-[var(--color-app-border)] bg-white shadow-lg">
+        <div className="absolute z-50 mt-1 w-full min-w-[240px] rounded-2xl bg-white shadow-[var(--shadow-pop)] overflow-hidden">
           <div className="flex items-center gap-2 px-2.5 py-2 border-b border-[var(--color-app-border)]">
             <Search className="h-3.5 w-3.5 text-[var(--color-app-text-subtle)] shrink-0" />
             <input

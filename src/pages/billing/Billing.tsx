@@ -51,7 +51,7 @@ export function Billing() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2"><FileText className="h-5 w-5 text-[var(--color-app-primary)]" /> Facturación (CFDI 4.0)</h1>
+          <h1 className="page-title flex items-center gap-2"><FileText className="h-5 w-5 text-[var(--color-app-primary)]" /> Facturación (CFDI 4.0)</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">Emite facturas y complementos con Facturapi, con tus datos fiscales.</p>
         </div>
         {status.connected && (

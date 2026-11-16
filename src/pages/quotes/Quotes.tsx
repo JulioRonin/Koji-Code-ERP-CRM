@@ -157,7 +157,7 @@ export function Quotes() {
     <div className="space-y-5 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg md:text-xl font-semibold">Cotizaciones</h1>
+          <h1 className="page-title">Cotizaciones</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Estima costos de material y maquinado, genera la cotización y conviértela en proyecto.
           </p>

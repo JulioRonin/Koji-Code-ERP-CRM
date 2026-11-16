@@ -203,7 +203,7 @@ export function Pmo() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg md:text-xl font-semibold">Oficina de proyectos (PMO)</h1>
+          <h1 className="page-title">Oficina de proyectos (PMO)</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Reportes ejecutivos y comunicación con clientes.
           </p>

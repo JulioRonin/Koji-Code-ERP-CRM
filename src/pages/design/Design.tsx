@@ -89,7 +89,7 @@ export function Design() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Diseño e Ingeniería</h1>
+          <h1 className="page-title">Diseño e Ingeniería</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Gestión de modelos CAD, revisiones y programación CAM.
           </p>

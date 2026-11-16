@@ -253,7 +253,7 @@ export function NewProjectWizard() {
         </div>
 
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Nuevo proyecto</h1>
+          <h1 className="page-title">Nuevo proyecto</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Configura el proyecto y carga la documentación inicial. Podrás editarlo después.
           </p>

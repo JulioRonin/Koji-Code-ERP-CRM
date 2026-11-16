@@ -112,7 +112,7 @@ export function Customers() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg md:text-xl font-semibold flex items-center gap-2">
+          <h1 className="page-title flex items-center gap-2">
             <Users className="h-5 w-5 text-[var(--color-app-primary)]" /> Clientes
           </h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">

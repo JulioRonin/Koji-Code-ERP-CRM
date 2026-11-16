@@ -454,7 +454,7 @@ export function QuoteBuilder() {
           </Button>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg md:text-xl font-semibold truncate">{quote.project_name}</h1>
+              <h1 className="page-title truncate">{quote.project_name}</h1>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent">

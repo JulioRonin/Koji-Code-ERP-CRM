@@ -13,6 +13,7 @@ import { useClientPortalData, getFileDownloadUrl } from '@/lib/api';
 import type { ProjectStatus, ProjectFile } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { toLocalDate } from '@/lib/dates';
+import { accentOnWhite, isHex } from '@/lib/brand';
 
 const IMG_RE = /\.(png|jpe?g|webp|gif|bmp|avif)$/i;
 const isImageFile = (f: ProjectFile) =>
@@ -32,7 +33,8 @@ export function ClientPortal() {
   const { data, loading } = useClientPortalData(token);
   const { project, parts, visibleFiles, brand } = data;
 
-  const accent = brand?.primary_color && /^#[0-9a-fA-F]{6}$/.test(brand.primary_color) ? brand.primary_color : KANRI_ACCENT;
+  // Legible sobre blanco y con texto blanco encima (un acento claro pasa a tinta).
+  const accent = accentOnWhite(isHex(brand?.primary_color) ? brand.primary_color : KANRI_ACCENT);
   const brandName = brand?.name || 'KANRI';
 
   const currentStageIndex = useMemo(() => {

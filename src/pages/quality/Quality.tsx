@@ -279,7 +279,7 @@ export function Quality() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Calidad</h1>
+          <h1 className="page-title">Calidad</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Inspecciones, no conformidades (NCR) y calibración ISO 9001.
           </p>

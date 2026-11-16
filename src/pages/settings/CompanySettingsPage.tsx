@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateCompanySettings, uploadCompanyLogo, type CompanySettingsInput } from '@/lib/api';
 import { ACCEPTED_IMAGE_TYPES } from '@/lib/imageUpload';
 import { ADVANCE_TERMS_TEXT } from '@/lib/quoteTerms';
+import { ACCENT_PRESETS, DEFAULT_ACCENT, accentInk, resolveAccent } from '@/lib/brand';
 import { cn } from '@/lib/utils';
 
 const ADMIN_ROLES = ['Administrador', 'Administración / PM'];
@@ -39,15 +40,13 @@ const TAX_REGIMES = [
   '626 - Régimen Simplificado de Confianza (RESICO)',
 ];
 
+// Acentos del rediseño primero; luego tonos clásicos por si la marca lo pide.
 const COLOR_PRESETS = [
+  ...ACCENT_PRESETS,
   { name: 'Azul industrial', value: '#0369a1' },
-  { name: 'Acero', value: '#1e3a5f' },
   { name: 'Verde', value: '#15803d' },
   { name: 'Índigo', value: '#4338ca' },
-  { name: 'Violeta', value: '#7c3aed' },
-  { name: 'Cian', value: '#0891b2' },
   { name: 'Naranja', value: '#c2410c' },
-  { name: 'Rojo', value: '#b91c1c' },
 ];
 
 export function CompanySettingsPage() {
@@ -83,7 +82,7 @@ export function CompanySettingsPage() {
       email: company.email ?? '',
       website: company.website ?? '',
       logo_url: company.logo_url ?? '',
-      primary_color: company.primary_color ?? '#0369a1',
+      primary_color: company.primary_color ?? DEFAULT_ACCENT,
       bank_name: company.bank_name ?? '',
       bank_account: company.bank_account ?? '',
       bank_clabe: company.bank_clabe ?? '',
@@ -142,7 +141,7 @@ export function CompanySettingsPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Configuración</h1>
+          <h1 className="page-title">Configuración</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Datos de la empresa, fiscales (México) y preferencias de marca. Este nombre se muestra en
             la app y los reportes (KANRI es el nombre de la plataforma y no se muestra al cliente).
@@ -412,9 +411,12 @@ export function CompanySettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Palette className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Tema y color de la plataforma
+            <Palette className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Color de acento de la marca
           </CardTitle>
-          <CardDescription>El color primario se aplica en botones, acentos y la marca de la app.</CardDescription>
+          <CardDescription>
+            Los botones y textos usan tinta oscura; el color de tu marca se usa como acento (tarjetas destacadas,
+            menú activo, gráficas). En documentos, un acento claro se imprime en tinta para que se lea bien.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
@@ -426,10 +428,10 @@ export function CompanySettingsPage() {
                 onClick={() => set({ primary_color: p.value })}
                 title={p.name}
                 className={cn(
-                  'h-9 w-9 rounded-md border-2 transition-transform disabled:opacity-60',
-                  form.primary_color === p.value
+                  'h-10 w-10 rounded-full border-2 transition-transform disabled:opacity-60',
+                  form.primary_color?.toLowerCase() === p.value.toLowerCase()
                     ? 'border-[var(--color-app-text)] scale-110'
-                    : 'border-transparent hover:scale-105'
+                    : 'border-white hover:scale-105'
                 )}
                 style={{ backgroundColor: p.value }}
               />
@@ -438,19 +440,19 @@ export function CompanySettingsPage() {
           <div className="flex items-center gap-3">
             <input
               type="color"
-              value={form.primary_color ?? '#0369a1'}
+              value={form.primary_color ?? DEFAULT_ACCENT}
               onChange={e => set({ primary_color: e.target.value })}
               disabled={!isAdmin}
-              className="h-9 w-12 rounded border border-[var(--color-app-border)] cursor-pointer disabled:opacity-60"
+              className="h-10 w-12 rounded-xl border border-[var(--color-app-border)] cursor-pointer disabled:opacity-60"
             />
-            <Field label="" value={form.primary_color} onChange={v => set({ primary_color: v })} disabled={!isAdmin} mono placeholder="#0369a1" />
+            <Field label="" value={form.primary_color} onChange={v => set({ primary_color: v })} disabled={!isAdmin} mono placeholder={DEFAULT_ACCENT} />
             <div className="flex-1 flex items-center gap-2">
               <span className="text-xs text-[var(--color-app-text-muted)]">Vista previa:</span>
               <span
-                className="inline-flex items-center h-8 px-3 rounded-md text-white text-xs font-medium"
-                style={{ backgroundColor: form.primary_color ?? '#0369a1' }}
+                className="inline-flex items-center h-9 px-4 rounded-full text-xs font-medium"
+                style={{ backgroundColor: resolveAccent(form.primary_color), color: accentInk(resolveAccent(form.primary_color)) }}
               >
-                Botón primario
+                Tarjeta destacada
               </span>
             </div>
           </div>

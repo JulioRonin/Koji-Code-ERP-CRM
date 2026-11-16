@@ -70,7 +70,7 @@ export function Shipping() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-app-text)]">Embarques</h1>
+          <h1 className="page-title">Embarques</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
             Packing lists, etiquetas QR y portal de seguimiento para clientes.
           </p>

@@ -132,7 +132,7 @@ export function WorkOrderDetails() {
           </Button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold text-[var(--color-app-text)]">{workOrder.id}</h1>
+              <h1 className="page-title">{workOrder.id}</h1>
               <Badge variant={workOrder.status === 'Completado' ? 'success' : 'default'}>
                 {workOrder.status}
               </Badge>

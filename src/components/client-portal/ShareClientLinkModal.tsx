@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 import type { Project } from '@/types/database';
+import { accentOnWhite, resolveAccent } from '@/lib/brand';
 
 const STAGE_LABEL: Record<string, string> = {
   'Cotización': 'Cotización', 'Diseño': 'Diseño', 'Compras': 'Procura', 'En Producción': 'Producción',
@@ -124,7 +125,7 @@ export function ShareClientLinkModal({ project, open, onClose }: ShareClientLink
         subject: `Avance del proyecto ${project.name} · ${stage}`,
         html: brandedEmailHtml({
           brand,
-          accent: company.primary_color,
+          accent: accentOnWhite(resolveAccent(company.primary_color)),
           title: `Tu proyecto avanzó a: ${stage}`,
           bodyHtml: `Estimado equipo de <b>${project.client_name}</b>,<br/><br/>El proyecto <b>${project.name}</b> (${project.id}) se encuentra en la etapa <b>${stage}</b> con <b>${project.progress}%</b> de avance. Puede seguir el detalle en tiempo real:`,
           ctaLabel: 'Ver avance del proyecto',
