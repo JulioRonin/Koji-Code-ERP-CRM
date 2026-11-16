@@ -146,7 +146,7 @@ export function WorkOrderDetails() {
       </div>
 
       {/* KPIs WO */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           icon={Factory}
           label="Máquina"

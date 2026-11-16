@@ -21,6 +21,7 @@ import {
   Trash2,
   AlertTriangle,
   ListChecks,
+  ScanLine,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +54,7 @@ import {
   getFileDownloadUrl,
 } from '@/lib/api';
 import { DimensionalModal } from '@/components/quality/DimensionalModal';
+import { DimensionalInspections } from '@/components/quality/DimensionalInspections';
 import { NcrFormModal } from '@/components/quality/NcrFormModal';
 import { NcrDetailModal } from '@/components/quality/NcrDetailModal';
 import { NonconformingProcedureCard } from '@/components/quality/NonconformingProcedureCard';
@@ -113,6 +115,7 @@ const STATUS_META: Record<
 };
 
 const tabs = [
+  { id: 'inspection',      label: 'Inspección',           icon: ScanLine },
   { id: 'project_control', label: 'Control por proyecto', icon: LayoutDashboard },
   { id: 'inspections',     label: 'Historial inspecciones', icon: FileSignature },
   { id: 'ncrs',            label: 'No conformidades',     icon: AlertOctagon },
@@ -128,7 +131,7 @@ async function openStorageFile(path: string | null) {
 }
 
 export function Quality() {
-  const [activeTab, setActiveTab] = useState<Tab>('project_control');
+  const [activeTab, setActiveTab] = useState<Tab>('inspection');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ManufacturingStatus | 'TODOS'>('TODOS');
@@ -296,7 +299,7 @@ export function Quality() {
       </div>
 
       {/* KPIs en vivo */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Tasa de aprobación"
           value={`${approvalRate}%`}
@@ -344,6 +347,8 @@ export function Quality() {
           </button>
         ))}
       </div>
+
+      {activeTab === 'inspection' && <DimensionalInspections />}
 
       {activeTab === 'project_control' && (
         <Card className="p-0 overflow-hidden">
@@ -816,7 +821,9 @@ function KpiCard({
   icon: React.ComponentType<{ className?: string }>;
   tone: 'success' | 'danger' | 'warning' | 'primary';
 }) {
-  return <StatTile icon={Icon} label={title} value={value} sub={desc} tone={tone === 'success' ? 'accent' : tone === 'danger' ? 'danger' : tone === 'warning' ? 'warning' : 'default'} />;
+  // Rojo/ámbar solo cuando hay algo pendiente (un 0 no es alerta).
+  const alert = (parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0) > 0;
+  return <StatTile icon={Icon} label={title} value={value} sub={desc} tone={tone === 'success' ? 'accent' : tone === 'danger' && alert ? 'danger' : tone === 'warning' && alert ? 'warning' : 'default'} />;
 }
 
 interface QualityRowProps {

@@ -26,6 +26,7 @@ import {
 import type { ControlPlanItem, ControlPlanPhase, Project } from '@/types/database';
 import { CorrectiveActionModal, Field } from './CorrectiveActionModal';
 import { CONTROL_METHODS, FREQUENCIES, SELECT_CLS } from './capaMeta';
+import { withPrintTheme } from '@/lib/printTheme';
 
 const PHASES: ControlPlanPhase[] = ['Prototipo', 'Pre-lanzamiento', 'Producción'];
 
@@ -185,7 +186,7 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:3p
 <script>window.onload=function(){window.print()}</script></body></html>`;
     const w = window.open('', '_blank', 'width=1200,height=900');
     if (!w) return;
-    w.document.write(html);
+    w.document.write(withPrintTheme(html, brand));
     w.document.close();
   };
 

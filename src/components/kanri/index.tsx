@@ -4,7 +4,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatedValue, useAppeared } from './motion';
 
-export { AnimatedValue, useAppeared, useCountUp } from './motion';
+export { AnimatedValue, useAppeared, useCountUp, useMediaQuery } from './motion';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Kit visual del rediseño KANRI: tarjetas de indicador, paneles, encabezado,

@@ -24,6 +24,7 @@ import type {
 } from '@/types/database';
 import { NcrFormModal } from '@/components/quality/NcrFormModal';
 import { DUE_VARIANT, ORDER_STATUS_VARIANT } from './shared';
+import { withPrintTheme } from '@/lib/printTheme';
 
 const SELECT = 'w-full h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 disabled:opacity-60';
 
@@ -232,7 +233,7 @@ ${form.problem ? `<tr><th>Falla reportada</th><td colspan="3">${e(form.problem)}
 <script>window.onload=function(){window.print()}</script></body></html>`;
     const w = window.open('', '_blank', 'width=900,height=1000');
     if (!w) return;
-    w.document.write(html);
+    w.document.write(withPrintTheme(html, brand));
     w.document.close();
   };
 

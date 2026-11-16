@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
   ArrowLeft,
@@ -311,6 +311,21 @@ export function QuoteBuilder() {
     await updateQuote(quote.id, { status });
     await refetchQuote();
   };
+
+  // Acciones pedidas desde la lista de cotizaciones (?accion=pdf|correo|aprobar):
+  // se ejecutan una sola vez, ya cargada la cotización y sus partidas.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const actionDone = useRef(false);
+  useEffect(() => {
+    const accion = searchParams.get('accion');
+    if (!accion || actionDone.current || !quote || !hydrated) return;
+    actionDone.current = true;
+    setSearchParams({}, { replace: true });
+    if (accion === 'pdf') setShowDocument(true);
+    else if (accion === 'correo') openEmail();
+    else if (accion === 'aprobar') void handleStatusChange('Aprobada');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, quote, hydrated]);
 
   const handleHeaderChange = async (patch: Partial<Quote>) => {
     if (!quote) return;

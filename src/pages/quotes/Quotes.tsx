@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
   Calculator,
@@ -15,12 +15,12 @@ import {
   Send,
   CheckCircle2,
   Layers,
+  FileText,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Table,
@@ -48,20 +48,13 @@ import {
   useUpsertMaterialPrice,
   useDeleteMaterialPrice,
   useBulkImportMaterialPrices,
+  useQuoteItems,
 } from '@/lib/api';
 import { Combobox } from '@/components/ui/combobox';
-import type { MaterialPrice, QuoteStatus } from '@/types/database';
+import type { MaterialPrice, Quote, QuoteStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
-import { StatTile } from '@/components/kanri';
+import { BigNumber, Chips, PageHeader, Panel, Pill, Segmented, StatTile, toneFor, useMediaQuery } from '@/components/kanri';
 
-const statusBadge: Record<QuoteStatus, 'secondary' | 'default' | 'success' | 'destructive' | 'outline' | 'warning'> = {
-  Borrador:   'secondary',
-  Enviada:    'default',
-  Aprobada:   'success',
-  Rechazada:  'destructive',
-  Convertida: 'outline',
-  Expirada:   'warning',
-};
 
 const QUOTE_STATUSES: QuoteStatus[] = ['Borrador', 'Enviada', 'Aprobada', 'Rechazada', 'Convertida', 'Expirada'];
 
@@ -144,6 +137,17 @@ export function Quotes() {
     navigate(`/quotes/${quote.id}`);
   };
 
+  // "Nueva cotización para este cliente" (desde Clientes): ?cliente=<id>
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const cid = searchParams.get('cliente');
+    if (!cid || customers.length === 0) return;
+    setSearchParams({}, { replace: true });
+    pickCustomer(cid);
+    setShowNew(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, customers.length]);
+
   const pickCustomer = (id: string | null) => {
     const c = id ? customers.find(x => x.id === id) : null;
     setDraft(d => ({
@@ -156,103 +160,40 @@ export function Quotes() {
 
   return (
     <div className="space-y-5 md:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div>
-          <h1 className="page-title">Cotizaciones</h1>
-          <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
-            Estima costos de material y maquinado, genera la cotización y conviértela en proyecto.
-          </p>
-        </div>
-        <Button onClick={() => setShowNew(true)}>
-          <Plus className="h-4 w-4 mr-1.5" /> Nueva cotización
-        </Button>
-      </div>
+      <PageHeader
+        title="Cotizaciones"
+        subtitle={`${stats.open} abierta${stats.open === 1 ? '' : 's'} · ${money2(stats.pipelineValue)} en pipeline`}
+        actions={
+          <>
+            <Segmented<Tab> value={activeTab} onChange={setActiveTab} items={tabs.map(t => ({ id: t.id, label: t.label }))} />
+            <Button size="lg" onClick={() => setShowNew(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Nueva cotización
+            </Button>
+          </>
+        }
+      />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={Calculator} label="Abiertas"          value={String(stats.open)} />
         <Kpi icon={CheckCircle2} label="Aprobadas"        value={String(stats.approved)} />
         <Kpi icon={TrendingUp} label="Valor en pipeline" value={money(stats.pipelineValue)} />
         <Kpi icon={DollarSign} label="Valor ganado"      value={money(stats.wonValue)} tone="success" />
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full w-fit max-w-full overflow-x-auto">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={cn(
-              'flex items-center gap-2 px-3 py-1.5 text-sm font-medium transition-colors rounded-md',
-              activeTab === t.id
-                ? 'bg-white text-[var(--color-app-text)] shadow-sm'
-                : 'text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]'
-            )}
-          >
-            <t.icon className="h-4 w-4" /> {t.label}
-          </button>
-        ))}
-      </div>
-
       {activeTab === 'quotes' && (
-        <Card className="p-0">
-          <CardHeader className="pb-3">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">Historial de cotizaciones</CardTitle>
-                <CardDescription>Haz clic en una cotización para editarla o generar el documento.</CardDescription>
-              </div>
-              {/* Toolbar: buscar · filtrar por estatus · agrupar */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative w-full sm:w-56">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
-                  <Input placeholder="Buscar ID, proyecto o cliente…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
-                </div>
-                <select
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value as QuoteStatus | 'TODOS')}
-                  className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
-                >
-                  <option value="TODOS">Todos los estados</option>
-                  {QUOTE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <Button
-                  variant={groupByStatus ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-9"
-                  onClick={() => setGroupByStatus(v => !v)}
-                >
-                  <Layers className="h-4 w-4 mr-1.5" /> Agrupar por estatus
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {quotes.length === 0 ? (
-              <div className="text-center py-12 text-sm text-[var(--color-app-text-muted)]">
-                No hay cotizaciones. Crea la primera arriba.
-              </div>
-            ) : visibleQuotes.length === 0 ? (
-              <div className="text-center py-12 text-sm text-[var(--color-app-text-muted)]">
-                Sin resultados para el filtro actual.
-              </div>
-            ) : groupedQuotes ? (
-              <div className="divide-y divide-[var(--color-app-border)]">
-                {groupedQuotes.map(g => (
-                  <div key={g.status}>
-                    <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-app-surface-alt)]">
-                      <Badge variant={statusBadge[g.status]}>{g.status}</Badge>
-                      <span className="text-xs text-[var(--color-app-text-muted)]">{g.rows.length} cotización{g.rows.length === 1 ? '' : 'es'}</span>
-                    </div>
-                    <QuotesTable rows={g.rows} onOpen={id => navigate(`/quotes/${id}`)} onDelete={handleDeleteQuote} hideStatus />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <QuotesTable rows={visibleQuotes} onOpen={id => navigate(`/quotes/${id}`)} onDelete={handleDeleteQuote} />
-            )}
-          </CardContent>
-        </Card>
+        <QuotesWorkspace
+          quotes={quotes}
+          visible={visibleQuotes}
+          grouped={groupedQuotes}
+          search={search}
+          setSearch={setSearch}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          groupByStatus={groupByStatus}
+          setGroupByStatus={setGroupByStatus}
+          onDelete={handleDeleteQuote}
+        />
       )}
 
       {activeTab === 'prices' && <PriceBook />}
@@ -343,68 +284,193 @@ export function Quotes() {
   );
 }
 
-function QuotesTable({
-  rows,
-  onOpen,
-  onDelete,
-  hideStatus,
+// ============================================================================
+// LISTA + PANEL DE DETALLE (rediseño)
+// ============================================================================
+
+const money2 = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const quoteTone = (s: QuoteStatus) => toneFor(s === 'Convertida' ? 'Aprobada' : s === 'Borrador' ? 'gris' : s === 'Expirada' ? 'cotiz' : s);
+
+function QuotesWorkspace({
+  quotes, visible, grouped, search, setSearch, statusFilter, setStatusFilter, groupByStatus, setGroupByStatus, onDelete,
 }: {
-  rows: import('@/types/database').Quote[];
-  onOpen: (id: string) => void;
+  quotes: Quote[];
+  visible: Quote[];
+  grouped: { status: QuoteStatus; rows: Quote[] }[] | null;
+  search: string;
+  setSearch: (v: string) => void;
+  statusFilter: QuoteStatus | 'TODOS';
+  setStatusFilter: (v: QuoteStatus | 'TODOS') => void;
+  groupByStatus: boolean;
+  setGroupByStatus: (fn: (v: boolean) => boolean) => void;
   onDelete: (id: string) => void;
-  hideStatus?: boolean;
 }) {
+  const navigate = useNavigate();
+  const wide = useMediaQuery('(min-width: 1180px)');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = visible.find(q => q.id === selectedId) ?? visible[0] ?? null;
+
+  const pick = (q: Quote) => (wide ? setSelectedId(q.id) : navigate(`/quotes/${q.id}`));
+
+  const card = (q: Quote) => {
+    const on = wide && selected?.id === q.id;
+    return (
+      <button
+        key={q.id}
+        onClick={() => pick(q)}
+        onDoubleClick={() => navigate(`/quotes/${q.id}`)}
+        className={cn(
+          'k-rise w-full text-left rounded-[24px] p-5 transition-all duration-200',
+          on ? 'bg-white shadow-[0_0_0_2px_var(--color-app-ink)]' : 'bg-[var(--color-app-surface-alt)] hover:bg-white',
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="font-mono text-xs text-[var(--color-app-text-muted)]">{q.id}</span>
+            <Pill tone={quoteTone(q.status)}>{q.status}</Pill>
+          </div>
+          <span className="font-mono text-[15px] whitespace-nowrap">{q.total > 0 ? money2(q.total) : '—'}</span>
+        </div>
+        <div className="mt-2 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[18px] leading-snug truncate">{q.project_name}</p>
+            <p className="text-sm text-[var(--color-app-text-muted)] truncate">{q.client_name}</p>
+          </div>
+          <span className="text-[13px] text-[var(--color-app-text-muted)] whitespace-nowrap">
+            {format(new Date(q.created_at), 'd MMM', { locale: es })}
+          </span>
+        </div>
+      </button>
+    );
+  };
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>ID</TableHead>
-          <TableHead>Proyecto / cliente</TableHead>
-          {!hideStatus && <TableHead>Estado</TableHead>}
-          <TableHead className="text-right">Total</TableHead>
-          <TableHead className="hidden md:table-cell">Creada</TableHead>
-          <TableHead className="w-20 text-right">Acciones</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map(q => (
-          <TableRow key={q.id} className="cursor-pointer" onClick={() => onOpen(q.id)}>
-            <TableCell className="font-mono text-xs">{q.id}</TableCell>
-            <TableCell>
-              <div className="flex flex-col">
-                <span className="font-medium text-sm">{q.project_name}</span>
-                <span className="text-xs text-[var(--color-app-text-muted)]">{q.client_name}</span>
+    <div className="space-y-4">
+      {/* Barra: buscar · estatus · agrupar */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" />
+          <input
+            placeholder="Buscar folio, proyecto o cliente"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full h-11 pl-11 pr-4 rounded-full bg-[var(--color-app-surface-alt)] text-[15px] placeholder:text-[var(--color-app-text-muted)] outline-none focus:bg-white focus:ring-2 focus:ring-[var(--color-app-ink)] transition-colors"
+          />
+        </div>
+        <Chips<QuoteStatus | 'TODOS'>
+          value={statusFilter}
+          onChange={setStatusFilter}
+          items={[
+            { id: 'TODOS', label: 'Todas', count: quotes.length },
+            ...QUOTE_STATUSES.map(st => ({ id: st, label: st, count: quotes.filter(q => q.status === st).length, tone: quoteTone(st) })),
+          ]}
+        />
+        <Button variant={groupByStatus ? 'default' : 'outline'} className="ml-auto" onClick={() => setGroupByStatus(v => !v)}>
+          <Layers className="h-4 w-4 mr-1.5" /> Agrupar por estatus
+        </Button>
+      </div>
+
+      {quotes.length === 0 ? (
+        <Panel><p className="py-10 text-center text-sm text-[var(--color-app-text-muted)]">No hay cotizaciones. Crea la primera arriba.</p></Panel>
+      ) : visible.length === 0 ? (
+        <Panel><p className="py-10 text-center text-sm text-[var(--color-app-text-muted)]">Sin resultados para el filtro actual.</p></Panel>
+      ) : (
+        <div className={cn('grid gap-3 items-start', wide && 'grid-cols-[minmax(0,1fr)_minmax(380px,460px)]')}>
+          <div className="space-y-2.5 min-w-0">
+            {grouped
+              ? grouped.map(g => (
+                  <div key={g.status} className="space-y-2.5">
+                    <div className="flex items-center gap-2 px-1 pt-2">
+                      <Pill tone={quoteTone(g.status)} dot>{g.status}</Pill>
+                      <span className="text-xs text-[var(--color-app-text-muted)]">{g.rows.length} cotización{g.rows.length === 1 ? '' : 'es'}</span>
+                    </div>
+                    {g.rows.map(card)}
+                  </div>
+                ))
+              : visible.map(card)}
+          </div>
+          {wide && selected && <QuoteDetailPanel key={selected.id} quote={selected} onDelete={onDelete} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuoteDetailPanel({ quote, onDelete }: { quote: Quote; onDelete: (id: string) => void }) {
+  const navigate = useNavigate();
+  const { data: items, loading } = useQuoteItems(quote.id);
+  const subtotal = items.reduce((a, it) => a + (it.line_total || 0), 0) || quote.subtotal || 0;
+  const iva = subtotal * ((quote.tax_pct ?? 16) / 100);
+  const go = (accion?: string) => navigate(`/quotes/${quote.id}${accion ? `?accion=${accion}` : ''}`);
+  const canApprove = quote.status !== 'Aprobada' && quote.status !== 'Convertida';
+
+  return (
+    <aside className="k-rise sticky top-2 rounded-[30px] bg-white p-6 flex flex-col gap-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-xs text-[var(--color-app-text-muted)]">
+            {quote.id} · {format(new Date(quote.created_at), 'd MMM yyyy', { locale: es })}
+          </p>
+          <h2 className="mt-2 text-[26px] leading-tight font-normal tracking-[-0.01em]">{quote.project_name}</h2>
+          <p className="text-[15px] text-[var(--color-app-text-muted)] mt-1">{quote.client_name}</p>
+        </div>
+        <Pill tone={quoteTone(quote.status)}>{quote.status}</Pill>
+      </div>
+
+      <div>
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 pb-2 text-xs text-[var(--color-app-text-muted)] border-b border-[var(--color-app-border)]">
+          <span>Concepto</span><span className="text-right">Cant.</span><span className="text-right w-28">Importe</span>
+        </div>
+        {loading ? (
+          <p className="py-6 text-center text-sm text-[var(--color-app-text-muted)]">Cargando partidas…</p>
+        ) : items.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[var(--color-app-text-muted)]">Sin partidas todavía.</p>
+        ) : (
+          <div className="max-h-[300px] overflow-y-auto">
+            {items.map(it => (
+              <div key={it.id} className="grid grid-cols-[1fr_auto_auto] gap-x-4 py-3 border-b border-[var(--color-app-border)] text-sm">
+                <div className="min-w-0">
+                  <p className="truncate">{it.description || it.part_number}</p>
+                  <p className="font-mono text-xs text-[var(--color-app-text-muted)]">{money2(it.unit_price)} c/u</p>
+                </div>
+                <span className="text-right font-mono">{it.quantity}</span>
+                <span className="text-right font-mono w-28">{money2(it.line_total)}</span>
               </div>
-            </TableCell>
-            {!hideStatus && (
-              <TableCell>
-                <Badge variant={statusBadge[q.status]}>{q.status}</Badge>
-              </TableCell>
-            )}
-            <TableCell className="text-right font-semibold tabular-nums">
-              {q.total > 0 ? money(q.total) : '—'}
-            </TableCell>
-            <TableCell className="hidden md:table-cell text-sm text-[var(--color-app-text-muted)]">
-              {format(new Date(q.created_at), 'dd MMM yyyy', { locale: es })}
-            </TableCell>
-            <TableCell className="text-right">
-              <div className="inline-flex items-center gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-[var(--color-app-danger)]"
-                  title="Eliminar cotización"
-                  onClick={e => { e.stopPropagation(); onDelete(q.id); }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-                <ChevronRight className="h-4 w-4 text-[var(--color-app-text-subtle)]" />
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+            ))}
+          </div>
+        )}
+        <div className="pt-3 space-y-1 text-[15px]">
+          <div className="flex justify-between text-[var(--color-app-text-muted)]"><span>Subtotal</span><span className="font-mono">{money2(subtotal)}</span></div>
+          <div className="flex justify-between text-[var(--color-app-text-muted)]"><span>IVA {quote.tax_pct ?? 16} %</span><span className="font-mono">{money2(iva)}</span></div>
+          <div className="flex items-baseline justify-between pt-3">
+            <span>Total {quote.currency || 'MXN'}</span>
+            <BigNumber value={money2(subtotal + iva)} size="md" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <Button variant="outline" size="lg" onClick={() => go('correo')}>
+          <Send className="h-4 w-4 mr-1.5" /> Enviar por correo
+        </Button>
+        {canApprove ? (
+          <Button variant="accent" size="lg" onClick={() => go('aprobar')}>Marcar aprobada</Button>
+        ) : (
+          <Button variant="accent" size="lg" onClick={() => (quote.converted_project_id ? navigate(`/projects/${quote.converted_project_id}`) : go())}>
+            {quote.converted_project_id ? 'Ver proyecto' : 'Convertir a proyecto'}
+          </Button>
+        )}
+        <Button variant="outline" size="lg" onClick={() => go('pdf')}>
+          <FileText className="h-4 w-4 mr-1.5" /> Documento PDF
+        </Button>
+        <Button size="lg" onClick={() => go()}>
+          <Pencil className="h-4 w-4 mr-1.5" /> Editar
+        </Button>
+      </div>
+      <button onClick={() => onDelete(quote.id)} className="self-start inline-flex items-center gap-1.5 text-sm text-[var(--color-app-danger)] hover:underline">
+        <Trash2 className="h-3.5 w-3.5" /> Eliminar cotización
+      </button>
+    </aside>
   );
 }
 
@@ -653,8 +719,7 @@ function PriceBook() {
 // CATÁLOGO DE INVENTARIO (precios de venta) — solo lectura, para cotizar
 // ============================================================================
 
-const money2 = (n: number) =>
-  n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
+
 
 function InventoryPriceList() {
   const { data: inventory } = useInventoryItems();

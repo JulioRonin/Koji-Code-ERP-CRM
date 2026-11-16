@@ -60,8 +60,8 @@ const fmtDate = (s: string | null | undefined) => {
 const DEPT_COLORS: Record<string, string> = {
   Compras:    '#7c3aed',
   Diseño:     '#0ea5e9',
-  Producción: '#0369a1',
-  Calidad:    '#15803d',
+  Producción: '#16181D',
+  Calidad:    '#146C35',
   Embarque:   '#0d9488',
 };
 
@@ -314,7 +314,7 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
             position: sticky; top: 8px; z-index: 5;
           }
           #pmi-report {
-            width: 100%; background: #f1f5f9;
+            width: 100%; background: #F5F6F8;
             border-radius: 10px; overflow: hidden;
           }
           #pmi-report .pmi-page { min-height: auto; padding: 36px 40px; }
@@ -390,7 +390,7 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
 
       <div className="report-stage">
         {/* Toolbar (oculta al imprimir) */}
-        <div className="report-toolbar no-print-pmi flex items-center justify-between gap-3 mb-3 px-4 py-2.5 rounded-lg border border-[var(--color-app-border)] bg-white shadow-sm">
+        <div className="report-toolbar no-print-pmi flex items-center justify-between gap-3 mb-3 px-4 py-2.5 rounded-2xl border border-[var(--color-app-border)] bg-white shadow-sm">
           <div className="text-sm min-w-0 truncate">
             <span className="font-medium">{mode === 'slides' ? 'Presentación' : 'Reporte ejecutivo'}</span>
             <span className="text-[var(--color-app-text-muted)] ml-2">· {project.id}</span>
@@ -445,7 +445,7 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
           {ganttTasks.length > 0 && (
             <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm">
               <PageHeader title="Cronograma del proyecto" subtitle="Vista Gantt · línea de base" />
-              <p className="text-xs text-[#475569] mb-4">
+              <p className="text-xs text-[#6B7079] mb-4">
                 Líneas rojas: actividades en ruta crítica · ★ tareas ad-hoc añadidas fuera del plan formal.
               </p>
               <div className="pmi-keep">
@@ -468,16 +468,16 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
               <div className="grid grid-cols-1 gap-8">
                 {deptPerformanceData.length > 0 && (
                   <div className="pmi-keep">
-                    <h3 className="text-sm font-semibold text-[#0f172a] mb-3">Desempeño por departamento</h3>
+                    <h3 className="text-sm font-medium text-[#16181D] mb-3">Desempeño por departamento</h3>
                     <div className="h-[220px] w-full">
                       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                         <BarChart data={deptPerformanceData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                          <XAxis type="number" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} domain={[0, 100]} />
-                          <YAxis dataKey="name" type="category" stroke="#475569" fontSize={11} axisLine={false} tickLine={false} />
-                          <Tooltip cursor={{ fill: 'rgba(0,0,0,0.03)' }} contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6 }} />
-                          <Bar dataKey="complete" fill="#0369a1" stackId="a" radius={[0, 4, 4, 0]} barSize={18} />
-                          <Bar dataKey="pending" fill="#e2e8f0" stackId="a" radius={[0, 4, 4, 0]} barSize={18} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E6E8EC" horizontal={false} />
+                          <XAxis type="number" stroke="#A3A8B1" fontSize={11} axisLine={false} tickLine={false} domain={[0, 100]} />
+                          <YAxis dataKey="name" type="category" stroke="#6B7079" fontSize={11} axisLine={false} tickLine={false} />
+                          <Tooltip cursor={{ fill: 'rgba(0,0,0,0.03)' }} contentStyle={{ background: '#fff', border: '1px solid #E6E8EC', borderRadius: 6 }} />
+                          <Bar dataKey="complete" fill="#16181D" stackId="a" radius={[0, 4, 4, 0]} barSize={18} />
+                          <Bar dataKey="pending" fill="#E6E8EC" stackId="a" radius={[0, 4, 4, 0]} barSize={18} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -486,15 +486,15 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
 
                 {progressTimelineData.length > 0 && (
                   <div className="pmi-keep">
-                    <h3 className="text-sm font-semibold text-[#0f172a] mb-3">Curva de progreso (S-Curve)</h3>
+                    <h3 className="text-sm font-medium text-[#16181D] mb-3">Curva de progreso (S-Curve)</h3>
                     <div className="h-[220px] w-full">
                       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                         <LineChart data={progressTimelineData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
-                          <YAxis stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} domain={[0, 100]} />
-                          <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6 }} />
-                          <Line type="monotone" dataKey="progress" stroke="#0369a1" strokeWidth={2.5} dot={{ fill: '#0369a1', r: 3 }} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E6E8EC" />
+                          <XAxis dataKey="date" stroke="#A3A8B1" fontSize={11} axisLine={false} tickLine={false} />
+                          <YAxis stroke="#A3A8B1" fontSize={11} axisLine={false} tickLine={false} domain={[0, 100]} />
+                          <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E6E8EC', borderRadius: 6 }} />
+                          <Line type="monotone" dataKey="progress" stroke="#16181D" strokeWidth={2.5} dot={{ fill: '#16181D', r: 3 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -505,24 +505,24 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
               {/* Próximos hitos */}
               {upcomingMilestones.length > 0 && (
                 <div className="mt-8 pmi-keep">
-                  <h3 className="text-sm font-semibold text-[#0f172a] mb-3 flex items-center gap-2">
-                    <Flag className="h-4 w-4 text-[#0369a1]" /> Próximos hitos
+                  <h3 className="text-sm font-medium text-[#16181D] mb-3 flex items-center gap-2">
+                    <Flag className="h-4 w-4 text-[#16181D]" /> Próximos hitos
                   </h3>
-                  <div className="border border-[#e2e8f0] rounded-lg overflow-hidden">
+                  <div className="border border-[#E6E8EC] rounded-2xl overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-[#f8fafc]">
-                        <tr className="text-left text-xs text-[#475569]">
-                          <th className="px-3 py-2 font-semibold">WBS</th>
-                          <th className="px-3 py-2 font-semibold">Actividad</th>
-                          <th className="px-3 py-2 font-semibold">Depto.</th>
-                          <th className="px-3 py-2 font-semibold">Fecha objetivo</th>
-                          <th className="px-3 py-2 font-semibold text-right">Avance</th>
+                      <thead className="bg-[#F5F6F8]">
+                        <tr className="text-left text-xs text-[#6B7079]">
+                          <th className="px-3 py-2 font-medium">WBS</th>
+                          <th className="px-3 py-2 font-medium">Actividad</th>
+                          <th className="px-3 py-2 font-medium">Depto.</th>
+                          <th className="px-3 py-2 font-medium">Fecha objetivo</th>
+                          <th className="px-3 py-2 font-medium text-right">Avance</th>
                         </tr>
                       </thead>
                       <tbody>
                         {upcomingMilestones.map(m => (
-                          <tr key={m.id} className="border-t border-[#e2e8f0]">
-                            <td className="px-3 py-2 font-mono text-xs text-[#475569]">{m.wbs_code}</td>
+                          <tr key={m.id} className="border-t border-[#E6E8EC]">
+                            <td className="px-3 py-2 font-mono text-xs text-[#6B7079]">{m.wbs_code}</td>
                             <td className="px-3 py-2 font-medium">{m.name}</td>
                             <td className="px-3 py-2">
                               {m.department && (
@@ -553,17 +553,17 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
             <div className="space-y-6">
               {masterPlan?.risk_summary ? (
                 <div className="pmi-keep">
-                  <h3 className="text-sm font-semibold text-[#0f172a] mb-2 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-[#b45309]" /> Riesgos identificados
+                  <h3 className="text-sm font-medium text-[#16181D] mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-[#8A4B06]" /> Riesgos identificados
                   </h3>
-                  <div className="p-4 bg-[#fef3c7]/30 border border-[#fde68a] rounded-md text-sm leading-relaxed whitespace-pre-wrap">
+                  <div className="p-4 bg-[#fef3c7]/30 border border-[#fde68a] rounded-2xl text-sm leading-relaxed whitespace-pre-wrap">
                     {masterPlan.risk_summary}
                   </div>
                 </div>
               ) : (
                 <div className="pmi-keep">
-                  <h3 className="text-sm font-semibold text-[#0f172a] mb-2">Riesgos identificados</h3>
-                  <p className="text-sm text-[#94a3b8] italic">
+                  <h3 className="text-sm font-medium text-[#16181D] mb-2">Riesgos identificados</h3>
+                  <p className="text-sm text-[#A3A8B1] italic">
                     Sin riesgos documentados en el Master Plan.
                   </p>
                 </div>
@@ -571,20 +571,20 @@ export function ProjectReport({ isOpen, onClose, project, ganttTasks }: ProjectR
 
               {datedTasks.length > 0 && (
                 <div className="pmi-keep">
-                  <h3 className="text-sm font-semibold text-[#0f172a] mb-2">
+                  <h3 className="text-sm font-medium text-[#16181D] mb-2">
                     Tareas adicionales fuera del plan formal
                   </h3>
-                  <div className="border border-[#e2e8f0] rounded-md divide-y divide-[#e2e8f0]">
+                  <div className="border border-[#E6E8EC] rounded-2xl divide-y divide-[#E6E8EC]">
                     {datedTasks.map(t => (
                       <div key={t.id} className="px-3 py-2 flex items-center gap-3 text-sm">
                         {t.status === 'completed' ? (
-                          <CheckCircle2 className="h-4 w-4 text-[#15803d] shrink-0" />
+                          <CheckCircle2 className="h-4 w-4 text-[#146C35] shrink-0" />
                         ) : (
-                          <div className="h-2 w-2 rounded-full bg-[#0369a1] shrink-0" />
+                          <div className="h-2 w-2 rounded-full bg-[#16181D] shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{t.name}</p>
-                          <p className="text-xs text-[#475569]">
+                          <p className="text-xs text-[#6B7079]">
                             {t.department ?? 'Sin asignar'} · {fmtDate(t.start_date)} → {fmtDate(t.end_date)}
                           </p>
                         </div>
@@ -655,34 +655,34 @@ function PortadaPage({
       <div className="flex items-start justify-between pt-12 mb-20">
         <div className="flex items-center gap-3">
           {company.logo_url ? (
-            <img src={company.logo_url} alt={brandName} className="h-14 w-14 rounded-md object-cover shadow-sm bg-white" />
+            <img src={company.logo_url} alt={brandName} className="h-14 w-14 rounded-2xl object-cover shadow-sm bg-white" />
           ) : (
-            <div className="h-14 w-14 rounded-md bg-[var(--color-app-primary)] flex items-center justify-center text-white font-bold text-2xl shadow-sm">
+            <div className="h-14 w-14 rounded-2xl bg-[var(--color-app-primary)] flex items-center justify-center text-white font-medium text-2xl shadow-sm">
               {brandInitial}
             </div>
           )}
           <div>
-            <p className="font-bold text-lg text-[#0f172a] leading-tight">{brandName}</p>
-            <p className="text-xs text-[#475569]">{company.tagline || ''}</p>
+            <p className="font-medium text-lg text-[#16181D] leading-tight">{brandName}</p>
+            <p className="text-xs text-[#6B7079]">{company.tagline || ''}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-widest text-[#94a3b8] font-medium">
+          <p className="text-[10px] uppercase tracking-widest text-[#A3A8B1] font-medium">
             Documento PMI · Confidencial
           </p>
-          <p className="text-xs font-mono text-[#475569] mt-1">{project.id}</p>
+          <p className="text-xs font-mono text-[#6B7079] mt-1">{project.id}</p>
         </div>
       </div>
 
       {/* Título principal */}
       <div className="text-center mb-16">
-        <p className="text-xs uppercase tracking-[0.3em] text-[#0369a1] font-semibold mb-4">
+        <p className="text-xs uppercase tracking-[0.3em] text-[#16181D] font-medium mb-4">
           Reporte ejecutivo de proyecto
         </p>
-        <h1 className="text-4xl font-bold text-[#0f172a] mb-3 leading-tight">{project.name}</h1>
-        <div className="inline-block px-4 py-1.5 bg-[#f1f5f9] rounded-full">
-          <p className="text-sm text-[#475569]">
-            Cliente: <span className="font-semibold text-[#0f172a]">{project.client}</span>
+        <h1 className="text-5xl font-light tracking-[-0.03em] text-[#16181D] mb-3 leading-tight">{project.name}</h1>
+        <div className="inline-block px-4 py-1.5 bg-[#F5F6F8] rounded-full">
+          <p className="text-sm text-[#6B7079]">
+            Cliente: <span className="font-medium text-[#16181D]">{project.client}</span>
           </p>
         </div>
       </div>
@@ -695,7 +695,7 @@ function PortadaPage({
       </div>
 
       {/* Datos del documento */}
-      <div className="border-t border-[#e2e8f0] pt-6 grid grid-cols-2 gap-y-3 gap-x-8 text-sm">
+      <div className="border-t border-[#E6E8EC] pt-6 grid grid-cols-2 gap-y-3 gap-x-8 text-sm">
         <InfoRow label="Estado actual"  value={project.status} />
         <InfoRow label="Manager del proyecto" value={project.manager} />
         <InfoRow label="Fecha de inicio" value={fmtDate(project.startDate)} />
@@ -710,9 +710,9 @@ function PortadaPage({
 
       {/* Footer portada */}
       <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-xs text-[#94a3b8]">
+        <p className="text-xs text-[#A3A8B1]">
           Emitido el{' '}
-          <span className="font-medium text-[#475569]">
+          <span className="font-medium text-[#6B7079]">
             {format(new Date(), "EEEE d 'de' MMMM 'de' yyyy", { locale: es })}
           </span>
         </p>
@@ -750,26 +750,26 @@ function ExecSummaryPage({
 
       {/* Descripción / contexto */}
       <div className="mb-6 pmi-keep">
-        <h3 className="text-sm font-semibold text-[#0f172a] mb-2">Contexto del proyecto</h3>
-        <p className="text-sm leading-relaxed text-[#334155] whitespace-pre-wrap">
+        <h3 className="text-sm font-medium text-[#16181D] mb-2">Contexto del proyecto</h3>
+        <p className="text-sm leading-relaxed text-[#474C55] whitespace-pre-wrap">
           {project.description || `Proyecto de manufactura CNC para ${project.client}. Sin descripción adicional registrada.`}
         </p>
       </div>
 
       {/* Estado narrativo */}
       <div className={cn(
-        'p-4 rounded-md border pmi-keep',
+        'p-4 rounded-2xl border pmi-keep',
         isAtRisk
           ? 'bg-[#fef2f2] border-[#fecaca]'
           : stats.avgProgress >= 80
           ? 'bg-[#f0fdf4] border-[#bbf7d0]'
           : 'bg-[#eff6ff] border-[#bfdbfe]'
       )}>
-        <h3 className="text-sm font-semibold text-[#0f172a] mb-2 flex items-center gap-2">
-          {isAtRisk ? <AlertTriangle className="h-4 w-4 text-[#b91c1c]" /> : <ShieldCheck className="h-4 w-4 text-[#15803d]" />}
+        <h3 className="text-sm font-medium text-[#16181D] mb-2 flex items-center gap-2">
+          {isAtRisk ? <AlertTriangle className="h-4 w-4 text-[#b91c1c]" /> : <ShieldCheck className="h-4 w-4 text-[#146C35]" />}
           Análisis del PMI
         </h3>
-        <p className="text-sm text-[#334155] leading-relaxed">
+        <p className="text-sm text-[#474C55] leading-relaxed">
           El proyecto presenta un avance global del{' '}
           <strong>{stats.avgProgress}%</strong>
           {stats.total > 0 && (
@@ -808,17 +808,17 @@ function ScoreboardPage({ tasks }: { tasks: ReturnType<typeof useMasterPlanTasks
 
       {/* Sin break-inside:avoid — si hay muchas actividades, la tabla pagina
           fila por fila en lugar de cortarse o dejar una página en blanco. */}
-      <div className="border border-[#e2e8f0] rounded-lg overflow-hidden">
+      <div className="border border-[#E6E8EC] rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-[#f8fafc]">
-            <tr className="text-left text-xs text-[#475569]">
-              <th className="px-3 py-2 font-semibold">WBS</th>
-              <th className="px-3 py-2 font-semibold">Actividad</th>
-              <th className="px-3 py-2 font-semibold">Depto.</th>
-              <th className="px-3 py-2 font-semibold">Inicio</th>
-              <th className="px-3 py-2 font-semibold">Fin</th>
-              <th className="px-3 py-2 font-semibold text-right">Avance</th>
-              <th className="px-3 py-2 font-semibold text-center">Estado</th>
+          <thead className="bg-[#F5F6F8]">
+            <tr className="text-left text-xs text-[#6B7079]">
+              <th className="px-3 py-2 font-medium">WBS</th>
+              <th className="px-3 py-2 font-medium">Actividad</th>
+              <th className="px-3 py-2 font-medium">Depto.</th>
+              <th className="px-3 py-2 font-medium">Inicio</th>
+              <th className="px-3 py-2 font-medium">Fin</th>
+              <th className="px-3 py-2 font-medium text-right">Avance</th>
+              <th className="px-3 py-2 font-medium text-center">Estado</th>
             </tr>
           </thead>
           <tbody>
@@ -826,11 +826,11 @@ function ScoreboardPage({ tasks }: { tasks: ReturnType<typeof useMasterPlanTasks
               const status =
                 t.progress >= 100 ? 'done' : t.progress > 0 ? 'wip' : 'pending';
               return (
-                <tr key={t.id} className="border-t border-[#e2e8f0] text-sm">
-                  <td className="px-3 py-2 font-mono text-xs text-[#475569]">
+                <tr key={t.id} className="border-t border-[#E6E8EC] text-sm">
+                  <td className="px-3 py-2 font-mono text-xs text-[#6B7079]">
                     <div className="flex items-center gap-1.5">
                       {t.wbs_code}
-                      {t.is_milestone && <Flag className="h-3 w-3 text-[#b45309]" />}
+                      {t.is_milestone && <Flag className="h-3 w-3 text-[#8A4B06]" />}
                       {t.is_critical_path && (
                         <span className="h-1.5 w-1.5 rounded-full bg-[#b91c1c]" title="Ruta crítica" />
                       )}
@@ -845,16 +845,16 @@ function ScoreboardPage({ tasks }: { tasks: ReturnType<typeof useMasterPlanTasks
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-xs text-[#475569]">{fmtDate(t.start_date)}</td>
-                  <td className="px-3 py-2 text-xs text-[#475569]">{fmtDate(t.end_date)}</td>
+                  <td className="px-3 py-2 text-xs text-[#6B7079]">{fmtDate(t.start_date)}</td>
+                  <td className="px-3 py-2 text-xs text-[#6B7079]">{fmtDate(t.end_date)}</td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <div className="w-16 h-1.5 bg-[#e2e8f0] rounded-full overflow-hidden">
+                      <div className="w-16 h-1.5 bg-[#E6E8EC] rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full"
                           style={{
                             width: `${t.progress}%`,
-                            backgroundColor: status === 'done' ? '#15803d' : '#0369a1',
+                            backgroundColor: status === 'done' ? '#146C35' : '#16181D',
                           }}
                         />
                       </div>
@@ -888,7 +888,7 @@ function SignaturePage({
     <div className="pmi-page bg-white max-w-[850px] mx-auto my-6 shadow-sm">
       <PageHeader title="Cierre y firmas" subtitle="Validación del reporte" />
 
-      <div className="text-sm text-[#334155] mb-12 leading-relaxed">
+      <div className="text-sm text-[#474C55] mb-12 leading-relaxed">
         <p>
           Este documento es un reporte ejecutivo emitido por la oficina de gestión de proyectos (PMO)
           de {brandName} para el proyecto <strong>{project.name}</strong> ({project.id}).
@@ -910,7 +910,7 @@ function SignaturePage({
         <Signature title="Aceptación del cliente" name={project.client} />
       </div>
 
-      <div className="absolute bottom-8 left-0 right-0 text-center text-xs text-[#94a3b8] mt-12">
+      <div className="absolute bottom-8 left-0 right-0 text-center text-xs text-[#A3A8B1] mt-12">
         <p>
           {brandName}
           {company.rfc ? ` · RFC ${company.rfc}` : ''} · Reporte PMI ·{' '}
@@ -928,11 +928,11 @@ function SignaturePage({
 
 function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="border-b-2 border-[#0369a1] pb-3 mb-6">
-      <p className="text-[10px] uppercase tracking-widest text-[#0369a1] font-semibold mb-1">
+    <div className="border-b-2 border-[#16181D] pb-3 mb-6">
+      <p className="text-[10px] uppercase tracking-widest text-[#16181D] font-medium mb-1">
         {subtitle}
       </p>
-      <h2 className="text-2xl font-bold text-[#0f172a]">{title}</h2>
+      <h2 className="text-2xl font-medium text-[#16181D]">{title}</h2>
     </div>
   );
 }
@@ -940,8 +940,8 @@ function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-[#94a3b8] font-medium mb-0.5">{label}</p>
-      <p className="font-semibold text-[#0f172a]">{value}</p>
+      <p className="text-[10px] uppercase tracking-wide text-[#A3A8B1] font-medium mb-0.5">{label}</p>
+      <p className="font-medium text-[#16181D]">{value}</p>
     </div>
   );
 }
@@ -950,21 +950,21 @@ function PortadaStat({ label, value, tone }: { label: string; value: string; ton
   return (
     <div
       className={cn(
-        'rounded-lg p-4 border text-center',
+        'rounded-2xl p-4 border text-center',
         tone === 'primary'
-          ? 'bg-[#0369a1] text-white border-[#0369a1]'
-          : 'bg-[#f8fafc] border-[#e2e8f0] text-[#0f172a]'
+          ? 'bg-[#16181D] text-white border-[#16181D]'
+          : 'bg-[#F5F6F8] border-[#E6E8EC] text-[#16181D]'
       )}
     >
       <p
         className={cn(
           'text-[10px] uppercase tracking-wide font-medium',
-          tone === 'primary' ? 'text-white/80' : 'text-[#94a3b8]'
+          tone === 'primary' ? 'text-white/80' : 'text-[#A3A8B1]'
         )}
       >
         {label}
       </p>
-      <p className="text-2xl font-bold mt-1 tabular-nums">{value}</p>
+      <p className="text-2xl font-medium mt-1 tabular-nums">{value}</p>
     </div>
   );
 }
@@ -981,20 +981,20 @@ function KpiBox({
   tone?: 'success' | 'warning';
 }) {
   return (
-    <div className="rounded-lg p-4 border border-[#e2e8f0] bg-white text-center">
-      <div className="h-8 w-8 rounded-md bg-[#f1f5f9] mx-auto flex items-center justify-center mb-2">
-        <Icon className="h-4 w-4 text-[#475569]" />
+    <div className="rounded-2xl p-4 border border-[#E6E8EC] bg-white text-center">
+      <div className="h-8 w-8 rounded-2xl bg-[#F5F6F8] mx-auto flex items-center justify-center mb-2">
+        <Icon className="h-4 w-4 text-[#6B7079]" />
       </div>
       <p
         className={cn(
-          'text-xl font-bold tabular-nums',
-          tone === 'success' && 'text-[#15803d]',
-          tone === 'warning' && 'text-[#b45309]'
+          'text-xl font-medium tabular-nums',
+          tone === 'success' && 'text-[#146C35]',
+          tone === 'warning' && 'text-[#8A4B06]'
         )}
       >
         {value}
       </p>
-      <p className="text-[10px] uppercase tracking-wide text-[#94a3b8] mt-1">{label}</p>
+      <p className="text-[10px] uppercase tracking-wide text-[#A3A8B1] mt-1">{label}</p>
     </div>
   );
 }
@@ -1002,9 +1002,9 @@ function KpiBox({
 function Signature({ title, name }: { title: string; name: string }) {
   return (
     <div className="text-center">
-      <div className="border-t-2 border-[#cbd5e1] pt-2">
-        <p className="text-xs text-[#475569] mb-0.5">{title}</p>
-        <p className="text-sm font-semibold text-[#0f172a]">{name}</p>
+      <div className="border-t-2 border-[#E6E8EC] pt-2">
+        <p className="text-xs text-[#6B7079] mb-0.5">{title}</p>
+        <p className="text-sm font-medium text-[#16181D]">{name}</p>
       </div>
     </div>
   );
@@ -1028,18 +1028,18 @@ function NotesAndMeetingsPage({
     milestone: 'Hito',
   };
   const noteTypeColor: Record<string, string> = {
-    note: '#0369a1',
-    system: '#94a3b8',
-    status_change: '#b45309',
-    milestone: '#15803d',
+    note: '#16181D',
+    system: '#A3A8B1',
+    status_change: '#8A4B06',
+    milestone: '#146C35',
   };
 
   const meetingTypeColor: Record<string, string> = {
-    'Kick-off':  '#0369a1',
+    'Kick-off':  '#16181D',
     Semanal:     '#0ea5e9',
     Quincenal:   '#7c3aed',
-    Mensual:     '#15803d',
-    Hito:        '#b45309',
+    Mensual:     '#146C35',
+    Hito:        '#8A4B06',
     Cierre:      '#0d9488',
   };
 
@@ -1050,26 +1050,26 @@ function NotesAndMeetingsPage({
       {/* JUNTAS */}
       {meetings.length > 0 && (
         <div className="mb-8 pmi-keep">
-          <h3 className="text-sm font-semibold text-[#0f172a] mb-2 flex items-center gap-2">
-            <CalendarClock className="h-4 w-4 text-[#0369a1]" /> Calendario de juntas de seguimiento
+          <h3 className="text-sm font-medium text-[#16181D] mb-2 flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-[#16181D]" /> Calendario de juntas de seguimiento
           </h3>
-          <div className="border border-[#e2e8f0] rounded-lg overflow-hidden">
+          <div className="border border-[#E6E8EC] rounded-2xl overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#f8fafc]">
-                <tr className="text-left text-xs text-[#475569]">
-                  <th className="px-3 py-2 font-semibold">Tipo</th>
-                  <th className="px-3 py-2 font-semibold">Junta</th>
-                  <th className="px-3 py-2 font-semibold">Fecha / hora</th>
-                  <th className="px-3 py-2 font-semibold">Asistentes</th>
-                  <th className="px-3 py-2 font-semibold text-center">Estado</th>
+              <thead className="bg-[#F5F6F8]">
+                <tr className="text-left text-xs text-[#6B7079]">
+                  <th className="px-3 py-2 font-medium">Tipo</th>
+                  <th className="px-3 py-2 font-medium">Junta</th>
+                  <th className="px-3 py-2 font-medium">Fecha / hora</th>
+                  <th className="px-3 py-2 font-medium">Asistentes</th>
+                  <th className="px-3 py-2 font-medium text-center">Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {meetings.map(m => {
                   const date = new Date(m.scheduled_at);
-                  const color = meetingTypeColor[m.meeting_type] ?? '#94a3b8';
+                  const color = meetingTypeColor[m.meeting_type] ?? '#A3A8B1';
                   return (
-                    <tr key={m.id} className="border-t border-[#e2e8f0]">
+                    <tr key={m.id} className="border-t border-[#E6E8EC]">
                       <td className="px-3 py-2">
                         <span
                           className="inline-flex items-center gap-1.5 text-xs font-medium"
@@ -1082,7 +1082,7 @@ function NotesAndMeetingsPage({
                       <td className="px-3 py-2">
                         <p className="font-medium">{m.title}</p>
                         {m.notes && (
-                          <p className="text-[10px] text-[#475569] mt-0.5 truncate max-w-[280px]">
+                          <p className="text-[10px] text-[#6B7079] mt-0.5 truncate max-w-[280px]">
                             {m.notes}
                           </p>
                         )}
@@ -1090,11 +1090,11 @@ function NotesAndMeetingsPage({
                       <td className="px-3 py-2 text-xs">
                         {format(date, "dd MMM yyyy", { locale: es })}
                         <br />
-                        <span className="text-[10px] text-[#94a3b8]">
+                        <span className="text-[10px] text-[#A3A8B1]">
                           {format(date, 'HH:mm')} · {m.duration_minutes} min
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-xs text-[#475569]">
+                      <td className="px-3 py-2 text-xs text-[#6B7079]">
                         {m.attendees.length > 0 ? m.attendees.join(', ') : '—'}
                       </td>
                       <td className="px-3 py-2 text-center">
@@ -1117,18 +1117,18 @@ function NotesAndMeetingsPage({
 
       {/* NOTAS Y HALLAZGOS */}
       <div className="pmi-keep">
-        <h3 className="text-sm font-semibold text-[#0f172a] mb-2 flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-[#0369a1]" /> Notas y hallazgos del equipo
+        <h3 className="text-sm font-medium text-[#16181D] mb-2 flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-[#16181D]" /> Notas y hallazgos del equipo
         </h3>
         {notes.length === 0 ? (
-          <p className="text-sm text-[#94a3b8] italic">
+          <p className="text-sm text-[#A3A8B1] italic">
             Sin notas registradas aún. Las notas agregadas desde el proyecto aparecerán aquí
             ordenadas cronológicamente.
           </p>
         ) : (
-          <div className="border-l-2 border-[#e2e8f0] pl-4 space-y-3">
+          <div className="border-l-2 border-[#E6E8EC] pl-4 space-y-3">
             {notes.map(n => {
-              const color = noteTypeColor[n.note_type] ?? '#0369a1';
+              const color = noteTypeColor[n.note_type] ?? '#16181D';
               return (
                 <div key={n.id} className="relative">
                   <span
@@ -1136,7 +1136,7 @@ function NotesAndMeetingsPage({
                     style={{ backgroundColor: color }}
                   />
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-semibold text-[#0f172a]">
+                    <span className="text-xs font-medium text-[#16181D]">
                       {n.user_name ?? 'Sistema'}
                     </span>
                     <span
@@ -1148,11 +1148,11 @@ function NotesAndMeetingsPage({
                     >
                       {noteTypeLabel[n.note_type] ?? n.note_type}
                     </span>
-                    <span className="text-[10px] text-[#94a3b8]">
+                    <span className="text-[10px] text-[#A3A8B1]">
                       {format(new Date(n.created_at), "dd MMM yyyy 'a las' HH:mm", { locale: es })}
                     </span>
                   </div>
-                  <p className="text-sm text-[#334155] leading-snug">{n.action}</p>
+                  <p className="text-sm text-[#474C55] leading-snug">{n.action}</p>
                 </div>
               );
             })}

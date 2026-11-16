@@ -24,6 +24,7 @@ import {
   CA_STATUS_VARIANT, DISPOSITIONS, DISPOSITION_META, NCR_STATUS_VARIANT, SELECT_CLS, SEVERITY_VARIANT,
 } from './capaMeta';
 import { QMS_DOC, QMS_SECTION_LABEL } from './qmsDoc';
+import { withPrintTheme } from '@/lib/printTheme';
 
 /** Pasos B2–B6 de la sección 8 (TPNC) del PR-CAL-001; B1 es el registro de la NCR. */
 const STEPS = [
@@ -203,7 +204,7 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:5p
     // Sin "noopener": con él window.open devuelve null y no podríamos escribir el registro.
     const w = window.open('', '_blank', 'width=900,height=1000');
     if (!w) { setError('Permite ventanas emergentes para imprimir el registro.'); return; }
-    w.document.write(html);
+    w.document.write(withPrintTheme(html, brand));
     w.document.close();
   };
 

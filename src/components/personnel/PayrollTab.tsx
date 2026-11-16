@@ -112,7 +112,7 @@ export function PayrollTab({ staff, isAdmin }: { staff: Profile[]; isAdmin: bool
   return (
     <div className="space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Colaboradores" value={String(active.length)} icon={Banknote} />
         <KpiCard label="Percepciones" value={money(totals.perceptions)} icon={Banknote} />
         <KpiCard label="Deducciones" value={money(totals.deductions)} icon={Banknote} />

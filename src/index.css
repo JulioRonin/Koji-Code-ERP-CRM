@@ -210,7 +210,9 @@ html, body {
    ===================================================================== */
 @media print {
   .no-print { display: none !important; }
-  body { background: #ffffff !important; color: #000000 !important; }
+  html, body { background: #ffffff !important; color: #16181D !important; }
+  /* Sin animaciones de entrada en papel (evita elementos a medio aparecer). */
+  .k-rise { animation: none !important; }
   .surface, .surface-soft { box-shadow: none !important; border-color: #d4d4d8 !important; }
 }
 

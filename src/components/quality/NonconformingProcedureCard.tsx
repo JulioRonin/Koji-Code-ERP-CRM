@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCompany } from '@/contexts/CompanyContext';
 import { QMS_DOC } from './qmsDoc';
+import { withPrintTheme } from '@/lib/printTheme';
 
 /**
  * Pasos B1–B6 de la sección 8 (TPNC) del PR-CAL-001. Deben coincidir con el
@@ -96,7 +97,7 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6p
 <script>window.onload=function(){window.print()}</script></body></html>`;
     const w = window.open('', '_blank', 'width=900,height=1000');
     if (!w) return;
-    w.document.write(html);
+    w.document.write(withPrintTheme(html, brand));
     w.document.close();
   };
 

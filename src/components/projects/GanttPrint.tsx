@@ -79,13 +79,13 @@ export function GanttPrint({ startDate, tasks, endDate, title, subtitle, onClose
         <div className="gp-toolbar">
           <button
             onClick={() => window.print()}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#2563eb', color: 'white', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#16181D', color: 'white', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 500 }}
           >
             <Printer style={{ width: 16, height: 16 }} /> Imprimir / Guardar PDF
           </button>
           <button
             onClick={onClose}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'white', color: '#0f172a', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'white', color: '#16181D', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 500 }}
           >
             <X style={{ width: 16, height: 16 }} /> Cerrar
           </button>
@@ -93,19 +93,19 @@ export function GanttPrint({ startDate, tasks, endDate, title, subtitle, onClose
 
         <div className="gp-page">
           {/* Encabezado */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: 10, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #16181D', paddingBottom: 10, marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {company.logo_url && (
                 <img src={company.logo_url} alt={brand} style={{ height: 40, width: 40, borderRadius: 8, objectFit: 'cover' }} />
               )}
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{brand}</div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>{title}</div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: '#16181D' }}>{brand}</div>
+                <div style={{ fontSize: 11, color: '#6B7079' }}>{title}</div>
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>CRONOGRAMA · GANTT</div>
-              {subtitle && <div style={{ fontSize: 11, color: '#64748b' }}>{subtitle}</div>}
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#16181D' }}>CRONOGRAMA · GANTT</div>
+              {subtitle && <div style={{ fontSize: 11, color: '#6B7079' }}>{subtitle}</div>}
             </div>
           </div>
 

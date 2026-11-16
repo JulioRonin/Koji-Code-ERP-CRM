@@ -14,10 +14,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
-import { useCustomers, useUpsertCustomer, useDeleteCustomer, useProjects, useQuotes } from '@/lib/api';
+import { useCustomers, useUpsertCustomer, useDeleteCustomer, useProjects, useQuotes, useReceivables, useReceivablePayments } from '@/lib/api';
 import type { Customer, CustomerStage, Project, Quote } from '@/types/database';
 import { cn } from '@/lib/utils';
-import { StatTile } from '@/components/kanri';
+import { AnimatedValue, Chips, PageHeader, Panel, Pill, Segmented, StatTile, toneFor, useMediaQuery } from '@/components/kanri';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 
@@ -76,6 +76,10 @@ export function Customers() {
   const { data: projects } = useProjects();
   const { data: quotes } = useQuotes();
   const { remove } = useDeleteCustomer();
+  const { data: receivables } = useReceivables();
+  const { data: payments } = useReceivablePayments();
+  const wide = useMediaQuery('(min-width: 1180px)');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('');
@@ -96,6 +100,21 @@ export function Customers() {
     return matchesSearch && matchesStage;
   }), [enriched, search, stageFilter]);
 
+  // Saldo por cobrar por cliente (cuentas por cobrar − pagos), por nombre.
+  const balances = useMemo(() => {
+    const paid: Record<string, number> = {};
+    for (const p of payments) paid[p.receivable_id] = (paid[p.receivable_id] ?? 0) + (p.amount || 0);
+    const out: Record<string, number> = {};
+    for (const r of receivables) {
+      const k = r.customer_name.trim().toLowerCase();
+      out[k] = (out[k] ?? 0) + Math.max(0, (r.total_amount || 0) - (paid[r.id] ?? 0));
+    }
+    return out;
+  }, [receivables, payments]);
+  const balanceOf = (c: Customer) => balances[c.name.trim().toLowerCase()] ?? 0;
+  const selected = filtered.find(c => c.id === selectedId) ?? filtered[0] ?? null;
+  const openCustomer = (c: Enriched) => (wide && view === 'directory' ? setSelectedId(c.id) : setDetail(c));
+
   const kpis = useMemo(() => {
     const activos = enriched.filter(c => (c.stage ?? 'activo') === 'activo').length;
     const prospectos = enriched.filter(c => ['prospecto', 'contacto', 'propuesta'].includes(c.stage ?? '')).length;
@@ -111,19 +130,27 @@ export function Customers() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div>
-          <h1 className="page-title flex items-center gap-2">
-            <Users className="h-5 w-5 text-[var(--color-app-primary)]" /> Clientes
-          </h1>
-          <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
-            Seguimiento comercial: ranking, cartera y roadmap de tus clientes y prospectos.
-          </p>
-        </div>
-        <Button onClick={() => { setEdit(null); setOpen(true); }}>
-          <Plus className="h-4 w-4 mr-1.5" /> Nuevo cliente
-        </Button>
-      </div>
+      <PageHeader
+        title="Clientes"
+        subtitle={`${kpis.activos} cuenta${kpis.activos === 1 ? '' : 's'} activa${kpis.activos === 1 ? '' : 's'} · ${Object.values(balances).filter(v => v > 0).length} con saldo por cobrar`}
+        actions={
+          <>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" />
+              <input
+                placeholder="Nombre, contacto, giro o RFC"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full h-[52px] pl-11 pr-4 rounded-full bg-[var(--color-app-surface-alt)] text-[15px] placeholder:text-[var(--color-app-text-muted)] outline-none focus:bg-white focus:ring-2 focus:ring-[var(--color-app-ink)] transition-colors"
+              />
+            </div>
+            <Segmented<'directory' | 'pipeline'> value={view} onChange={setView} items={[{ id: 'directory', label: 'Directorio' }, { id: 'pipeline', label: 'Roadmap' }]} />
+            <Button size="lg" onClick={() => { setEdit(null); setOpen(true); }}>
+              <Plus className="h-4 w-4 mr-1.5" /> Nuevo cliente
+            </Button>
+          </>
+        }
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -133,104 +160,100 @@ export function Customers() {
         <Kpi icon={Building2} label="Inactivos" value={String(kpis.inactivos)} sub="oportunidad de mercado" tone={kpis.inactivos > 0 ? 'warning' : undefined} />
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
-          <Input placeholder="Buscar cliente, contacto o giro…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
-        </div>
-        <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40">
-          <option value="">Todas las etapas</option>
-          {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-        </select>
-        <div className="ml-auto inline-flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full">
-          <button onClick={() => setView('directory')} className={cn('flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md', view === 'directory' ? 'bg-white shadow-sm' : 'text-[var(--color-app-text-muted)]')}>
-            <LayoutList className="h-4 w-4" /> Directorio
-          </button>
-          <button onClick={() => setView('pipeline')} className={cn('flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md', view === 'pipeline' ? 'bg-white shadow-sm' : 'text-[var(--color-app-text-muted)]')}>
-            <Kanban className="h-4 w-4" /> Roadmap
-          </button>
-        </div>
-      </div>
+      {/* Etapas */}
+      <Chips
+        value={stageFilter || 'all'}
+        onChange={v => setStageFilter(v === 'all' ? '' : v)}
+        items={[
+          { id: 'all', label: 'Todos', count: enriched.length },
+          ...STAGES.map(st => ({ id: st.key as string, label: st.label, count: enriched.filter(c => (c.stage ?? 'activo') === st.key).length })),
+        ]}
+      />
 
       {view === 'directory' ? (
-        <Card className="p-0">
-          <CardContent className="p-0 overflow-x-auto">
-            {filtered.length === 0 ? (
-              <div className="py-12 text-center text-sm text-[var(--color-app-text-muted)]">
-                {customers.length === 0 ? 'Sin clientes. Da de alta el primero.' : 'Sin resultados.'}
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Etapa</TableHead>
-                    <TableHead className="text-center">Rank</TableHead>
-                    <TableHead className="text-center">Proyectos</TableHead>
-                    <TableHead className="text-right">Ventas</TableHead>
-                    <TableHead>Última actividad</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map(c => (
-                    <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetail(c)}>
-                      <TableCell>
-                        <div className="font-medium">{c.name}</div>
-                        <div className="text-[11px] text-[var(--color-app-text-subtle)]">
-                          {c.industry || c.contact_name || (c.tax_id ? c.tax_id : '—')}
-                        </div>
-                      </TableCell>
-                      <TableCell><Badge variant={stageMeta(c.stage).variant}>{stageMeta(c.stage).label}</Badge></TableCell>
-                      <TableCell className="text-center"><TierPill tier={c.m.tier} auto={c.m.tierAuto} /></TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {c.m.projectsTotal}
-                        {c.m.activeProjects > 0 && <span className="text-[10px] text-[var(--color-app-primary)] ml-1">({c.m.activeProjects} act.)</span>}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{money(c.m.ventas)}</TableCell>
-                      <TableCell className="text-[var(--color-app-text-muted)] text-xs">
-                        {c.m.lastActivity ? formatDistanceToNow(new Date(c.m.lastActivity), { addSuffix: true, locale: es }) : '—'}
-                      </TableCell>
-                      <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="h-8" onClick={() => { setEdit(c); setOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
-                          <Button variant="ghost" size="sm" className="h-8 text-[var(--color-app-danger)]" onClick={() => del(c)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+        filtered.length === 0 ? (
+          <Panel>
+            <p className="py-10 text-center text-sm text-[var(--color-app-text-muted)]">
+              {customers.length === 0 ? 'Sin clientes. Da de alta el primero.' : 'Sin resultados.'}
+            </p>
+          </Panel>
+        ) : (
+          <div className={cn('grid gap-3 items-start', wide && 'grid-cols-[minmax(0,1fr)_minmax(380px,460px)]')}>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 min-w-0">
+              {filtered.map((c, i) => {
+                const on = wide && selected?.id === c.id;
+                const bal = balanceOf(c);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => openCustomer(c)}
+                    className={cn(
+                      'k-rise text-left rounded-[24px] p-5 flex flex-col gap-4 transition-all duration-200',
+                      on ? 'bg-white shadow-[0_0_0_2px_var(--color-app-ink)]' : 'bg-[var(--color-app-surface-alt)] hover:bg-white',
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Initials name={c.name} index={i} />
+                      <div className="min-w-0">
+                        <p className="text-[16px] leading-tight truncate">{c.name}</p>
+                        <p className="text-[13px] text-[var(--color-app-text-muted)] truncate">{c.industry || c.contact_name || stageMeta(c.stage).label}</p>
+                      </div>
+                      <span className="ml-auto"><TierPill tier={c.m.tier} auto={c.m.tierAuto} /></span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-[var(--color-app-text-muted)]">Proyectos</p>
+                        <p className="text-[20px] font-light">{c.m.projectsTotal}{c.m.activeProjects > 0 && <span className="text-xs text-[var(--color-app-text-muted)] ml-1">({c.m.activeProjects} act.)</span>}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--color-app-text-muted)]">Saldo</p>
+                        <p className={cn('font-mono text-[15px] mt-1', bal > 0 ? 'text-[#B45309]' : 'text-[var(--color-app-text-muted)]')}>{money2(bal)}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {wide && selected && (
+              <CustomerPanel
+                key={selected.id}
+                c={selected}
+                index={filtered.indexOf(selected)}
+                balance={balanceOf(selected)}
+                onEdit={() => { setEdit(selected); setOpen(true); }}
+                onDelete={() => del(selected)}
+                onOpenProject={id => navigate(`/projects/${id}`)}
+                onNewQuote={() => navigate(`/quotes?cliente=${encodeURIComponent(selected.id)}`)}
+              />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          {STAGES.map(stage => {
+          {STAGES.map((stage, si) => {
             const items = filtered.filter(c => (c.stage ?? 'activo') === stage.key);
             return (
-              <div key={stage.key} className="bg-[var(--color-app-surface-alt)]/50 rounded-lg p-2">
-                <div className="flex items-center justify-between px-1.5 py-1 mb-1.5">
-                  <span className="text-xs font-semibold flex items-center gap-1.5">
+              <div key={stage.key} className="k-rise bg-[var(--color-app-surface-alt)] rounded-[26px] p-3 min-h-[320px]" style={{ ['--i' as string]: si }}>
+                <div className="flex items-center justify-between px-2 pt-2 pb-3">
+                  <span className="text-[16px] flex items-center gap-2">
                     <span
                       className="h-2 w-2 rounded-full"
                       style={{ background: `var(--color-app-${stage.variant === 'success' ? 'success' : stage.variant === 'warning' ? 'warning' : 'primary'})` }}
                     />
                     {stage.label}
                   </span>
-                  <span className="text-[11px] text-[var(--color-app-text-muted)]">{items.length}</span>
+                  <span className="font-mono text-xs text-[var(--color-app-text-muted)]">{items.length}</span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {items.map(c => (
-                    <button key={c.id} onClick={() => setDetail(c)} className="w-full text-left rounded-md border border-[var(--color-app-border)] bg-white p-2.5 hover:border-[var(--color-app-primary)]/40 transition-colors">
+                    <button key={c.id} onClick={() => setDetail(c)} className="k-rise w-full text-left rounded-[20px] bg-white p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(22,24,29,.08)]">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="font-medium text-sm truncate">{c.name}</span>
+                        <span className="text-[15px] truncate">{c.name}</span>
                         <TierPill tier={c.m.tier} auto={c.m.tierAuto} />
                       </div>
-                      <div className="text-[11px] text-[var(--color-app-text-muted)] mt-1 flex items-center justify-between">
+                      <div className="text-xs text-[var(--color-app-text-muted)] mt-2 flex items-center justify-between">
                         <span>{c.m.projectsTotal} proyecto{c.m.projectsTotal === 1 ? '' : 's'}</span>
-                        <span className="tabular-nums font-medium">{money(c.m.ventas)}</span>
+                        <span className="font-mono">{money(c.m.ventas)}</span>
                       </div>
                     </button>
                   ))}
@@ -253,6 +276,80 @@ export function Customers() {
         />
       )}
     </div>
+  );
+}
+
+const money2 = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const TINTS = ['#E4E7EF', '#E6DCCF', '#D5E4DB', '#E8DDE9', '#DCE6EE', '#EEE6D2'];
+
+function Initials({ name, index, size = 48 }: { name: string; index: number; size?: number }) {
+  const ini = name.replace(/\b(S\.?\s?A\.?|DE|RL|CV)\b/gi, '').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+  return (
+    <span className="rounded-2xl flex items-center justify-center text-[15px] shrink-0" style={{ width: size, height: size, background: TINTS[index % TINTS.length] }}>
+      {ini}
+    </span>
+  );
+}
+
+/** Panel de detalle del cliente (rediseño). */
+function CustomerPanel({ c, index, balance, onEdit, onDelete, onOpenProject, onNewQuote }: {
+  c: Enriched; index: number; balance: number; onEdit: () => void; onDelete: () => void; onOpenProject: (id: string) => void; onNewQuote: () => void;
+}) {
+  return (
+    <aside className="k-rise sticky top-2 rounded-[30px] bg-white p-6 flex flex-col gap-5">
+      <div className="flex items-center gap-3.5">
+        <Initials name={c.name} index={index} size={56} />
+        <div className="min-w-0">
+          <h2 className="text-[26px] leading-tight font-normal tracking-[-0.01em] truncate">{c.name}</h2>
+          <p className="font-mono text-xs text-[var(--color-app-text-muted)]">{c.tax_id ? `RFC ${c.tax_id}` : c.industry || 'Sin RFC'}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Pill tone={toneFor(stageMeta(c.stage).label)}>{stageMeta(c.stage).label}</Pill>
+        <TierPill tier={c.m.tier} auto={c.m.tierAuto} />
+        <Pill>Score {c.m.score}/100</Pill>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="rounded-[18px] bg-[var(--color-app-surface-muted)] p-4">
+          <p className="text-xs text-[var(--color-app-text-muted)]">Ventas ganadas</p>
+          <p className="font-mono text-[17px] mt-1"><AnimatedValue value={money2(c.m.ventas)} /></p>
+        </div>
+        <div className="rounded-[18px] bg-[var(--color-app-surface-muted)] p-4">
+          <p className="text-xs text-[var(--color-app-text-muted)]">Saldo por cobrar</p>
+          <p className={cn('font-mono text-[17px] mt-1', balance > 0 && 'text-[#B45309]')}><AnimatedValue value={money2(balance)} /></p>
+        </div>
+      </div>
+      <div className="space-y-1.5 text-sm">
+        <p className="text-xs text-[var(--color-app-text-muted)]">Contacto</p>
+        {c.contact_name && <p>{c.contact_name}</p>}
+        {c.contact_email && <a className="underline underline-offset-2 block truncate" href={`mailto:${c.contact_email}`}>{c.contact_email}</a>}
+        {c.phone && <p className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-[var(--color-app-text-muted)]" /> {c.phone}</p>}
+        {c.last_contact_at && <p className="text-[var(--color-app-text-muted)]">Último contacto: {format(new Date(c.last_contact_at), 'dd MMM yyyy', { locale: es })}</p>}
+        {!c.contact_name && !c.contact_email && !c.phone && <p className="text-[var(--color-app-text-muted)]">Sin datos de contacto.</p>}
+      </div>
+      {c.notes && <p className="text-sm rounded-[18px] bg-[var(--color-app-surface-muted)] p-4">{c.notes}</p>}
+      <div className="space-y-2">
+        <p className="text-xs text-[var(--color-app-text-muted)]">Proyectos ({c.m.projects.length})</p>
+        {c.m.projects.length === 0 ? (
+          <p className="text-sm text-[var(--color-app-text-muted)]">Sin proyectos con este cliente.</p>
+        ) : (
+          c.m.projects.slice(0, 6).map(p => (
+            <button key={p.id} onClick={() => onOpenProject(p.id)} className="w-full flex items-center justify-between gap-2 rounded-[16px] bg-[var(--color-app-surface-muted)] px-4 py-3 text-left hover:bg-[var(--color-app-surface-alt)] transition-colors">
+              <span className="min-w-0">
+                <span className="block text-sm truncate">{p.name}</span>
+                <span className="block font-mono text-[11px] text-[var(--color-app-text-muted)]">{p.id}</span>
+              </span>
+              <Pill tone={toneFor(p.status)}>{p.status === 'En Producción' ? 'Producción' : p.status}</Pill>
+            </button>
+          ))
+        )}
+      </div>
+      <Button size="lg" className="w-full" onClick={onNewQuote}>Nueva cotización para este cliente</Button>
+      <div className="flex items-center justify-between">
+        <button onClick={onEdit} className="inline-flex items-center gap-1.5 text-sm hover:underline"><Pencil className="h-3.5 w-3.5" /> Editar cliente</button>
+        <button onClick={onDelete} className="inline-flex items-center gap-1.5 text-sm text-[var(--color-app-danger)] hover:underline"><Trash2 className="h-3.5 w-3.5" /> Eliminar</button>
+      </div>
+    </aside>
   );
 }
 
