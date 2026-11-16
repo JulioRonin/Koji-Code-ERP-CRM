@@ -59,6 +59,7 @@ import {
   useRequisitions, useBomItems, summarizePurchasing, useCreateRequisition,
 } from '@/lib/api';
 import type { Requisition, Priority, RequisitionStatus } from '@/types/database';
+import { Segmented, StatTile } from '@/components/kanri';
 
 const priorityVariant: Record<Priority, 'destructive' | 'warning' | 'secondary'> = {
   Alta: 'destructive',
@@ -211,7 +212,7 @@ export function Purchasing() {
       </div>
 
       {/* KPI cards — desglose por estatus de compra del BOM activo */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
         {[
           {
             label: 'Avance global',
@@ -228,41 +229,20 @@ export function Purchasing() {
             sub: kpis.late > 0 ? 'Requieren seguimiento' : 'Todo al día',
             icon: AlertCircle,
           },
-        ].map(k => (
-          <Card key={k.label} className="p-0">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-[var(--color-app-text-muted)]">{k.label}</p>
-                  <p className="text-2xl font-semibold mt-1">{k.value}</p>
-                </div>
-                <div className="h-9 w-9 rounded-md bg-[var(--color-app-surface-alt)] flex items-center justify-center">
-                  <k.icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-                </div>
-              </div>
-              <p className="text-xs text-[var(--color-app-text-muted)] mt-2">{k.sub}</p>
-            </CardContent>
-          </Card>
+        ].map((k, i) => (
+          <StatTile
+            key={k.label}
+            icon={k.icon}
+            label={k.label}
+            value={k.value}
+            sub={k.sub}
+            tone={i === 0 ? 'accent' : k.label === 'Atrasadas' && kpis.late > 0 ? 'danger' : 'default'}
+          />
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-[var(--color-app-border)] flex">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={cn(
-              'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
-              activeTab === t.id
-                ? 'border-[var(--color-app-primary)] text-[var(--color-app-primary)]'
-                : 'border-transparent text-[var(--color-app-text-muted)] hover:text-[var(--color-app-text)]'
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Segmented<Tab> items={tabs.map(t => ({ id: t.id, label: t.label }))} value={activeTab} onChange={setActiveTab} />
 
       {/* Content */}
       {activeTab === 'by-project' && <ProjectPurchaseTracker />}

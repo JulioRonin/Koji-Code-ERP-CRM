@@ -52,6 +52,7 @@ import { ProjectReport } from '@/components/projects/ProjectReport';
 import { ShareClientLinkModal } from '@/components/client-portal/ShareClientLinkModal';
 import { cn } from '@/lib/utils';
 import { toLocalDate } from '@/lib/dates';
+import { StatTile } from '@/components/kanri';
 
 const GANTT_MOCK = [
   { id: 't1', name: 'Procura de Acero',    department: 'Compras' as const,    startDay: 0,  duration: 5,  progress: 100, status: 'completed' as const },
@@ -612,25 +613,5 @@ function Kpi({
   value: string;
   tone?: 'success' | 'warning';
 }) {
-  return (
-    <Card className="p-0">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-xs text-[var(--color-app-text-muted)] truncate">{label}</p>
-            <p
-              className={cn(
-                'text-xl md:text-2xl font-semibold mt-1',
-                tone === 'success' && 'text-[var(--color-app-success)]',
-                tone === 'warning' && 'text-[var(--color-app-warning)]'
-              )}
-            >
-              {value}
-            </p>
-          </div>
-          <Icon className="h-4 w-4 text-[var(--color-app-text-muted)] shrink-0" />
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} tone={tone === 'success' ? 'success' : tone === 'warning' ? 'warning' : 'default'} />;
 }

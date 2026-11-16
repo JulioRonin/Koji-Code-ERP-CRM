@@ -37,6 +37,7 @@ import { useProjects } from '@/lib/api';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toLocalDate } from '@/lib/dates';
+import { StatTile } from '@/components/kanri';
 
 const statusVariant: Record<string, 'success' | 'warning' | 'secondary' | 'default' | 'outline'> = {
   'Cotización': 'warning',
@@ -105,7 +106,7 @@ export function Design() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit">
+      <div className="flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full w-fit max-w-full overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -124,27 +125,14 @@ export function Design() {
 
       {activeTab === 'dashboard' && (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
             {[
               { title: 'En diseño',        value: String(kpis.activos),    sub: 'Proyectos en fase de diseño',   icon: PenTool },
               { title: 'En cotización',    value: String(kpis.revision),   sub: 'Por definir / aprobar',         icon: Clock },
               { title: 'En manufactura',   value: String(kpis.aprobados),  sub: 'Compras, producción y calidad', icon: FileCheck },
               { title: 'Entregados',       value: String(kpis.entregados), sub: 'Proyectos cerrados',            icon: MonitorPlay },
-            ].map(k => (
-              <Card key={k.title} className="p-0">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-[var(--color-app-text-muted)]">{k.title}</p>
-                      <p className="text-2xl font-semibold mt-1">{k.value}</p>
-                    </div>
-                    <div className="h-9 w-9 rounded-md bg-[var(--color-app-surface-alt)] flex items-center justify-center">
-                      <k.icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-                    </div>
-                  </div>
-                  <p className="text-xs text-[var(--color-app-text-muted)] mt-2">{k.sub}</p>
-                </CardContent>
-              </Card>
+            ].map((k, i) => (
+              <StatTile key={k.title} icon={k.icon} label={k.title} value={k.value} sub={k.sub} tone={i === 0 ? 'accent' : 'default'} />
             ))}
           </div>
 

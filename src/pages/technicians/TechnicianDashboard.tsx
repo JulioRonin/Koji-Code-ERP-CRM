@@ -34,6 +34,7 @@ import {
 import { DailyChecklistModal } from '@/components/maintenance/DailyChecklistModal';
 import type { BomItem, ManufacturingStatus, Project } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { StatTile } from '@/components/kanri';
 
 const STATUS_VARIANT: Record<ManufacturingStatus, 'secondary' | 'default' | 'warning' | 'success' | 'destructive'> = {
   PENDIENTE: 'secondary',
@@ -425,28 +426,7 @@ function KpiBox({
   sub: string;
   tone?: 'muted' | 'primary' | 'success';
 }) {
-  const color =
-    tone === 'success'
-      ? 'text-[var(--color-app-success)]'
-      : tone === 'primary'
-      ? 'text-[var(--color-app-primary)]'
-      : tone === 'muted'
-      ? 'text-[var(--color-app-text-muted)]'
-      : 'text-[var(--color-app-text)]';
-  return (
-    <Card className="p-0">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-[var(--color-app-text-muted)]">{label}</p>
-            <p className={cn('text-2xl font-semibold mt-1 tabular-nums', color)}>{value}</p>
-            <p className="text-[10px] text-[var(--color-app-text-muted)] mt-0.5">{sub}</p>
-          </div>
-          <Icon className={cn('h-5 w-5', color)} />
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} sub={sub} tone={tone === 'primary' ? 'accent' : tone === 'success' ? 'success' : 'default'} />;
 }
 
 function MiniStat({

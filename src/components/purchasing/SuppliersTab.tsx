@@ -13,6 +13,7 @@ import {
 import { useSuppliers, useUpsertSupplier, useDeleteSupplier, usePurchaseOrders } from '@/lib/api';
 import type { Supplier, PurchaseOrder } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { StatTile } from '@/components/kanri';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 
@@ -167,20 +168,7 @@ function TierPill({ tier, auto }: { tier: string; auto: boolean }) {
 }
 
 function Kpi({ icon: Icon, label, value, sub, tone }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; sub?: string; tone?: 'warning' }) {
-  return (
-    <Card className="p-0">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-xs text-[var(--color-app-text-muted)] truncate">{label}</p>
-            <p className={cn('text-xl font-semibold mt-0.5 truncate', tone === 'warning' && 'text-[var(--color-app-warning)]')}>{value}</p>
-          </div>
-          <Icon className="h-4 w-4 text-[var(--color-app-text-muted)] shrink-0" />
-        </div>
-        {sub && <p className="text-[11px] text-[var(--color-app-text-muted)] mt-1 truncate">{sub}</p>}
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} sub={sub} tone={tone === 'warning' ? 'warning' : 'default'} />;
 }
 
 function SupplierDetail({ s, onClose, onEdit }: { s: Enriched; onClose: () => void; onEdit: () => void }) {

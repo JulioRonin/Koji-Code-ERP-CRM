@@ -3,7 +3,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, Wallet, Plus, Trash2, Download, PiggyBank,
 } from 'lucide-react';
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 import { startOfMonth, startOfYear, subMonths, isSameMonth, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -22,6 +22,7 @@ import { Profitability } from './Profitability';
 import { cn } from '@/lib/utils';
 import { toLocalDate } from '@/lib/dates';
 import { isWonQuote, quoteSaleDate } from '@/lib/sales';
+import { ProgressLine, StatTile } from '@/components/kanri';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 const money2 = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
@@ -37,7 +38,6 @@ function periodStart(p: Period): Date {
   return startOfYear(now);
 }
 
-const EXP_COLORS = ['#E2401F', '#0369a1', '#7c3aed', '#15803d', '#b45309', '#0891b2'];
 
 export function Finance() {
   const { data: invoices } = useInvoices();
@@ -155,7 +155,7 @@ export function Finance() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit">
+      <div className="flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full w-fit max-w-full overflow-x-auto">
         {([['resumen', 'Resumen (P&L)'], ['rentabilidad', 'Rentabilidad por proyecto']] as const).map(([id, label]) => (
           <button
             key={id}
@@ -175,27 +175,27 @@ export function Finance() {
       {tab === 'resumen' && (<>
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={TrendingUp} label="Ingresos" value={money(agg.income)} tone="success" />
-        <Kpi icon={TrendingDown} label="Egresos" value={money(agg.expenses)} tone="danger" />
-        <Kpi icon={DollarSign} label="Utilidad" value={money(agg.profit)} tone={agg.profit >= 0 ? 'success' : 'danger'} />
-        <Kpi icon={Wallet} label="Margen" value={`${agg.margin}%`} />
+        <Kpi icon={TrendingUp} label="Ingresos" value={money(agg.income)} />
+        <Kpi icon={TrendingDown} label="Egresos" value={money(agg.expenses)} />
+        <Kpi icon={DollarSign} label="Utilidad" value={money(agg.profit)} tone={agg.profit >= 0 ? undefined : 'danger'} />
+        <Kpi icon={Wallet} label="Margen operativo" value={`${agg.margin}%`} tone="accent" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Ingresos vs Egresos */}
         <Card className="lg:col-span-2 p-0">
-          <CardHeader className="pb-2"><CardTitle className="text-base">Ingresos vs Egresos</CardTitle><CardDescription>Últimos 6 meses</CardDescription></CardHeader>
+          <CardHeader className="pb-2"><CardTitle>Ingresos vs. egresos</CardTitle><CardDescription>Últimos 6 meses</CardDescription></CardHeader>
           <CardContent className="pb-4">
             <div className="h-[260px] -ml-2">
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <BarChart data={monthly}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} width={48} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
-                  <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} formatter={(v: number) => money2(v)} />
-                  <Legend />
-                  <Bar dataKey="Ingresos" fill="#15803d" radius={[4, 4, 0, 0]} barSize={18} />
-                  <Bar dataKey="Egresos" fill="#E2401F" radius={[4, 4, 0, 0]} barSize={18} />
+                  <CartesianGrid stroke="#EEF0F3" vertical={false} />
+                  <XAxis dataKey="label" stroke="#6B7079" fontSize={12} axisLine={false} tickLine={false} />
+                  <YAxis stroke="#A3A8B1" fontSize={11} axisLine={false} tickLine={false} width={48} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
+                  <Tooltip cursor={{ fill: '#F5F6F8' }} contentStyle={{ background: '#fff', border: 0, borderRadius: 16, boxShadow: '0 18px 50px rgba(22,24,29,.14)', fontSize: 13 }} formatter={(v: number) => money2(v)} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#6B7079' }} />
+                  <Bar dataKey="Ingresos" fill="#16181D" radius={[14, 14, 14, 14]} barSize={26} animationDuration={900} />
+                  <Bar dataKey="Egresos" fill="#D3D7DF" radius={[14, 14, 14, 14]} barSize={26} animationDuration={900} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -204,31 +204,25 @@ export function Finance() {
 
         {/* Egresos por categoría */}
         <Card className="p-0">
-          <CardHeader className="pb-2"><CardTitle className="text-base">Egresos por categoría</CardTitle><CardDescription>{PERIOD_LABEL[period]}</CardDescription></CardHeader>
+          <CardHeader className="pb-2"><CardTitle>Egresos por rubro</CardTitle><CardDescription>{PERIOD_LABEL[period]}</CardDescription></CardHeader>
           <CardContent className="pb-4">
             {agg.expenseByCat.length === 0 ? (
               <p className="py-10 text-center text-sm text-[var(--color-app-text-muted)]">Sin egresos en el periodo.</p>
             ) : (
-              <>
-                <div className="h-[170px]">
-                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
-                    <PieChart>
-                      <Pie data={agg.expenseByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={44} outerRadius={68} paddingAngle={3} strokeWidth={0}>
-                        {agg.expenseByCat.map((_, i) => <Cell key={i} fill={EXP_COLORS[i % EXP_COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} formatter={(v: number) => money2(v)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-1 mt-2">
-                  {agg.expenseByCat.map((c, i) => (
-                    <div key={c.name} className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-2 text-[var(--color-app-text-muted)]"><span className="h-2 w-2 rounded-full" style={{ background: EXP_COLORS[i % EXP_COLORS.length] }} />{c.name}</span>
-                      <span className="font-medium tabular-nums">{money(c.value)}</span>
+              <div className="space-y-3.5 pt-1">
+                {[...agg.expenseByCat].sort((a, b) => b.value - a.value).map((c, i, arr) => {
+                  const total = arr.reduce((t, x) => t + x.value, 0) || 1;
+                  return (
+                    <div key={c.name}>
+                      <div className="flex items-baseline justify-between gap-3 text-[15px]">
+                        <span>{c.name}</span>
+                        <span className="font-mono text-xs text-[var(--color-app-text-muted)]">{money(c.value)} · {Math.round((c.value / total) * 100)} %</span>
+                      </div>
+                      <ProgressLine pct={(c.value / arr[0].value) * 100} className="mt-1.5 h-2" delay={i * 80} />
                     </div>
-                  ))}
-                </div>
-              </>
+                  );
+                })}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -348,14 +342,8 @@ function TxModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => voi
   );
 }
 
-function Kpi({ icon: Icon, label, value, tone }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; tone?: 'success' | 'danger' }) {
-  const color = tone === 'success' ? 'text-[var(--color-app-success)]' : tone === 'danger' ? 'text-[var(--color-app-danger)]' : 'text-[var(--color-app-text)]';
-  return (
-    <Card className="p-0"><CardContent className="p-4 flex items-start justify-between">
-      <div><p className="text-xs text-[var(--color-app-text-muted)]">{label}</p><p className={`text-xl font-semibold mt-0.5 ${color}`}>{value}</p></div>
-      <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-    </CardContent></Card>
-  );
+function Kpi({ icon: Icon, label, value, tone }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; tone?: 'success' | 'danger' | 'accent' }) {
+  return <StatTile icon={Icon} label={label} value={value} tone={tone === 'accent' ? 'accent' : tone === 'success' ? 'success' : tone === 'danger' ? 'danger' : 'default'} />;
 }
 
 function PL({ label, value, muted }: { label: string; value: number; muted?: boolean }) {

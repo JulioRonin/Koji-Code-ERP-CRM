@@ -13,6 +13,7 @@ import {
   useReceivables, useReceivablePayments, useSetProjectSaleAmount,
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { StatTile } from '@/components/kanri';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 
@@ -277,15 +278,7 @@ export function Profitability() {
 function Kpi({ icon: Icon, label, value, tone }: {
   icon: React.ComponentType<{ className?: string }>; label: string; value: string; tone?: 'success' | 'warning' | 'danger';
 }) {
-  const color = tone === 'success' ? 'text-[var(--color-app-success)]'
-    : tone === 'warning' ? 'text-[var(--color-app-warning)]'
-    : tone === 'danger' ? 'text-[var(--color-app-danger)]' : 'text-[var(--color-app-text)]';
-  return (
-    <Card className="p-0"><CardContent className="p-4 flex items-start justify-between">
-      <div className="min-w-0"><p className="text-xs text-[var(--color-app-text-muted)] truncate">{label}</p><p className={cn('text-lg font-semibold mt-0.5 truncate', color)}>{value}</p></div>
-      <Icon className="h-4 w-4 text-[var(--color-app-text-muted)] shrink-0" />
-    </CardContent></Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} tone={tone === 'success' ? 'success' : tone === 'warning' ? 'warning' : tone === 'danger' ? 'danger' : 'default'} />;
 }
 
 function csv(s: string): string { return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }

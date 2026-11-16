@@ -56,6 +56,10 @@ import { useChat } from '@/contexts/ChatContext';
 import { useProjects, useCreateProject, useDeleteProject } from '@/lib/api';
 import type { Project, ProjectStatus } from '@/types/database';
 import { toLocalDate } from '@/lib/dates';
+import { Chips, ProgressLine, Segmented, TONE, toneFor } from '@/components/kanri';
+import { useAuth } from '@/contexts/AuthContext';
+import { canSeeAmounts } from '@/lib/permissions';
+import { cn } from '@/lib/utils';
 
 const statusVariant: Record<ProjectStatus, 'default' | 'secondary' | 'success' | 'outline' | 'warning'> = {
   'En Producción': 'default',
@@ -124,6 +128,16 @@ export function Projects() {
   const [statusFilter, setStatusFilter] = useState('');
   const [clientFilter, setClientFilter] = useState('');
   const [groupBy, setGroupBy] = useState<'' | 'status' | 'client_name'>('');
+  const { user } = useAuth();
+  const showMoney = canSeeAmounts(user?.role, user?.isPlatformOwner);
+  // Vista Tablero (por etapa) o Lista (tabla); se recuerda por navegador.
+  const [view, setViewState] = useState<'board' | 'list'>(() => {
+    try { return localStorage.getItem('kanri_projects_view') === 'list' ? 'list' : 'board'; } catch { return 'board'; }
+  });
+  const setView = (v: 'board' | 'list') => {
+    setViewState(v);
+    try { localStorage.setItem('kanri_projects_view', v); } catch { /* ignore */ }
+  };
 
   // Clientes únicos presentes en los proyectos (para el filtro).
   const clientOptions = React.useMemo(
@@ -140,6 +154,14 @@ export function Projects() {
     ),
     [projects, statusFilter, clientFilter]
   );
+
+  // Búsqueda de texto aplicada también al tablero.
+  const searched = React.useMemo(() => {
+    const q = (globalFilter ?? '').trim().toLowerCase();
+    return q ? projects.filter(p => `${p.id} ${p.name} ${p.client_name}`.toLowerCase().includes(q)) : projects;
+  }, [projects, globalFilter]);
+  const activeProjects = projects.filter(p => p.status !== 'Entregado' && p.status !== 'Cancelado');
+  const portfolio = activeProjects.reduce((s, p) => s + (p.quote_amount ?? 0), 0);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -309,40 +331,51 @@ export function Projects() {
         <div>
           <h1 className="page-title">Proyectos</h1>
           <p className="text-sm text-[var(--color-app-text-muted)] mt-0.5">
-            Administra órdenes de trabajo, cotizaciones y seguimiento de producción.
+            {activeProjects.length} en curso
+            {showMoney && portfolio > 0 && <> · {portfolio.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} en cartera</>}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsModalOpen(true)}>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-app-text)]" />
+            <input
+              placeholder="Buscar folio, pieza o cliente"
+              value={globalFilter ?? ''}
+              onChange={e => setGlobalFilter(e.target.value)}
+              className="w-full h-[52px] pl-11 pr-4 rounded-full bg-[var(--color-app-surface-alt)] text-[15px] placeholder:text-[var(--color-app-text-muted)] outline-none focus:bg-white focus:ring-2 focus:ring-[var(--color-app-ink)] transition-colors"
+            />
+          </div>
+          <Segmented<'board' | 'list'> value={view} onChange={setView} items={[{ id: 'board', label: 'Tablero' }, { id: 'list', label: 'Lista' }]} />
+          <Button variant="outline" size="lg" onClick={() => setIsModalOpen(true)}>
             Crear rápido
           </Button>
-          <Button onClick={() => navigate('/projects/new')}>
+          <Button size="lg" onClick={() => navigate('/projects/new')}>
             <Plus className="h-4 w-4 mr-1.5" /> Nuevo proyecto
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-app-text-subtle)]" />
-          <Input
-            placeholder="Buscar proyectos..."
-            value={globalFilter ?? ''}
-            onChange={e => setGlobalFilter(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+      {/* Chips por etapa (filtran tablero y lista) */}
+      <Chips
+        value={statusFilter || 'all'}
+        onChange={v => setStatusFilter(v === 'all' ? '' : v)}
+        items={[
+          { id: 'all', label: 'Todos', count: searched.length },
+          ...BOARD_STAGES.map(st => ({ id: st, label: stageLabel(st), count: searched.filter(p => p.status === st).length })),
+          { id: 'Entregado', label: 'Entregados', count: searched.filter(p => p.status === 'Entregado').length },
+        ]}
+      />
 
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40"
-        >
-          <option value="">Todos los estados</option>
-          {(Object.keys(statusVariant) as ProjectStatus[]).map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+      {view === 'board' && (
+        <ProjectBoard
+          projects={searched.filter(p => !clientFilter || p.client_name === clientFilter)}
+          stages={statusFilter ? [statusFilter as ProjectStatus] : BOARD_STAGES}
+          onOpen={id => navigate(`/projects/${id}`)}
+        />
+      )}
+
+      {view === 'list' && <>
+      <div className="flex flex-wrap items-center gap-3">
 
         <select
           value={clientFilter}
@@ -469,6 +502,7 @@ export function Projects() {
           </Button>
         </div>
       )}
+      </>}
 
       <ProjectFormModal
         isOpen={isModalOpen}
@@ -530,6 +564,66 @@ export function Projects() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+const BOARD_STAGES: ProjectStatus[] = ['Cotización', 'Diseño', 'Compras', 'En Producción', 'Calidad', 'Embarque'];
+const stageLabel = (s: string) => (s === 'En Producción' ? 'Producción' : s);
+
+/** Tablero por etapa (rediseño): columnas con tarjetas de proyecto. */
+function ProjectBoard({ projects, stages, onOpen }: { projects: Project[]; stages: ProjectStatus[]; onOpen: (id: string) => void }) {
+  return (
+    <div className="overflow-x-auto pb-2">
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(196px, 1fr))` }}>
+        {stages.map((st, ci) => {
+          const cards = projects
+            .filter(p => p.status === st)
+            .sort((a, b) => toLocalDate(a.deadline).getTime() - toLocalDate(b.deadline).getTime());
+          return (
+            <section key={st} className="k-rise rounded-[26px] bg-[var(--color-app-surface-alt)] p-3 min-h-[420px] flex flex-col" style={{ ['--i' as string]: ci }}>
+              <div className="flex items-center justify-between px-2 pt-2 pb-3">
+                <span className="flex items-center gap-2 text-[16px]">
+                  <span className="h-2 w-2 rounded-full" style={{ background: TONE[toneFor(st)].fg }} />
+                  {stageLabel(st)}
+                </span>
+                <span className="font-mono text-xs text-[var(--color-app-text-muted)]">{cards.length}</span>
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {cards.length === 0 && <p className="px-2 py-6 text-center text-xs text-[var(--color-app-text-subtle)]">Sin proyectos</p>}
+                {cards.map(p => {
+                  const days = Math.ceil((toLocalDate(p.deadline).getTime() - Date.now()) / 86_400_000);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => onOpen(p.id)}
+                      className="k-rise text-left rounded-[20px] bg-white p-4 flex flex-col gap-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(22,24,29,.08)]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[11px] text-[var(--color-app-text-muted)]">{p.id}</span>
+                        <span className={cn('text-[11px] whitespace-nowrap', days < 0 || days <= 3 ? 'text-[#B91C1C]' : days <= 7 ? 'text-[#B45309]' : 'text-[var(--color-app-text-muted)]')}>
+                          {days < 0 ? `vencido ${-days} d` : days === 0 ? 'hoy' : `en ${days} días`}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-[16px] leading-snug">{p.name}</p>
+                        <p className="text-[13px] text-[var(--color-app-text-muted)] mt-0.5 truncate">{p.client_name}</p>
+                      </div>
+                      <div className="flex items-center gap-2.5 mt-1">
+                        <ProgressLine pct={p.progress} />
+                        <span className="font-mono text-[11px] w-8 text-right">{p.progress}%</span>
+                      </div>
+                      <span className="text-[12px] text-[var(--color-app-text-muted)]">
+                        Entrega {format(toLocalDate(p.deadline), 'd MMM', { locale: es })}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

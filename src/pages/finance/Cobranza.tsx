@@ -17,6 +17,7 @@ import {
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toLocalDate } from '@/lib/dates';
+import { StatTile } from '@/components/kanri';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
 const money0 = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
@@ -275,13 +276,7 @@ function ReceivableDetail({ r, onClose, onPay, onReload }: { r: Enriched; onClos
 }
 
 function Kpi({ icon: Icon, label, value, tone }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; tone?: 'success' | 'danger' }) {
-  const color = tone === 'success' ? 'text-[var(--color-app-success)]' : tone === 'danger' ? 'text-[var(--color-app-danger)]' : 'text-[var(--color-app-text)]';
-  return (
-    <Card className="p-0"><CardContent className="p-4 flex items-start justify-between">
-      <div><p className="text-xs text-[var(--color-app-text-muted)]">{label}</p><p className={`text-xl font-semibold mt-0.5 ${color}`}>{value}</p></div>
-      <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-    </CardContent></Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} tone={tone === 'success' ? 'success' : tone === 'danger' ? 'danger' : 'default'} />;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

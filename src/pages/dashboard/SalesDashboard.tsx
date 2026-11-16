@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { useQuotes, useInventoryItems } from '@/lib/api';
 import type { Quote } from '@/types/database';
 import { isWonQuote, quoteSaleDate } from '@/lib/sales';
+import { StatTile } from '@/components/kanri';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
@@ -322,22 +323,5 @@ function Kpi({
   sub: string;
   tone?: 'danger';
 }) {
-  return (
-    <Card className="p-0 overflow-hidden">
-      <CardContent className="p-4 md:p-5">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0">
-            <span className="text-xs text-[var(--color-app-text-muted)] block truncate">{label}</span>
-            <span className={cn('text-xl md:text-2xl font-semibold mt-0.5 block', tone === 'danger' && 'text-[var(--color-app-danger)]')}>
-              {value}
-            </span>
-          </div>
-          <div className="h-8 w-8 md:h-9 md:w-9 rounded-md bg-[var(--color-app-surface-alt)] flex items-center justify-center shrink-0">
-            <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-          </div>
-        </div>
-        <p className="text-xs text-[var(--color-app-text-muted)] mt-2 truncate">{sub}</p>
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} sub={sub} tone={tone === 'danger' ? 'danger' : 'default'} />;
 }

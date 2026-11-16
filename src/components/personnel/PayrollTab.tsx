@@ -13,6 +13,7 @@ import {
   PERIODICITY_LABEL, type Periodicity,
 } from '@/lib/payroll';
 import type { Profile } from '@/types/database';
+import { StatTile } from '@/components/kanri';
 
 interface Adj { absences: number; bonus: number; deductions: number }
 
@@ -264,17 +265,7 @@ export function PayrollTab({ staff, isAdmin }: { staff: Profile[]; isAdmin: bool
 }
 
 function KpiCard({ label, value, icon: Icon, highlight }: { label: string; value: string; icon: React.ComponentType<{ className?: string }>; highlight?: boolean }) {
-  return (
-    <Card className="p-0">
-      <CardContent className="p-5 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-[var(--color-app-text-muted)]">{label}</p>
-          <p className={`text-xl font-semibold mt-1 ${highlight ? 'text-[var(--color-app-primary)]' : ''}`}>{value}</p>
-        </div>
-        <Icon className="h-5 w-5 text-[var(--color-app-text-muted)]" />
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} tone={highlight ? 'accent' : 'default'} />;
 }
 
 function ReceiptModal({ member, line, period, onClose }: {

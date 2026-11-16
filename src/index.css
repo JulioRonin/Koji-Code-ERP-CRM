@@ -226,3 +226,79 @@ html, body {
   color: var(--color-app-text);
 }
 .page-title svg { width: 0.6em; height: 0.6em; }
+
+/* =====================================================================
+   REDISEÑO — movimiento sutil: tarjetas que suben al aparecer (escalonado)
+   ===================================================================== */
+@keyframes k-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.k-rise {
+  animation: k-rise 620ms cubic-bezier(.2, .7, .2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .k-rise { animation: none; }
+}
+
+/* =====================================================================
+   REDISEÑO — rejilla del Tablero de planta (por ancho del contenido)
+   ===================================================================== */
+.k-dash-wrap { container-type: inline-size; }
+.k-dash { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: dense; gap: 12px; }
+@container (min-width: 700px) {
+  .k-dash { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .k-dash .k-a { grid-row: span 2; }
+  .k-dash .k-e, .k-dash .k-g, .k-dash .k-g-full { grid-column: span 2; }
+}
+@container (min-width: 1180px) {
+  .k-dash { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .k-dash .k-g { grid-column: span 3; }
+  .k-dash .k-g-full { grid-column: span 4; }
+}
+/* Escalonado automático entre hermanos (rejillas de indicadores, tarjetas). */
+.k-rise:nth-child(2) { --i: 1; } .k-rise:nth-child(3) { --i: 2; } .k-rise:nth-child(4) { --i: 3; }
+.k-rise:nth-child(5) { --i: 4; } .k-rise:nth-child(6) { --i: 5; } .k-rise:nth-child(7) { --i: 6; }
+.k-rise:nth-child(8) { --i: 7; } .k-rise:nth-child(n+9) { --i: 8; }
+
+/* =====================================================================
+   REDISEÑO — reglas globales para módulos
+   ===================================================================== */
+/* Pestañas segmentadas (barras con clase k-seg) */
+.k-seg { gap: 4px; }
+.k-seg > button {
+  border-radius: 9999px;
+  min-height: 40px;
+  padding-left: 16px;
+  padding-right: 16px;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+/* Encabezado de página: título grande y acciones alineadas abajo; en móvil
+   las acciones bajan a otra línea en lugar de salirse de la pantalla. */
+.app-content .flex:has(> div > h1.page-title) {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  column-gap: 20px;
+  row-gap: 16px;
+}
+.app-content .flex:has(> div > h1.page-title) > div:has(> h1.page-title) { min-width: 0; }
+.app-content h1.page-title + p { margin-top: 12px; font-size: 16px; }
+
+/* Selects nativos con la forma del diseño */
+.app-content select:not([multiple]) {
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 12px;
+  border-color: var(--color-app-border);
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2316181D' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 34px;
+}
+/* En el título grande no van íconos; los badges conservan su tamaño. */
+.page-title > svg { display: none; }
+.page-title > :not(svg) { letter-spacing: normal; font-size: 12px; vertical-align: middle; }

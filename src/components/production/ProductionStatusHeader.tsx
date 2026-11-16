@@ -2,6 +2,7 @@ import React from 'react';
 import { CheckCircle2, Clock, Target, Box, ShieldCheck, Factory, XCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { BomItem, Project } from '@/types/database';
+import { StatTile } from '@/components/kanri';
 
 interface Props {
   projects: Project[];
@@ -192,34 +193,5 @@ function Kpi({
   suffix: string;
   tone: 'success' | 'primary' | 'neutral';
 }) {
-  const toneColor =
-    tone === 'success'
-      ? 'var(--color-app-success)'
-      : tone === 'primary'
-      ? 'var(--color-app-primary)'
-      : 'var(--color-app-text)';
-  const chipBg =
-    tone === 'success'
-      ? 'color-mix(in srgb, var(--color-app-success) 14%, transparent)'
-      : tone === 'primary'
-      ? 'color-mix(in srgb, var(--color-app-primary) 14%, transparent)'
-      : 'var(--color-app-surface-alt)';
-
-  return (
-    <div className="rounded-xl bg-white p-3 border border-[var(--color-app-border)] flex items-center gap-3">
-      <span
-        className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
-        style={{ backgroundColor: chipBg, color: toneColor }}
-      >
-        <Icon className="h-4 w-4" />
-      </span>
-      <div className="min-w-0">
-        <div className="text-[11px] text-[var(--color-app-text-muted)] truncate">{label}</div>
-        <div className="flex items-baseline gap-1">
-          <span className="text-xl font-bold tabular-nums" style={{ color: toneColor }}>{value}</span>
-          <span className="text-[11px] text-[var(--color-app-text-muted)]">{suffix}</span>
-        </div>
-      </div>
-    </div>
-  );
+  return <StatTile icon={Icon} label={label} value={value.toLocaleString('en-US')} unit={suffix} tone={tone === 'success' ? 'accent' : 'default'} />;
 }

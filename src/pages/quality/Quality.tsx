@@ -60,6 +60,7 @@ import { CorrectiveActionsPanel } from '@/components/quality/CorrectiveActionsPa
 import { NCR_STATUS_VARIANT, SEVERITY_VARIANT, SELECT_CLS } from '@/components/quality/capaMeta';
 import type { BomItem, ManufacturingStatus, MeasurementInstrument, InstrumentStatus, Ncr, NcrStatus } from '@/types/database';
 import { toLocalDate } from '@/lib/dates';
+import { StatTile } from '@/components/kanri';
 
 const NCR_STATUSES: NcrStatus[] = ['Abierta', 'En Investigación', 'Acción Correctiva', 'Cerrada'];
 
@@ -327,7 +328,7 @@ export function Quality() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit overflow-x-auto">
+      <div className="flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full w-fit max-w-full overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -815,30 +816,7 @@ function KpiCard({
   icon: React.ComponentType<{ className?: string }>;
   tone: 'success' | 'danger' | 'warning' | 'primary';
 }) {
-  const color =
-    tone === 'success'
-      ? 'text-[var(--color-app-success)]'
-      : tone === 'danger'
-      ? 'text-[var(--color-app-danger)]'
-      : tone === 'warning'
-      ? 'text-[var(--color-app-warning)]'
-      : 'text-[var(--color-app-text)]';
-  return (
-    <Card className="p-0">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-[var(--color-app-text-muted)]">{title}</p>
-            <p className={cn('text-2xl font-semibold mt-1', color)}>{value}</p>
-          </div>
-          <div className="h-9 w-9 rounded-md bg-[var(--color-app-surface-alt)] flex items-center justify-center">
-            <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-          </div>
-        </div>
-        <p className="text-xs text-[var(--color-app-text-muted)] mt-2">{desc}</p>
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={title} value={value} sub={desc} tone={tone === 'success' ? 'accent' : tone === 'danger' ? 'danger' : tone === 'warning' ? 'warning' : 'default'} />;
 }
 
 interface QualityRowProps {

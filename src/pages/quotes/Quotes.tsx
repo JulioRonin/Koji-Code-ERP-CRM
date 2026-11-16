@@ -52,6 +52,7 @@ import {
 import { Combobox } from '@/components/ui/combobox';
 import type { MaterialPrice, QuoteStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { StatTile } from '@/components/kanri';
 
 const statusBadge: Record<QuoteStatus, 'secondary' | 'default' | 'success' | 'destructive' | 'outline' | 'warning'> = {
   Borrador:   'secondary',
@@ -170,13 +171,13 @@ export function Quotes() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Kpi icon={Calculator} label="Abiertas"          value={String(stats.open)} />
-        <Kpi icon={CheckCircle2} label="Aprobadas"        value={String(stats.approved)} tone="success" />
+        <Kpi icon={CheckCircle2} label="Aprobadas"        value={String(stats.approved)} />
         <Kpi icon={TrendingUp} label="Valor en pipeline" value={money(stats.pipelineValue)} />
         <Kpi icon={DollarSign} label="Valor ganado"      value={money(stats.wonValue)} tone="success" />
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit">
+      <div className="flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full w-fit max-w-full overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -727,19 +728,5 @@ function Kpi({
   value: string;
   tone?: 'success';
 }) {
-  return (
-    <Card className="p-0">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-xs text-[var(--color-app-text-muted)] truncate">{label}</p>
-            <p className={cn('text-lg md:text-xl font-semibold mt-1 truncate', tone === 'success' && 'text-[var(--color-app-success)]')}>
-              {value}
-            </p>
-          </div>
-          <Icon className="h-4 w-4 text-[var(--color-app-text-muted)] shrink-0" />
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} tone={tone === 'success' ? 'accent' : 'default'} />;
 }

@@ -32,6 +32,7 @@ import type {
 import { MaintenanceOrderModal } from '@/components/maintenance/MaintenanceOrderModal';
 import { DailyChecklistModal } from '@/components/maintenance/DailyChecklistModal';
 import { DUE_TEXT, DUE_VARIANT, effectiveFamily, nextDueFor, ORDER_STATUS_VARIANT } from '@/components/maintenance/shared';
+import { StatTile } from '@/components/kanri';
 
 const tabs = [
   { id: 'dashboard', label: 'Tablero', icon: LayoutDashboard },
@@ -90,7 +91,7 @@ export function Maintenance() {
         <p className="text-sm rounded-md border border-[var(--color-app-warning)]/40 bg-[var(--color-app-warning-soft)]/30 px-3 py-2">{tasksError.message}</p>
       )}
 
-      <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit max-w-full overflow-x-auto">
+      <div className="flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full w-fit max-w-full overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -279,14 +280,7 @@ function DashboardTab({ machines, tasks, orders, checklists, onChecklist, onNewO
 function Kpi({ icon: Icon, label, value, hint, tone }: {
   icon: ComponentType<{ className?: string }>; label: string; value: string; hint: string; tone: 'success' | 'warning' | 'danger' | 'neutral';
 }) {
-  const color = tone === 'success' ? 'var(--color-app-success)' : tone === 'warning' ? 'var(--color-app-warning)' : tone === 'danger' ? 'var(--color-app-danger)' : 'var(--color-app-text)';
-  return (
-    <div className="rounded-xl border border-[var(--color-app-border)] bg-white p-3">
-      <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-app-text-muted)]"><Icon className="h-3.5 w-3.5" /> {label}</div>
-      <p className="text-2xl font-bold tabular-nums mt-1" style={{ color }}>{value}</p>
-      <p className="text-[10.5px] text-[var(--color-app-text-subtle)]">{hint}</p>
-    </div>
-  );
+  return <StatTile icon={Icon} label={label} value={value} sub={hint} tone={tone === 'success' ? 'success' : tone === 'warning' ? 'warning' : tone === 'danger' ? 'danger' : 'default'} />;
 }
 
 // ============================================================================

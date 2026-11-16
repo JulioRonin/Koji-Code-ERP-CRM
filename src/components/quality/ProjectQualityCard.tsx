@@ -57,7 +57,7 @@ export function ProjectQualityCard({ project }: { project: Project }) {
         <CardDescription>Plan de control, acciones correctivas de todas las áreas y producto no conforme.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit max-w-full overflow-x-auto">
+        <div className="flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full w-fit max-w-full overflow-x-auto">
           {tabs.map(t => (
             <button
               key={t.id}

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Settings,
-  PlayCircle,
   AlertTriangle,
   Search,
   LayoutDashboard,
@@ -44,22 +43,9 @@ import { nextDueFor } from '@/components/maintenance/shared';
 import { useDeleteMachine, useUpdateMachine, useUpdateWorkOrder } from '@/lib/api/production';
 import type { Machine } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
+import { Pill, ProgressLine, toneFor } from '@/components/kanri';
 
-const machineLeftColor: Record<string, string> = {
-  Operando: 'border-l-[var(--color-app-success)]',
-  Setup: 'border-l-[var(--color-app-warning)]',
-  Mantenimiento: 'border-l-[var(--color-app-danger)]',
-  Disponible: 'border-l-[var(--color-app-border-strong)]',
-  Fuera_Servicio: 'border-l-[var(--color-app-danger)]',
-};
 
-const machineStatusVariant: Record<string, 'success' | 'warning' | 'destructive' | 'secondary'> = {
-  Operando: 'success',
-  Disponible: 'secondary',
-  Setup: 'warning',
-  Mantenimiento: 'destructive',
-  Fuera_Servicio: 'destructive',
-};
 
 const statusBadgeVariant: Record<string, 'success' | 'default' | 'warning'> = {
   Completado: 'success',
@@ -174,7 +160,7 @@ export function Production() {
       />
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg w-fit">
+      <div className="flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full w-fit max-w-full overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -225,22 +211,21 @@ export function Production() {
               </CardContent>
             </Card>
           ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {machines.map(m => {
               const activeWO = workOrders.find(w => w.machine_id === m.id && w.status === 'En Proceso');
               const progress = activeWO && activeWO.quantity > 0 ? Math.round((activeWO.completed_qty / activeWO.quantity) * 100) : 0;
               return (
-                <Card
-                  key={m.id}
-                  className={cn('border-l-4 p-0', machineLeftColor[m.status])}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-base">{m.id}</CardTitle>
-                    <div className="flex items-center gap-1">
-                      {m.status === 'Operando' && <PlayCircle className="h-4 w-4 text-[var(--color-app-success)]" />}
-                      {m.status === 'Setup' && <Settings className="h-4 w-4 text-[var(--color-app-warning)]" />}
-                      {m.status === 'Mantenimiento' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
-                      {m.status === 'Fuera_Servicio' && <AlertTriangle className="h-4 w-4 text-[var(--color-app-danger)]" />}
+                <Card key={m.id} className="p-5 flex flex-col gap-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[20px] leading-tight truncate">{m.id}</p>
+                      <p className="text-[13px] text-[var(--color-app-text-muted)] truncate">{m.type}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Pill tone={toneFor(m.status === 'Fuera_Servicio' ? 'Paro' : m.status)} dot>
+                        {m.status === 'Fuera_Servicio' ? 'Fuera de servicio' : m.status}
+                      </Pill>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
@@ -264,73 +249,63 @@ export function Production() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 pb-5">
-                    <p className="text-xs text-[var(--color-app-text-muted)]">{m.type}</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[var(--color-app-text-muted)]">Estado</span>
-                        <Badge variant={machineStatusVariant[m.status] ?? 'secondary'}>
-                          {m.status === 'Fuera_Servicio' ? 'Fuera de servicio' : m.status}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[var(--color-app-text-muted)]">Ubicación</span>
-                        <span className="font-medium">{m.location ?? '—'}</span>
-                      </div>
-                      {(() => {
-                        // Próximo preventivo del plan de mantenimiento (PR-MTO-001).
-                        const next = nextDueFor(m.id, mtoTasks);
-                        if (!next) return null;
-                        const st = dueState(next);
-                        return (
-                          <div className="flex justify-between">
-                            <span className="text-[var(--color-app-text-muted)]">Preventivo</span>
-                            <span className={cn('font-medium', st === 'overdue' ? 'text-[var(--color-app-danger)]' : st === 'due_soon' ? 'text-[var(--color-app-warning)]' : '')}>
-                              {dueLabel(next)}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                    </div>
+                  </div>
 
-                    <div className="space-y-1.5 pt-3 border-t border-[var(--color-app-border)]">
-                      {activeWO ? (
-                        <>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[var(--color-app-text)] font-medium truncate max-w-[150px]">
-                              {bomItems.find(b => b.id === activeWO.bom_item_id)?.part_number ?? activeWO.id}
-                            </span>
-                            <span className="font-medium tabular-nums">{progress}%</span>
-                          </div>
-                          <Progress value={progress} className="h-1" />
-                          <div className="flex justify-between items-center pt-1">
-                            <span className="text-[10px] text-[var(--color-app-text-muted)] font-mono truncate max-w-[130px]">
-                              {activeWO.project_id}
-                            </span>
-                            <button
-                              onClick={() => releaseMachine(m.id)}
-                              className="text-[10px] font-medium text-[var(--color-app-danger)] hover:underline"
-                            >
-                              Liberar
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex justify-between text-xs">
-                          <span className="text-[var(--color-app-text-muted)]">Sin orden activa</span>
-                          {m.status === 'Operando' && (
-                            <button
-                              onClick={() => releaseMachine(m.id)}
-                              className="text-[10px] font-medium text-[var(--color-app-danger)] hover:underline"
-                            >
-                              Liberar
-                            </button>
-                          )}
+                  <div className="rounded-[20px] bg-[var(--color-app-surface-muted)] p-4 min-h-[112px] flex flex-col">
+                    <p className="text-xs text-[var(--color-app-text-muted)]">Pieza activa</p>
+                    {activeWO ? (
+                      <>
+                        <p className="mt-2 text-[15px] truncate">
+                          {bomItems.find(b => b.id === activeWO.bom_item_id)?.part_number ?? activeWO.id}
+                          <span className="text-[var(--color-app-text-muted)]"> · {activeWO.project_id}</span>
+                        </p>
+                        <div className="mt-3 flex items-center gap-2.5">
+                          <ProgressLine pct={progress} />
+                          <span className="font-mono text-[11px] w-9 text-right">{progress}%</span>
                         </div>
-                      )}
+                      </>
+                    ) : (
+                      <p className="mt-2 text-[15px]">
+                        {m.status === 'Mantenimiento' || m.status === 'Fuera_Servicio' ? 'Detenida · ver mantenimiento' : 'Sin pieza asignada'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 text-[13px]">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-[var(--color-app-text-muted)]">Ubicación</span>
+                      <span>{m.location ?? '—'}</span>
                     </div>
-                  </CardContent>
+                    {(() => {
+                      // Próximo preventivo del plan de mantenimiento (PR-MTO-001).
+                      const next = nextDueFor(m.id, mtoTasks);
+                      if (!next) return null;
+                      const st = dueState(next);
+                      return (
+                        <div className="flex justify-between gap-2">
+                          <span className="text-[var(--color-app-text-muted)]">Preventivo</span>
+                          <span className={cn(st === 'overdue' ? 'text-[var(--color-app-danger)]' : st === 'due_soon' ? 'text-[var(--color-app-warning)]' : '')}>
+                            {dueLabel(next)}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="mt-auto flex items-center justify-between gap-2">
+                    <span className="text-[13px] text-[var(--color-app-text-muted)] truncate">
+                      {activeWO ? `OT ${activeWO.id}` : m.status === 'Disponible' ? 'Sin asignar' : ''}
+                    </span>
+                    {activeWO || m.status === 'Operando' || m.status === 'Setup' ? (
+                      <Button size="lg" variant={progress >= 100 ? 'accent' : 'default'} className="h-11" onClick={() => releaseMachine(m.id)}>
+                        Liberar
+                      </Button>
+                    ) : m.status === 'Mantenimiento' || m.status === 'Fuera_Servicio' ? (
+                      <Button size="lg" variant="outline" className="h-11" onClick={() => navigate('/maintenance')}>
+                        Ver mantenimiento
+                      </Button>
+                    ) : null}
+                  </div>
                 </Card>
               );
             })}

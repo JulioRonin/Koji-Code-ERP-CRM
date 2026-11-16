@@ -31,6 +31,7 @@ import {
 import type { WorkOrderStage, StageStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { StatTile } from '@/components/kanri';
 
 const stageBadge: Record<StageStatus, 'default' | 'secondary' | 'success' | 'warning' | 'outline'> = {
   Pendiente:    'secondary',
@@ -233,20 +234,7 @@ function KpiCard({
   value: string;
   sub: string;
 }) {
-  return (
-    <Card className="p-0">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-xs text-[var(--color-app-text-muted)]">{label}</p>
-            <p className="text-base font-semibold mt-1 truncate">{value}</p>
-            {sub && <p className="text-xs text-[var(--color-app-text-muted)] mt-0.5 truncate">{sub}</p>}
-          </div>
-          <Icon className="h-4 w-4 text-[var(--color-app-text-muted)] shrink-0" />
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} sub={sub} />;
 }
 
 function StageRow({

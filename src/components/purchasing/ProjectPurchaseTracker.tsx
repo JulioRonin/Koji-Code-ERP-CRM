@@ -49,6 +49,7 @@ import { PurchasingInsights } from './PurchasingInsights';
 import { applyTableState, type TableState } from '@/lib/tableControls';
 import { PURCHASING_FIELDS } from '@/lib/bomFields';
 import type { BomItem, BomStatus } from '@/types/database';
+import { StatTile } from '@/components/kanri';
 
 const STATUS_VARIANT: Record<BomStatus, 'secondary' | 'warning' | 'default' | 'success' | 'outline'> = {
   Pendiente: 'secondary',
@@ -850,33 +851,7 @@ interface KpiProps {
 }
 
 function KpiCard({ icon: Icon, label, value, sub, progress, tone }: KpiProps) {
-  return (
-    <Card className="p-0">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-[var(--color-app-text-muted)]">{label}</p>
-            <p
-              className={
-                tone === 'warning'
-                  ? 'text-xl font-semibold mt-1 text-[var(--color-app-warning)]'
-                  : tone === 'success'
-                  ? 'text-xl font-semibold mt-1 text-[var(--color-app-success)]'
-                  : 'text-xl font-semibold mt-1'
-              }
-            >
-              {value}
-            </p>
-          </div>
-          <div className="h-8 w-8 rounded-md bg-[var(--color-app-surface-alt)] flex items-center justify-center">
-            <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-          </div>
-        </div>
-        <p className="text-xs text-[var(--color-app-text-muted)] mt-2">{sub}</p>
-        {progress != null && <Progress value={progress} className="h-1 mt-2" />}
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} sub={sub} progress={progress} tone={tone === 'success' ? 'accent' : tone === 'warning' ? 'danger' : 'default'} />;
 }
 
 interface RowProps {

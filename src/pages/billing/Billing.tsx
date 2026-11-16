@@ -14,6 +14,7 @@ import {
   useCustomers, useQuotes, type Invoice, type InvoiceItemInput,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { StatTile } from '@/components/kanri';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
 
@@ -287,12 +288,7 @@ function NewInvoiceModal({ onClose, onDone }: { onClose: () => void; onDone: () 
 }
 
 function Kpi({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
-  return (
-    <Card className="p-0"><CardContent className="p-4 flex items-start justify-between">
-      <div><p className="text-xs text-[var(--color-app-text-muted)]">{label}</p><p className="text-xl font-semibold mt-0.5">{value}</p></div>
-      <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-    </CardContent></Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} />;
 }
 
 function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {

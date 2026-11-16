@@ -17,6 +17,7 @@ import {
 import { useCustomers, useUpsertCustomer, useDeleteCustomer, useProjects, useQuotes } from '@/lib/api';
 import type { Customer, CustomerStage, Project, Quote } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { StatTile } from '@/components/kanri';
 
 const money = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 
@@ -142,7 +143,7 @@ export function Customers() {
           <option value="">Todas las etapas</option>
           {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
-        <div className="ml-auto inline-flex items-center gap-1 p-1 bg-[var(--color-app-surface-alt)] border border-[var(--color-app-border)] rounded-lg">
+        <div className="ml-auto inline-flex items-center gap-1 k-seg p-1 bg-[var(--color-app-surface-alt)] rounded-full">
           <button onClick={() => setView('directory')} className={cn('flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md', view === 'directory' ? 'bg-white shadow-sm' : 'text-[var(--color-app-text-muted)]')}>
             <LayoutList className="h-4 w-4" /> Directorio
           </button>
@@ -264,20 +265,7 @@ function TierPill({ tier, auto }: { tier: string; auto: boolean }) {
 }
 
 function Kpi({ icon: Icon, label, value, sub, tone }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; sub: string; tone?: 'warning' }) {
-  return (
-    <Card className="p-0">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-xs text-[var(--color-app-text-muted)] truncate">{label}</p>
-            <p className={cn('text-xl font-semibold mt-0.5 truncate', tone === 'warning' && 'text-[var(--color-app-warning)]')}>{value}</p>
-          </div>
-          <Icon className="h-4 w-4 text-[var(--color-app-text-muted)] shrink-0" />
-        </div>
-        <p className="text-[11px] text-[var(--color-app-text-muted)] mt-1 truncate">{sub}</p>
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} sub={sub} tone={tone === 'warning' ? 'warning' : 'default'} />;
 }
 
 function CustomerDetail({ c, onClose, onEdit, onOpenProject, onNewProject }: {

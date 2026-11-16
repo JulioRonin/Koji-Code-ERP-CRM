@@ -28,6 +28,7 @@ import {
 } from '@/lib/api';
 import { parseInventoryFile, downloadInventoryTemplate } from '@/lib/inventoryImport';
 import type { InventoryItem, InventoryMovementType, StockStatus, RestockStatus } from '@/types/database';
+import { StatTile } from '@/components/kanri';
 
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 
@@ -416,22 +417,7 @@ function Kpi({ icon: Icon, label, value, tone }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string; value: string; tone?: 'primary' | 'warning' | 'danger' | 'muted';
 }) {
-  const color = tone === 'primary' ? 'text-[var(--color-app-primary)]'
-    : tone === 'warning' ? 'text-[var(--color-app-warning)]'
-    : tone === 'danger' ? 'text-[var(--color-app-danger)]'
-    : tone === 'muted' ? 'text-[var(--color-app-text-subtle)]'
-    : 'text-[var(--color-app-text)]';
-  return (
-    <Card className="p-0">
-      <CardContent className="p-4 flex items-start justify-between">
-        <div>
-          <p className="text-xs text-[var(--color-app-text-muted)]">{label}</p>
-          <p className={cn('text-2xl font-semibold mt-1', color)}>{value}</p>
-        </div>
-        <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-      </CardContent>
-    </Card>
-  );
+  return <StatTile icon={Icon} label={label} value={value} tone={tone === 'primary' ? 'accent' : tone === 'warning' ? 'warning' : tone === 'danger' ? 'danger' : 'default'} />;
 }
 
 // ── Modal: alta / edición de producto ──

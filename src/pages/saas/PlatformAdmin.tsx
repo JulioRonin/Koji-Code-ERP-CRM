@@ -20,6 +20,7 @@ import { useTenant } from '@/contexts/TenantContext';
 import { listTenants, saveTenant, deleteTenant } from '@/lib/api/tenants';
 import { listInvoices, type StripeInvoice } from '@/lib/api/billing';
 import { Receipt } from 'lucide-react';
+import { StatTile } from '@/components/kanri';
 
 const STATUS_VARIANT: Record<SubscriptionStatus, 'success' | 'warning' | 'destructive' | 'secondary'> = {
   active: 'success',
@@ -312,20 +313,7 @@ function Kpi({ icon: Icon, label, value, tone }: {
   label: string; value: string;
   tone?: 'success' | 'warning' | 'primary';
 }) {
-  const color = tone === 'success' ? 'text-[var(--color-app-success)]'
-    : tone === 'warning' ? 'text-[var(--color-app-warning)]'
-    : tone === 'primary' ? 'text-[var(--color-app-primary)]' : 'text-[var(--color-app-text)]';
-  return (
-    <div className="rounded-xl border border-[var(--color-app-border)] bg-white p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs text-[var(--color-app-text-muted)]">{label}</p>
-          <p className={cn('text-2xl font-semibold mt-1', color)}>{value}</p>
-        </div>
-        <Icon className="h-4 w-4 text-[var(--color-app-text-muted)]" />
-      </div>
-    </div>
-  );
+  return <StatTile icon={Icon} label={label} value={value} tone={tone === 'primary' ? 'accent' : tone === 'success' ? 'success' : tone === 'warning' ? 'warning' : 'default'} />;
 }
 
 function EditTenantModal({ tenant, onClose, onSave }: {
