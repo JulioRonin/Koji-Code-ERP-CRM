@@ -116,6 +116,8 @@ export function useUploadProjectFile() {
  * Devuelve URL firmada (privada) o pública según configuración del bucket.
  */
 export async function getFileDownloadUrl(storagePath: string): Promise<string | null> {
+  // Imágenes de la demo (archivos estáticos) o data URLs: se usan tal cual.
+  if (storagePath.startsWith('/demo/') || storagePath.startsWith('data:')) return storagePath;
   if (!supabase) return null;
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(storagePath, 3600);
   if (error) return null;

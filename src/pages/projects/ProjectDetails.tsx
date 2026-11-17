@@ -67,6 +67,7 @@ import {
   useMasterPlanTasks,
   useBomItems,
   summarizePurchasing,
+  useProfiles,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { ProjectStatus, MasterPlanTask, ProjectTask } from '@/types/database';
@@ -101,6 +102,8 @@ export function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { data: teamProfiles } = useProfiles();
+  const personName = (id: string | null | undefined) => (id ? teamProfiles.find(t => t.id === id)?.full_name ?? id : '—');
   const { user } = useAuth();
 
   const { data: project, loading: loadingProject, refetch: refetchProject } = useProject(id);
@@ -371,7 +374,7 @@ export function ProjectDetails() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <SummaryItem icon={User} label="Manager" value={project.manager_id ?? '—'} />
+                <SummaryItem icon={User} label="Manager" value={personName(project.manager_id)} />
                 <SummaryItem
                   icon={Calendar}
                   label="Inicio"
@@ -699,7 +702,7 @@ export function ProjectDetails() {
           progress: project.progress,
           startDate: project.start_date,
           deadline: project.deadline,
-          manager: project.manager_id ?? '—',
+          manager: personName(project.manager_id),
           description: project.description ?? '',
           tasks: [],
         }}

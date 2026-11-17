@@ -44,7 +44,10 @@ export function useFacturapiStatus(): AsyncState<FacturapiStatus> {
 export function useInvoices(): AsyncState<Invoice[]> {
   return useAsync<Invoice[]>(
     async () => {
-      if (!supabase) return [];
+      if (!supabase) {
+        // Demo: facturas de ejemplo (las siembra la demo del usuario maestro).
+        try { return JSON.parse(localStorage.getItem('kanri_demo_invoices') || '[]') as Invoice[]; } catch { return []; }
+      }
       const { data, error } = await scopeByTenant(supabase.from('invoices').select('*'))
         .order('created_at', { ascending: false });
       if (error) throw error;

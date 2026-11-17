@@ -999,6 +999,8 @@ export interface ChatChannel {
   category: string | null;
   project_id: string | null;
   is_archived: boolean;
+  /** Participantes de un mensaje directo (category = 'DIRECTO'). */
+  member_ids?: string[] | null;
   created_at: string;
 }
 

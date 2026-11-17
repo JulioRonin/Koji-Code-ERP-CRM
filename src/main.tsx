@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { ChatProvider } from './contexts/ChatContext.tsx';
+import { PresenceProvider } from './contexts/PresenceContext.tsx';
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import { CompanyProvider } from './contexts/CompanyContext.tsx';
 import { TenantProvider } from './contexts/TenantContext.tsx';
@@ -18,9 +19,11 @@ createRoot(document.getElementById('root')!).render(
       <CompanyProvider>
         <AuthProvider>
           <ChatProvider>
-            <ErrorBoundary fullScreen>
-              <App />
-            </ErrorBoundary>
+            <PresenceProvider>
+              <ErrorBoundary fullScreen>
+                <App />
+              </ErrorBoundary>
+            </PresenceProvider>
           </ChatProvider>
         </AuthProvider>
       </CompanyProvider>

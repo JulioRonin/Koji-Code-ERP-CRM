@@ -45,6 +45,7 @@ import {
   useMarkReportSent,
   useProjects,
   useProjectsMasterPlanStatus,
+  useProfiles,
 } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import type { PmoReportType, Project } from '@/types/database';
@@ -81,6 +82,8 @@ const TYPE_COLORS: Record<PmoReportType, string> = {
 export function Pmo() {
   const navigate = useNavigate();
   const { data: projects } = useProjects();
+  const { data: teamProfiles } = useProfiles();
+  const personName = (id: string | null | undefined) => (id ? teamProfiles.find(t => t.id === id)?.full_name ?? id : '—');
   const { data: reports, refetch: refetchReports } = usePmoReports();
   const { create: createReport, loading: creating } = useCreatePmoReport();
   const { markSent } = useMarkReportSent();
@@ -582,7 +585,7 @@ export function Pmo() {
             progress: previewProject.progress,
             startDate: previewProject.start_date,
             deadline: previewProject.deadline,
-            manager: previewProject.manager_id ?? '—',
+            manager: personName(previewProject.manager_id),
             description: previewProject.description ?? '',
             tasks: [],
           }}

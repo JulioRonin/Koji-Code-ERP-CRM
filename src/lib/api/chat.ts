@@ -158,3 +158,75 @@ export function useSendMessage() {
 
   return { send, ...state };
 }
+
+// ── Mensajes directos ──────────────────────────────────────────────────────
+
+export const DM_CATEGORY = 'DIRECTO';
+
+/** Nombre estable del canal directo entre dos usuarios. */
+export function directChannelName(a: string, b: string): string {
+  return 'dm:' + [a, b].sort().join(':');
+}
+
+/** ¿Es un canal directo del usuario? */
+export function isMyDirectChannel(c: ChatChannel, userId: string | undefined | null): boolean {
+  if (c.category !== DM_CATEGORY || !userId) return false;
+  return (c.member_ids?.includes(userId) ?? false) || c.name.split(':').includes(userId);
+}
+
+/** El otro participante de un canal directo. */
+export function otherMember(c: ChatChannel, userId: string): string | null {
+  const ids = c.member_ids?.length ? c.member_ids : c.name.replace(/^dm:/, '').split(':');
+  return ids.find(id => id !== userId) ?? null;
+}
+
+/**
+ * Abre (o crea) el canal directo entre el usuario y otra persona. Es privado:
+ * con db/2026_chat_direct.sql solo sus dos miembros lo ven.
+ */
+export function useEnsureDirectChannel() {
+  const [state, setState] = useState<MutationState>({ loading: false, error: null });
+
+  const ensure = useCallback(async (me: string, other: string, existing: ChatChannel[]): Promise<ChatChannel> => {
+    const name = directChannelName(me, other);
+    const found = existing.find(c => c.name === name);
+    if (found) return found;
+    setState({ loading: true, error: null });
+    try {
+      const draft = {
+        name,
+        description: null,
+        category: DM_CATEGORY,
+        project_id: null,
+        is_archived: false,
+        member_ids: [me, other].sort(),
+      };
+      if (!supabase) {
+        const ch: ChatChannel = { id: `dm-${Date.now()}`, created_at: new Date().toISOString(), ...draft };
+        localStorage.setItem(DEMO_CHANNELS_KEY, JSON.stringify([...readDemoChannels(), ch]));
+        setState({ loading: false, error: null });
+        return ch;
+      }
+      let { data, error } = await supabase.from('chat_channels').insert(draft).select('*').single();
+      // Sin la migración (falta member_ids): crea el canal igual (no privado).
+      if (error && /member_ids/i.test(error.message)) {
+        const { member_ids: _m, ...base } = draft;
+        ({ data, error } = await supabase.from('chat_channels').insert(base).select('*').single());
+      }
+      // Ya existía (creado por la otra persona): lo buscamos.
+      if (error && /duplicate|unique/i.test(error.message)) {
+        ({ data, error } = await supabase.from('chat_channels').select('*').eq('name', name).maybeSingle());
+      }
+      if (error) throw error;
+      if (!data) throw new Error('No se pudo abrir la conversación.');
+      setState({ loading: false, error: null });
+      return data as ChatChannel;
+    } catch (err) {
+      const e = err as Error;
+      setState({ loading: false, error: e });
+      throw e;
+    }
+  }, []);
+
+  return { ensure, ...state };
+}

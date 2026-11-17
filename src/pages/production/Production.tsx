@@ -216,9 +216,9 @@ export function Production() {
               const activeWO = workOrders.find(w => w.machine_id === m.id && w.status === 'En Proceso');
               const progress = activeWO && activeWO.quantity > 0 ? Math.round((activeWO.completed_qty / activeWO.quantity) * 100) : 0;
               return (
-                <Card key={m.id} className="p-5 flex flex-col gap-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
+                <Card key={m.id} className="p-5 flex flex-col gap-4 min-w-0">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
                       <p className="text-[20px] leading-tight truncate">{m.id}</p>
                       <p className="text-[13px] text-[var(--color-app-text-muted)] truncate">{m.type}</p>
                     </div>

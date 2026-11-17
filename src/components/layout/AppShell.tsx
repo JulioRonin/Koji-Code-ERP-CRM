@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, Clock } from 'lucide-react';
+import { ArrowRight, Clock, Sparkles } from 'lucide-react';
+import { isDemoSession } from '@/lib/supabase';
+import { exitDemo } from '@/lib/demo/seed';
 import { useCompany } from '@/contexts/CompanyContext';
 import { crumbsForPath } from '@/lib/navigation';
 import { TopBar } from './TopBar';
@@ -94,6 +96,15 @@ export function AppShell() {
       {/* Lienzo redondeado del rediseño (a pantalla completa en móvil) */}
       <div className="h-full flex flex-col overflow-hidden bg-[var(--color-app-bg)] md:rounded-[32px] md:shadow-[0_0_0_6px_rgba(255,255,255,.6)]">
         <TopBar onOpenNav={() => setSidebarOpen(true)} onOpenSearch={() => setSearchOpen(true)} />
+
+        {/* Demo del usuario maestro: datos de ejemplo locales */}
+        {isDemoSession && (
+          <div className="mx-4 md:mx-6 mb-2 shrink-0 self-start inline-flex flex-wrap items-center gap-2 min-h-9 px-4 py-1.5 rounded-full text-xs bg-[var(--color-app-ink)] text-white">
+            <Sparkles className="h-3.5 w-3.5 text-[var(--color-app-accent)]" />
+            Estás en la demo · datos e imágenes de ejemplo, tu cuenta real no se modifica
+            <button onClick={exitDemo} className="underline underline-offset-2 hover:text-[var(--color-app-accent)]">Salir de la demo</button>
+          </div>
+        )}
 
         {/* Banner de demo con días restantes */}
         {onTrial && (

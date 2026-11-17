@@ -844,7 +844,7 @@ export function QuoteBuilder() {
                         <span className="italic">Sin plano 2D</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 text-sm shrink-0 flex-wrap">
+                    <div className="flex items-center gap-x-4 gap-y-1 text-sm flex-wrap min-w-0">
                       {!simple && (() => {
                         const baseCost = it.material_qty * it.material_unit_cost
                           + it.machining_hours * it.machine_rate + it.extra_cost;

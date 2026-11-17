@@ -575,7 +575,7 @@ const stageLabel = (s: string) => (s === 'En Producción' ? 'Producción' : s);
 function ProjectBoard({ projects, stages, onOpen }: { projects: Project[]; stages: ProjectStatus[]; onOpen: (id: string) => void }) {
   return (
     <div className="overflow-x-auto pb-2">
-      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(196px, 1fr))` }}>
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(172px, 1fr))` }}>
         {stages.map((st, ci) => {
           const cards = projects
             .filter(p => p.status === st)

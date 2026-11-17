@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Settings, Shield, UserCircle, Webhook, Home, CreditCard, Layers } from 'lucide-react';
+import { LogOut, Settings, Shield, UserCircle, Webhook, Home, CreditCard, Layers, Sparkles, RotateCcw, DoorOpen } from 'lucide-react';
+import { isDemoSession, isSupabaseConfigured } from '@/lib/supabase';
+import { enterDemo, exitDemo, seedDemoData } from '@/lib/demo/seed';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -66,6 +68,38 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
           <DropdownMenuItem onClick={() => navigate('/platform')} className="gap-2.5">
             <Layers className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Plataforma
           </DropdownMenuItem>
+        )}
+        {/* Demo con datos e imágenes para explorar toda la plataforma (usuario maestro) */}
+        {user?.isPlatformOwner && (
+          <>
+            <DropdownMenuSeparator className="bg-[var(--color-app-border)]" />
+            {isDemoSession || !isSupabaseConfigured ? (
+              <DropdownMenuItem
+                onClick={() => {
+                  if (!window.confirm('¿Restablecer la demo? Se recargan los datos de ejemplo y se pierden los cambios hechos en ella.')) return;
+                  seedDemoData();
+                  window.location.assign('/');
+                }}
+                className="gap-2.5"
+              >
+                <RotateCcw className="h-4 w-4 text-[var(--color-app-text-muted)]" /> {isDemoSession ? 'Restablecer datos de la demo' : 'Cargar datos de demostración'}
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                onClick={() => {
+                  if (window.confirm('Entrarás a una demo con datos e imágenes de ejemplo. Tu cuenta y la base real no se modifican. ¿Continuar?')) enterDemo();
+                }}
+                className="gap-2.5"
+              >
+                <Sparkles className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Explorar demo
+              </DropdownMenuItem>
+            )}
+            {isDemoSession && (
+              <DropdownMenuItem onClick={exitDemo} className="gap-2.5">
+                <DoorOpen className="h-4 w-4 text-[var(--color-app-text-muted)]" /> Salir de la demo
+              </DropdownMenuItem>
+            )}
+          </>
         )}
         <DropdownMenuItem
           onClick={() => {

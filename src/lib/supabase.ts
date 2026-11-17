@@ -3,14 +3,27 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+/** Credenciales de Supabase presentes en el entorno. */
+const ENV_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http'));
+
+/** Llave del "modo demo" que activa el usuario maestro desde el menú de cuenta. */
+export const DEMO_MODE_KEY = 'kanri_demo_mode';
+
 /**
- * `true` cuando hay credenciales válidas de Supabase en el entorno.
- * Toda la capa de datos consulta este flag para decidir entre Supabase
- * real y los datos mock de demostración.
+ * Sesión de demostración: el usuario maestro activó "Explorar demo". La app usa
+ * datos de ejemplo locales (no toca la base real) hasta que sale de la demo.
  */
-export const isSupabaseConfigured: boolean = Boolean(
-  SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http')
-);
+export const isDemoSession: boolean = (() => {
+  if (!ENV_CONFIGURED) return false;
+  try { return localStorage.getItem(DEMO_MODE_KEY) === '1'; } catch { return false; }
+})();
+
+/**
+ * `true` cuando la app trabaja contra Supabase real. Toda la capa de datos
+ * consulta este flag para decidir entre Supabase y los datos de demostración
+ * (sin credenciales, o con la demo del usuario maestro activa).
+ */
+export const isSupabaseConfigured: boolean = ENV_CONFIGURED && !isDemoSession;
 
 /**
  * Cliente Supabase. Si no hay credenciales, se exporta `null` y los hooks

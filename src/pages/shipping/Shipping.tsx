@@ -75,11 +75,11 @@ export function Shipping() {
             Packing lists, etiquetas QR y portal de seguimiento para clientes.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <select
             value={creatingForProject}
             onChange={e => setCreatingForProject(e.target.value)}
-            className="h-9 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
+            className="h-10 px-3 rounded-md border border-[var(--color-app-border-strong)] bg-white text-sm w-full sm:w-72 min-w-0 focus:outline-none focus:ring-2 focus:ring-[var(--color-app-primary)]/40 focus:border-[var(--color-app-primary)]"
           >
             <option value="">Selecciona proyecto...</option>
             {projects.map(p => (

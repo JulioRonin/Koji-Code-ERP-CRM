@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEF0F4"/><stop offset="1" stop-color="#D9DEE7"/></linearGradient>
+<linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4F6F9"/><stop offset=".35" stop-color="#B9C0CB"/><stop offset=".6" stop-color="#E3E7ED"/><stop offset="1" stop-color="#8C95A3"/></linearGradient>
+<linearGradient id="steelV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7F8FA"/><stop offset=".3" stop-color="#C9CFD8"/><stop offset=".55" stop-color="#EEF1F5"/><stop offset="1" stop-color="#7F8896"/></linearGradient>
+<linearGradient id="alu" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFCFD"/><stop offset=".5" stop-color="#D6DBE2"/><stop offset="1" stop-color="#A9B1BC"/></linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5E6673"/><stop offset="1" stop-color="#2B3038"/></linearGradient>
+<linearGradient id="brass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3E3B5"/><stop offset=".5" stop-color="#C9A55A"/><stop offset="1" stop-color="#8E6F2C"/></linearGradient>
+<radialGradient id="hole" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#3A404A"/><stop offset="1" stop-color="#14171C"/></radialGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#16181D" flood-opacity=".22"/></filter>
+</defs>
+<rect width="800" height="600" fill="url(#bg)"/>
+<ellipse cx="400" cy="500" rx="250" ry="26" fill="#16181D" opacity=".10"/>
+<g filter="url(#sh)"><path d="M400 110 C540 110 640 200 640 320 C640 420 560 480 470 480 L470 520 L560 520 L560 560 L330 560 L330 520 L410 520 L410 470 C300 460 200 390 200 290 C200 190 290 110 400 110 Z" fill="url(#alu)" stroke="#8C95A3" stroke-width="3"/><circle cx="410" cy="300" r="120" fill="url(#steelV)" stroke="#9AA2AE" stroke-width="3"/><circle cx="410" cy="300" r="58" fill="url(#hole)"/><path d="M560 160 L700 160 L700 230 L600 230" fill="url(#alu)" stroke="#8C95A3" stroke-width="3"/><circle cx="660" cy="195" r="22" fill="url(#hole)"/></g>
+</svg>

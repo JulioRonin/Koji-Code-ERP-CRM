@@ -97,14 +97,22 @@ export function Panel({ title, actions, children, className, tone = 'white', sty
 export type StatTone = 'default' | 'accent' | 'accent-soft' | 'danger' | 'warning' | 'success' | 'muted';
 
 /** Número grande ligero con unidad (el "scoreboard" del diseño). */
-export function BigNumber({ value, unit, size = 'lg', className }: { value: ReactNode; unit?: ReactNode; size?: 'md' | 'lg' | 'xl'; className?: string }) {
+export function BigNumber({ value, unit, size = 'lg', className, fit = false }: {
+  value: ReactNode; unit?: ReactNode; size?: 'md' | 'lg' | 'xl'; className?: string;
+  /** Ajusta el tamaño al ancho disponible (el padre debe ser contenedor: `@container`). */
+  fit?: boolean;
+}) {
   const fs = { md: 'text-[32px]', lg: 'text-[40px] sm:text-[44px]', xl: 'text-[48px]' }[size];
+  const max = { md: 32, lg: 44, xl: 48 }[size];
+  // Largo del texto (cifra + unidad) para encogerlo y que nunca se salga de la tarjeta.
+  const len = (typeof value === 'string' || typeof value === 'number' ? String(value).length : 4) + (typeof unit === 'string' ? unit.length * 0.45 : 0);
+  const fitStyle = fit ? { fontSize: `min(${max}px, calc(168cqi / ${Math.max(len, 2.5)}))` } : undefined;
   return (
     <div className={cn('flex flex-wrap items-baseline gap-x-1 min-w-0', className)}>
-      <span className={cn(fs, 'font-light leading-none tracking-[-0.02em] whitespace-nowrap')}>
+      <span className={cn(!fit && fs, 'font-light leading-none tracking-[-0.02em] whitespace-nowrap')} style={fitStyle}>
         {typeof value === 'string' || typeof value === 'number' ? <AnimatedValue value={value} /> : value}
       </span>
-      {unit && <span className="text-[18px] sm:text-[20px] text-[var(--color-app-text-subtle)] whitespace-nowrap">{unit}</span>}
+      {unit && <span className="text-[18px] sm:text-[20px] text-[var(--color-app-text-subtle)] min-w-0">{unit}</span>}
     </div>
   );
 }
@@ -157,11 +165,11 @@ export function StatTile({ label, value, unit, sub, icon: Icon, tone = 'default'
       style={index != null ? { ['--i' as string]: index } : undefined}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className={cn('text-sm leading-tight', t.label)}>{label}</span>
+        <span className={cn('text-sm leading-tight min-w-0 break-words', t.label)}>{label}</span>
         {Icon && <Icon className={cn('h-4 w-4 shrink-0 opacity-60', t.label)} strokeWidth={1.7} />}
       </div>
-      <div className={t.value}>
-        <BigNumber value={value} unit={unit} />
+      <div className={cn('[container-type:inline-size]', t.value)}>
+        <BigNumber value={value} unit={unit} fit />
         {sub && <div className={cn('mt-1.5 text-[13px] truncate', tone === 'default' || tone === 'muted' || tone === 'success' ? 'text-[var(--color-app-text-muted)]' : t.label)}>{sub}</div>}
         {progress != null && <ProgressLine pct={progress} className="mt-3" color={tone === 'accent' ? 'var(--color-app-accent-ink)' : undefined} />}
       </div>

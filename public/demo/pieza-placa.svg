@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEF0F4"/><stop offset="1" stop-color="#D9DEE7"/></linearGradient>
+<linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4F6F9"/><stop offset=".35" stop-color="#B9C0CB"/><stop offset=".6" stop-color="#E3E7ED"/><stop offset="1" stop-color="#8C95A3"/></linearGradient>
+<linearGradient id="steelV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7F8FA"/><stop offset=".3" stop-color="#C9CFD8"/><stop offset=".55" stop-color="#EEF1F5"/><stop offset="1" stop-color="#7F8896"/></linearGradient>
+<linearGradient id="alu" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFCFD"/><stop offset=".5" stop-color="#D6DBE2"/><stop offset="1" stop-color="#A9B1BC"/></linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5E6673"/><stop offset="1" stop-color="#2B3038"/></linearGradient>
+<linearGradient id="brass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3E3B5"/><stop offset=".5" stop-color="#C9A55A"/><stop offset="1" stop-color="#8E6F2C"/></linearGradient>
+<radialGradient id="hole" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#3A404A"/><stop offset="1" stop-color="#14171C"/></radialGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#16181D" flood-opacity=".22"/></filter>
+</defs>
+<rect width="800" height="600" fill="url(#bg)"/>
+<ellipse cx="400" cy="500" rx="250" ry="26" fill="#16181D" opacity=".10"/>
+<g filter="url(#sh)"><polygon points="140,240 420,140 680,230 400,330" fill="url(#alu)"/><polygon points="140,240 400,330 400,370 140,280" fill="#9AA2AE"/><polygon points="400,330 680,230 680,270 400,370" fill="#7F8896"/><ellipse cx="247.6" cy="241.8" rx="13" ry="6.5" fill="url(#hole)"/><ellipse cx="393.2" cy="292.2" rx="13" ry="6.5" fill="url(#hole)"/><ellipse cx="314.8" cy="217.8" rx="13" ry="6.5" fill="url(#hole)"/><ellipse cx="460.4" cy="268.2" rx="13" ry="6.5" fill="url(#hole)"/><ellipse cx="382.0" cy="193.8" rx="13" ry="6.5" fill="url(#hole)"/><ellipse cx="527.6" cy="244.2" rx="13" ry="6.5" fill="url(#hole)"/><ellipse cx="443.6" cy="171.8" rx="13" ry="6.5" fill="url(#hole)"/><ellipse cx="589.2" cy="222.2" rx="13" ry="6.5" fill="url(#hole)"/><rect x="330" y="215" width="140" height="22" rx="11" fill="url(#hole)" transform="rotate(-19 400 226)"/></g>
+</svg>

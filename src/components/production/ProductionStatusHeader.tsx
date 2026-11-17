@@ -50,9 +50,9 @@ export function ProductionStatusHeader({
     <Card className="p-0 overflow-hidden">
       <CardContent className="p-5">
         {/* Fila 1: selector + medidor radial de Producción real */}
-        <div className="flex flex-col lg:flex-row lg:items-center gap-5">
+        <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-5">
           {/* Project selector */}
-          <div className="w-full lg:w-72 space-y-2 shrink-0">
+          <div className="w-full 2xl:w-72 space-y-2 shrink-0">
             <div className="flex items-center gap-2 text-xs font-medium text-[var(--color-app-text-muted)]">
               <Target className="h-3.5 w-3.5" />
               <span>Monitoreo por proyecto</span>

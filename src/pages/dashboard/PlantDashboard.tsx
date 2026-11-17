@@ -559,7 +559,7 @@ function DeliveriesTable({ projects, showMoney, className, amounts }: { projects
       title="Próximas entregas"
       actions={<Segmented<'14' | '30'> size="sm" value={range} onChange={setRange} items={[{ id: '14', label: '14 días' }, { id: '30', label: '30 días' }]} />}
     >
-      <div className="overflow-x-auto -mx-1 px-1">
+      <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[620px] border-separate border-spacing-0">
           <thead>
             <tr className="text-xs text-[var(--color-app-text-muted)] text-left">

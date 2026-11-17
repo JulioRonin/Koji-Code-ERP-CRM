@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEF0F4"/><stop offset="1" stop-color="#D9DEE7"/></linearGradient>
+<linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4F6F9"/><stop offset=".35" stop-color="#B9C0CB"/><stop offset=".6" stop-color="#E3E7ED"/><stop offset="1" stop-color="#8C95A3"/></linearGradient>
+<linearGradient id="steelV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7F8FA"/><stop offset=".3" stop-color="#C9CFD8"/><stop offset=".55" stop-color="#EEF1F5"/><stop offset="1" stop-color="#7F8896"/></linearGradient>
+<linearGradient id="alu" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFCFD"/><stop offset=".5" stop-color="#D6DBE2"/><stop offset="1" stop-color="#A9B1BC"/></linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5E6673"/><stop offset="1" stop-color="#2B3038"/></linearGradient>
+<linearGradient id="brass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3E3B5"/><stop offset=".5" stop-color="#C9A55A"/><stop offset="1" stop-color="#8E6F2C"/></linearGradient>
+<radialGradient id="hole" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#3A404A"/><stop offset="1" stop-color="#14171C"/></radialGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#16181D" flood-opacity=".22"/></filter>
+</defs>
+<rect width="800" height="600" fill="url(#bg)"/>
+<ellipse cx="400" cy="500" rx="250" ry="26" fill="#16181D" opacity=".10"/>
+<g filter="url(#sh)"><polygon points="599.8,280.0 599.8,300.0 569.4,303.7 567.2,320.6 595.5,332.0 590.4,351.4 560.1,347.1 553.6,362.8 578.0,381.2 568.0,398.5 539.9,386.6 529.5,400.1 548.3,424.2 534.2,438.3 510.1,419.5 496.6,429.9 508.5,458.0 491.2,468.0 472.8,443.6 457.1,450.1 461.4,480.4 442.0,485.5 430.6,457.2 413.7,459.4 410.0,489.8 390.0,489.8 386.3,459.4 369.4,457.2 358.0,485.5 338.6,480.4 342.9,450.1 327.2,443.6 308.8,468.0 291.5,458.0 303.4,429.9 289.9,419.5 265.8,438.3 251.7,424.2 270.5,400.1 260.1,386.6 232.0,398.5 222.0,381.2 246.4,362.8 239.9,347.1 209.6,351.4 204.5,332.0 232.8,320.6 230.6,303.7 200.2,300.0 200.2,280.0 230.6,276.3 232.8,259.4 204.5,248.0 209.6,228.6 239.9,232.9 246.4,217.2 222.0,198.8 232.0,181.5 260.1,193.4 270.5,179.9 251.7,155.8 265.8,141.7 289.9,160.5 303.4,150.1 291.5,122.0 308.8,112.0 327.2,136.4 342.9,129.9 338.6,99.6 358.0,94.5 369.4,122.8 386.3,120.6 390.0,90.2 410.0,90.2 413.7,120.6 430.6,122.8 442.0,94.5 461.4,99.6 457.1,129.9 472.8,136.4 491.2,112.0 508.5,122.0 496.6,150.1 510.1,160.5 534.2,141.7 548.3,155.8 529.5,179.9 539.9,193.4 568.0,181.5 578.0,198.8 553.6,217.2 560.1,232.9 590.4,228.6 595.5,248.0 567.2,259.4 569.4,276.3" fill="url(#steel)" stroke="#7F8896" stroke-width="3"/><circle cx="400" cy="290" r="120" fill="url(#steelV)" opacity=".7"/><circle cx="400" cy="290" r="55" fill="url(#hole)"/><rect x="390" y="225" width="20" height="16" fill="url(#hole)"/></g>
+</svg>

@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { UserMenu } from './UserMenu';
+import { OnlineUsers } from './OnlineUsers';
 
 /** Tile de marca: logo de la empresa o sus iniciales sobre tinta. */
 export function BrandTile({ size = 44 }: { size?: number }) {
@@ -104,6 +105,9 @@ export function TopBar({ onOpenNav, onOpenSearch }: TopBarProps) {
       </nav>
 
       <div className="flex-1" />
+
+      {/* Equipo conectado (clic → mensaje directo) */}
+      <OnlineUsers />
 
       {/* Búsqueda / paleta de comandos */}
       <button
