@@ -63,6 +63,10 @@ export interface QuoteItemCostInput {
   quantity: number;
 }
 
+export function roundCents(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
 export function computeQuoteItem(input: QuoteItemCostInput): {
   materialCost: number;
   machiningCost: number;
@@ -73,8 +77,10 @@ export function computeQuoteItem(input: QuoteItemCostInput): {
   const materialCost = input.material_qty * input.material_unit_cost;
   const machiningCost = input.machining_hours * input.machine_rate;
   const baseCost = materialCost + machiningCost + input.extra_cost;
-  const unitPrice = baseCost * (1 + input.margin_pct / 100);
-  const lineTotal = unitPrice * input.quantity;
+  // El precio unitario se cotiza en centavos exactos; el importe sale de ese
+  // precio ya redondeado para que unitario × cantidad cuadre en el PDF.
+  const unitPrice = roundCents(baseCost * (1 + input.margin_pct / 100));
+  const lineTotal = roundCents(unitPrice * input.quantity);
   return { materialCost, machiningCost, baseCost, unitPrice, lineTotal };
 }
 

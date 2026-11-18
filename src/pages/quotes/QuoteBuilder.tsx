@@ -825,7 +825,7 @@ export function QuoteBuilder() {
                         type="number"
                         className="h-8 text-xs"
                         placeholder={String(marginDefault)}
-                        value={it.margin_pct ?? ''}
+                        value={it.margin_pct == null ? '' : Math.round(it.margin_pct * 100) / 100}
                         onChange={e =>
                           patchItem(i, { margin_pct: e.target.value === '' ? null : Number(e.target.value) })
                         }
@@ -877,8 +877,10 @@ export function QuoteBuilder() {
                                   const price = Number(e.target.value);
                                   if (!(price > 0) || Math.abs(price - it.unit_price) < 0.005) return;
                                   if (baseCost > 0) {
-                                    // Precio deseado → margen implícito.
-                                    patchItem(i, { margin_pct: Number((((price / baseCost) - 1) * 100).toFixed(2)) });
+                                    // Precio deseado → margen implícito. Se guarda con
+                                    // precisión completa: redondearlo (p. ej. 41.18 %)
+                                    // regresaba un unitario con centavos de más o de menos.
+                                    patchItem(i, { margin_pct: ((price / baseCost) - 1) * 100 });
                                   } else {
                                     // Sin costos capturados: el precio se vuelve el costo directo con margen 0.
                                     patchItem(i, { extra_cost: price, margin_pct: 0 });
